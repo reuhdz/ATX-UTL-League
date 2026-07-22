@@ -49,7 +49,17 @@ body {
   margin: 0; font-family: var(--font); color: var(--text);
   background: var(--bg-grad), var(--bg); background-attachment: fixed;
   min-height: 100vh; line-height: 1.5;
+  overflow-x: clip; /* backstop: never allow horizontal page scroll / zoom-out */
 }
+
+/* --- Prevent intrinsic content from forcing the page wider than the screen ---
+   Grid & flex items default to min-width:auto, so a wide table/chart can blow out
+   the whole layout on mobile. Let these containers shrink and scroll internally. */
+.grid-2 > *, .stat-cards > *, .team-grid > *, .rounds > *, .media-grid > *,
+.study-list > *, .rules-grid > *, .index-grid > *, .prof-grid > *, .mini-stats > * { min-width: 0; }
+.panel, .chart-wrap, .table-scroll, .prof-grid, .spot-card, .media-body { min-width: 0; }
+.table-scroll { max-width: 100%; }
+img, canvas, video, table { max-width: 100%; }
 
 /* ---- Header -------------------------------------------------------------- */
 .app-header {
@@ -465,7 +475,13 @@ code { background: var(--surface-2); padding: 2px 6px; border-radius: 6px; font-
   .brand-title { font-size: 20px; }
   .brand-sub { font-size: 11px; }
   .featured h3 { font-size: 18px; }
-  .modal-card { padding: 16px; }
+  .modal-overlay { padding: 10px; }
+  .modal-card { padding: 15px; max-height: 92vh; }
+  .modal-head { flex-wrap: wrap; gap: 10px; }
+  .modal-head #profile-close { margin-left: auto; }
+  .prof-id h2 { font-size: 18px; }
+  .prof-avatar { width: 40px; height: 40px; font-size: 18px; }
+  .mini-stats { grid-template-columns: repeat(3, 1fr); }
   .att-summary { grid-template-columns: 1fr 1fr; }
 }
 @media (max-width: 400px) {
