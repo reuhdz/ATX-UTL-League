@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark" data-preset="aqua">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="theme-color" content="#0b1a2b" />
+<meta name="description" content="ATX UTL — Austin Underwater Torpedo League Season 1 dashboard: standings, rosters, player profiles, stats, media and research." />
+<title>ATX UTL — Season Dashboard</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%8A%3C/text%3E%3C/svg%3E" />
+<link rel="stylesheet" href="css/styles.css" />
+</head>
+<body>
+<!-- ============================ HEADER ============================ -->
+<header class="app-header">
+  <div class="brand">
+    <span class="brand-mark">🌊</span>
+    <div>
+      <h1 class="brand-title">ATX <span>UTL</span></h1>
+      <p class="brand-sub" id="brand-sub">Austin Underwater Torpedo League</p>
+    </div>
+  </div>
+
+  <div class="header-actions">
+    <div class="preset-picker" title="Accent preset">
+      <button class="chip" data-preset="aqua">Aqua</button>
+      <button class="chip" data-preset="reef">Reef</button>
+      <button class="chip" data-preset="abyss">Abyss</button>
+    </div>
+    <button id="theme-toggle" class="icon-btn" title="Toggle light / dark" aria-label="Toggle theme">🌙</button>
+    <button id="menu-toggle" class="icon-btn only-mobile" aria-label="Menu">☰</button>
+  </div>
+</header>
+
+<!-- ============================ TABS ============================ -->
+<nav class="main-tabs" id="tabs" role="tablist" aria-label="Sections">
+  <button class="tab-btn active" data-tab="dashboard" role="tab">📊 Dashboard</button>
+  <button class="tab-btn" data-tab="teams" role="tab">🛡️ Teams</button>
+  <button class="tab-btn" data-tab="roster" role="tab">👤 Roster</button>
+  <button class="tab-btn" data-tab="schedule" role="tab">🗓️ Schedule</button>
+  <button class="tab-btn" data-tab="stats" role="tab">📈 Stats</button>
+  <button class="tab-btn" data-tab="media" role="tab">🎬 Media</button>
+  <button class="tab-btn" data-tab="attendance" role="tab">✅ Attendance</button>
+  <button class="tab-btn" data-tab="research" role="tab">🔬 Research</button>
+  <button class="tab-btn" data-tab="faq" role="tab">📖 Rules &amp; FAQ</button>
+</nav>
+
+<!-- ============================ MAIN ============================ -->
+<main id="view" class="view"></main>
+
+<div id="profile-modal" class="modal-overlay" hidden>
+  <div class="modal-card" id="profile-card" role="dialog" aria-modal="true" aria-label="Player profile"></div>
+</div>
+
+<footer class="app-footer">
+  <span id="footer-venue">Deepend Fitness — Austin, Texas</span>
+  <span class="dot">•</span>
+  <span>ATX UTL · Season 1 · demo data</span>
+</footer>
+
+<script src="vendor/chart.umd.js"></script>
+<script src="js/data.js"></script>
+<script src="js/content.js"></script>
+<script src="js/charts.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

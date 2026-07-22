@@ -1,0 +1,12 @@
+# OS / editor cruft
+.DS_Store
+Thumbs.db
+*.log
+.idea/
+.vscode/
+
+# local dev only (not needed on GitHub Pages)
+.preview-server.js
+
+# node (only if you ever add tooling)
+node_modules/
