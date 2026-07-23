@@ -1,0 +1,18 @@
+flowchart LR
+    Seed([LEAGUE.seed]) --> RNG[mulberry32 rng]
+    RNG --> Sched[buildSchedule]
+    Sched --> Asm[MATCHES IIFE]
+    RNG --> Play[playMatch per final]
+    Play --> Line[lineup + nextGuest]
+    Play --> Score[genGoals]
+    Play --> Box[boxFor]
+    Asm --> DB[DB derivations]
+    Box --> DB
+    DB --> UI[app.js tabs + charts]
+
+    classDef decision fill:#E8F0FE,stroke:#1A73E8,color:#0B3D91;
+    classDef process fill:#FEF7E0,stroke:#F9AB00,color:#9C5400;
+    classDef io fill:#E6F4EA,stroke:#137333,color:#0D652D;
+    classDef external fill:#FCE8E6,stroke:#D93025,color:#8C1D18;
+    class Seed io;
+    class RNG,Sched,Asm,Play,Line,Score,Box,DB,UI process;

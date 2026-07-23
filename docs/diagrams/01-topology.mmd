@@ -1,0 +1,41 @@
+flowchart LR
+    subgraph Clients["Clients"]
+        Browser([Browser])
+    end
+
+    subgraph Site["Static site (repo root)"]
+        HTML[index.html]
+        CSS[css/styles.css]
+        DATA[js/data.js]
+        CONTENT[js/content.js]
+        CHARTS[js/charts.js]
+        APP[js/app.js]
+        VENDOR[vendor/chart.umd.js]
+    end
+
+    subgraph Deploy["GitHub Pages"]
+        GHA[deploy.yml workflow]
+        Pages([Published site])
+    end
+
+    Browser --> HTML
+    HTML --> CSS
+    HTML --> VENDOR
+    HTML --> DATA
+    HTML --> CONTENT
+    HTML --> CHARTS
+    HTML --> APP
+    DATA --> APP
+    CONTENT --> APP
+    CHARTS --> APP
+    VENDOR --> CHARTS
+    GHA --> Pages
+    Pages --> Browser
+
+    classDef decision fill:#E8F0FE,stroke:#1A73E8,color:#0B3D91;
+    classDef process fill:#FEF7E0,stroke:#F9AB00,color:#9C5400;
+    classDef io fill:#E6F4EA,stroke:#137333,color:#0D652D;
+    classDef external fill:#FCE8E6,stroke:#D93025,color:#8C1D18;
+    class Browser,Pages io;
+    class HTML,CSS,DATA,CONTENT,CHARTS,APP,VENDOR process;
+    class GHA external;

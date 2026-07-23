@@ -1,0 +1,19 @@
+sequenceDiagram
+    autonumber
+    actor User as User
+    participant Tabs as Tab buttons
+    participant Router as go() in app.js
+    participant Render as Tab renderer
+    participant DB as window.DB
+    participant Charts as ChartHub
+
+    User->>Tabs: Click tab or restore from localStorage
+    Tabs->>Router: go(tabId)
+    Router->>Router: Update active tab + scroll top
+    Router->>Render: ROUTES[tabId]()
+    Render->>DB: standings / ratedPlayers / matches / etc.
+    DB-->>Render: Derived data
+    Render->>Render: innerHTML into #view
+    Render->>Charts: bar / line / radar / doughnut
+    Router->>Router: wrapTables(view)
+    Router->>Router: localStorage atxutl.tab = tabId

@@ -1,0 +1,13 @@
+flowchart LR
+    Push([Push to main]) --> Checkout[actions/checkout@v4]
+    Checkout --> Configure[configure-pages@v5]
+    Configure --> Upload[upload-pages-artifact@v3]
+    Upload --> Deploy[deploy-pages@v4]
+    Deploy --> Live([GitHub Pages URL])
+
+    classDef decision fill:#E8F0FE,stroke:#1A73E8,color:#0B3D91;
+    classDef process fill:#FEF7E0,stroke:#F9AB00,color:#9C5400;
+    classDef io fill:#E6F4EA,stroke:#137333,color:#0D652D;
+    classDef external fill:#FCE8E6,stroke:#D93025,color:#8C1D18;
+    class Push,Live io;
+    class Checkout,Configure,Upload,Deploy process;

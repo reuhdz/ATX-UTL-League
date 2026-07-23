@@ -1,0 +1,59 @@
+flowchart LR
+    subgraph Source["Single source of truth"]
+        LEAGUE[LEAGUE.seed]
+        TEAMS[TEAMS]
+        PLAYERS[PLAYERS]
+        PRNG[mulberry32 PRNG]
+    end
+
+    subgraph Generated["Generated at load time"]
+        SCHED[buildSchedule]
+        MATCHES[MATCHES ~70% final]
+        AVAIL[AVAILABILITY grid]
+    end
+
+    subgraph Derived["DB derivations"]
+        STAND[standings]
+        RATED[ratedPlayers]
+        TOTALS[playerTotals]
+        LOG[gameLog]
+        ATT[attendancePct]
+    end
+
+    subgraph UI["app.js tabs"]
+        Dash[Dashboard]
+        Teams[Teams]
+        Roster[Roster]
+        Stats[Stats + ChartHub]
+        Other[Schedule · Media · Attendance · Research · FAQ]
+    end
+
+    LEAGUE --> PRNG
+    PRNG --> SCHED
+    TEAMS --> SCHED
+    SCHED --> MATCHES
+    PRNG --> MATCHES
+    PLAYERS --> MATCHES
+    PRNG --> AVAIL
+    MATCHES --> STAND
+    MATCHES --> TOTALS
+    TOTALS --> RATED
+    PLAYERS --> RATED
+    MATCHES --> LOG
+    AVAIL --> ATT
+    STAND --> Dash
+    RATED --> Dash
+    STAND --> Teams
+    RATED --> Roster
+    RATED --> Stats
+    STAND --> Stats
+    MATCHES --> Other
+    AVAIL --> Other
+
+    classDef decision fill:#E8F0FE,stroke:#1A73E8,color:#0B3D91;
+    classDef process fill:#FEF7E0,stroke:#F9AB00,color:#9C5400;
+    classDef io fill:#E6F4EA,stroke:#137333,color:#0D652D;
+    classDef external fill:#FCE8E6,stroke:#D93025,color:#8C1D18;
+    class LEAGUE,TEAMS,PLAYERS,PRNG io;
+    class SCHED,MATCHES,AVAIL,STAND,RATED,TOTALS,LOG,ATT process;
+    class Dash,Teams,Roster,Stats,Other io;

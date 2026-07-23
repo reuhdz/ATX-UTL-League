@@ -1,0 +1,57 @@
+flowchart TB
+    subgraph Repo["ATX-UTL repo"]
+        subgraph Shell["index.html"]
+            Header[Header + theming controls]
+            Tabs[Tab navigation]
+            View[#view container]
+            Modal[Player profile modal]
+        end
+
+        subgraph Styles["css/styles.css"]
+            Themes[data-theme dark/light]
+            Presets[data-preset aqua/reef/abyss]
+            Responsive[Mobile hamburger + table scroll]
+        end
+
+        subgraph DataLayer["js/data.js"]
+            League[LEAGUE + RATING constants]
+            Roster[TEAMS + PLAYERS]
+            Generator[Seeded PRNG season]
+            DBObj[window.DB derivations]
+        end
+
+        subgraph Editorial["js/content.js"]
+            RulesFAQ[RULES + FAQ]
+            Research[RESEARCH library]
+            Media[MEDIA + stat glossaries]
+        end
+
+        subgraph Charts["js/charts.js"]
+            ChartHub[ChartHub registry]
+        end
+
+        subgraph App["js/app.js"]
+            Router[ROUTES + go()]
+            Renderers[Tab render functions]
+            ThemeInit[Theming + localStorage]
+            Clicks[Global click delegation]
+        end
+
+        Vendor[vendor/chart.umd.js]
+    end
+
+    Shell --> Styles
+    Shell --> DataLayer
+    Shell --> Editorial
+    Shell --> Charts
+    Shell --> App
+    Vendor --> Charts
+    DataLayer --> App
+    Editorial --> App
+    Charts --> App
+
+    classDef decision fill:#E8F0FE,stroke:#1A73E8,color:#0B3D91;
+    classDef process fill:#FEF7E0,stroke:#F9AB00,color:#9C5400;
+    classDef io fill:#E6F4EA,stroke:#137333,color:#0D652D;
+    classDef external fill:#FCE8E6,stroke:#D93025,color:#8C1D18;
+    class Shell,Styles,DataLayer,Editorial,Charts,App,Vendor process;
