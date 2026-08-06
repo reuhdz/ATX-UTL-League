@@ -85,8 +85,10 @@ const FAQ = [
   {
     q: 'How is the schedule structured?',
     a:
-      'Season 1 is a double round-robin — every team plays every other team twice. ' +
-      'Standings use 3 points for a win, 1 for a draw, 0 for a loss.',
+      'Season 5 runs 8 weeks — Sunday league nights starting August 23, 2026. ' +
+      'Each team plays once per week (two games per night). Every team faces every ' +
+      'opponent multiple times across the season. Standings use 3 points for a win, ' +
+      '1 for a draw, 0 for a loss.',
   },
   {
     q: 'Where does ATX UTL play?',
@@ -212,7 +214,7 @@ const MEDIA = {
   // Each game tile links to a folder of uploaded clips. Point this at wherever
   // your clips live (a relative folder next to the site, a Google Drive folder,
   // an S3 bucket, etc.). The per-game folder slug is appended, e.g.
-  //   clips/r5-makos-vs-carp/
+  //   clips/r5-capybara-vs-splash-damage/
   filmBase: 'clips/',
 
   featured: {
@@ -227,15 +229,15 @@ const MEDIA = {
       'runs and goal-line stands. (Links out to UTL footage.)',
   },
   items: [
-    { kind: 'photo', title: 'Makos vs Legion — Round 4 opener', team: 'makos', date: '2026-06-28', tag: 'Game photo', hue: 200 },
-    { kind: 'video', title: 'Lesley’s buzzer-beater from the throw-off', team: 'makos', date: '2026-06-28', tag: 'Highlight', hue: 195 },
-    { kind: 'photo', title: 'Carp defensive wall holds the line', team: 'carp', date: '2026-06-21', tag: 'Game photo', hue: 38 },
-    { kind: 'video', title: 'George hat-trick reel', team: 'carp', date: '2026-06-21', tag: 'Highlight', hue: 40 },
-    { kind: 'photo', title: 'Chlorine Crocs pre-dive huddle', team: 'crocs', date: '2026-06-14', tag: 'Behind the scenes', hue: 140 },
-    { kind: 'video', title: 'Glenn’s goal-line steal of the season', team: 'crocs', date: '2026-06-14', tag: 'Highlight', hue: 150 },
-    { kind: 'photo', title: 'Legion rookies’ first league night', team: 'legion', date: '2026-06-07', tag: 'Game photo', hue: 0 },
-    { kind: 'video', title: 'SK breaks the lockout — fast break', team: 'legion', date: '2026-06-07', tag: 'Highlight', hue: 5 },
-    { kind: 'photo', title: 'Deepend Fitness — 14 ft arena', date: '2026-06-07', tag: 'Venue', hue: 210 },
+    { kind: 'photo', title: 'Capybara vs Splash Damage — Week 4 opener', team: 'capybara', date: '2026-09-13', tag: 'Game photo', hue: 200 },
+    { kind: 'video', title: 'Lesley’s buzzer-beater from the throw-off', team: 'capybara', date: '2026-09-13', tag: 'Highlight', hue: 195 },
+    { kind: 'photo', title: 'Team 2 defensive wall holds the line', team: 'team2', date: '2026-09-06', tag: 'Game photo', hue: 38 },
+    { kind: 'video', title: 'Manny hat-trick reel', team: 'team2', date: '2026-09-06', tag: 'Highlight', hue: 40 },
+    { kind: 'photo', title: 'Hellfish pre-dive huddle', team: 'team1', date: '2026-08-30', tag: 'Behind the scenes', hue: 140 },
+    { kind: 'video', title: 'Glenn’s goal-line steal of the season', team: 'team1', date: '2026-08-30', tag: 'Highlight', hue: 150 },
+    { kind: 'photo', title: 'Splash Damage rookies’ first league night', team: 'team3', date: '2026-08-23', tag: 'Game photo', hue: 0 },
+    { kind: 'video', title: 'River breaks the lockout — fast break', team: 'team3', date: '2026-08-23', tag: 'Highlight', hue: 5 },
+    { kind: 'photo', title: 'Deepend Fitness — 14 ft arena', date: '2026-08-23', tag: 'Venue', hue: 210 },
   ],
 };
 

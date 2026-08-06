@@ -8,6 +8,7 @@ const $ = (sel, root = document) => root.querySelector(sel);
 const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
 
 let teamHighlight = null; // set when navigating via a team link
+let scrollTarget = null;  // CSS selector to scroll to after tab change
 
 /* ---------- small helpers ------------------------------------------------- */
 const teamColor = (id) => (DB.team(id) || {}).color || '#94a3b8';
@@ -18,15 +19,14 @@ const diff = (n) => (n > 0 ? `+${n}` : `${n}`);
 function teamPill(id) {
   if (id === 'fa') return `<span class="team-pill fa">Free Agent</span>`;
   const t = DB.team(id);
-  return `<button class="team-pill link" data-team="${id}" style="--tc:${t.color}">${t.emoji} ${t.name}</button>`;
+  return `<button class="team-pill link" data-team="${id}" style="--tc:${t.color}">${t.name}</button>`;
 }
-const teamBadge = (id) => (id === 'fa' ? 'Free Agent'
-  : `${DB.team(id).emoji} ${DB.team(id).name}`);
+const teamBadge = (id) => (id === 'fa' ? 'Free Agent' : DB.team(id).name);
 
 function teamTag(id) {
   if (id === 'fa') return `<span class="team-tag">Free Agent</span>`;
   const t = DB.team(id);
-  return `<span class="team-tag" style="--tc:${t.color}">${t.emoji} ${t.name}</span>`;
+  return `<span class="team-tag" style="--tc:${t.color}">${t.name}</span>`;
 }
 function playerLink(id, label) {
   const p = DB.player(id);
@@ -35,6 +35,17 @@ function playerLink(id, label) {
 function levelTag(level) {
   const cls = level === 'Rookie' ? 'rookie' : level.includes('IR') ? 'ir' : 'pro';
   return `<span class="lvl-tag ${cls}">${level}</span>`;
+}
+function playerPos(p, matches) {
+  const mp = matches ?? p.matches ?? 0;
+  return mp > 0 ? p.pos : '';
+}
+function posTag(p, matches) {
+  const pos = playerPos(p, matches);
+  return pos ? `<span class="pos-tag">${pos}</span>` : '<span class="muted">—</span>';
+}
+function posSuffix(p) {
+  return p.matches ? ` · ${p.pos}` : '';
 }
 function infoIcon(html) {
   return `<span class="info"><span class="info-i" tabindex="0" role="button" aria-label="More info">ⓘ</span><span class="info-pop">${html}</span></span>`;
@@ -61,19 +72,37 @@ function renderDashboard() {
   const upcoming = DB.upcoming();
   const totalGoals = finals.reduce((s, m) => s + m.homeScore + m.awayScore, 0);
   const leader = rated[0];
-  const topScorer = [...rated].sort((a, b) => b.goals - a.goals)[0];
+  // Golden Torpedo: Goals×2 + Assists×1 (goals weighted higher)
+  const topScorer = [...rated].sort((a, b) =>
+    DB.torpedoScore(b) - DB.torpedoScore(a) || b.goals - a.goals)[0];
+  // Golden Glove: Blocks×2 + Steals×1 (blocks weighted higher)
+  const topDefense = [...rated].sort((a, b) =>
+    DB.gloveScore(b) - DB.gloveScore(a) || b.blocks - a.blocks)[0];
 
   const cards = [
     { icon: '🎮', label: 'Matches played', value: finals.length, sub: `${upcoming.length} upcoming` },
-    { icon: '🥅', label: 'Total goals', value: totalGoals, sub: `${(totalGoals / (finals.length || 1)).toFixed(1)} per game` },
-    { icon: '⭐', label: 'Top rated', value: leader.name, sub: `${teamBadge(leader.teamId)} · ${leader.rating}/10` },
-    { icon: '🔥', label: 'Golden torpedo', value: topScorer.name, sub: `${topScorer.goals} goals` },
+    { icon: '🥅', label: 'Total goals', value: totalGoals, sub: finals.length ? `${(totalGoals / finals.length).toFixed(1)} per game` : 'Season not started' },
+    {
+      icon: '⭐', label: 'Top rated', info: ratingInfoHtml(),
+      value: leader ? playerLink(leader.playerId) : '—',
+      sub: leader ? `${teamBadge(leader.teamId)} · ${leader.rating}/10` : 'No games yet',
+    },
+    {
+      icon: '🔥', label: 'Golden Torpedo', info: goldenTorpedoInfoHtml(),
+      value: topScorer ? playerLink(topScorer.playerId) : '—',
+      sub: topScorer ? `${topScorer.goals} goals · ${topScorer.assists} assists` : 'No offense yet',
+    },
+    {
+      icon: '🧤', label: 'Golden Glove', info: goldenGloveInfoHtml(),
+      value: topDefense ? playerLink(topDefense.playerId) : '—',
+      sub: topDefense ? `${topDefense.steals} steals · ${topDefense.blocks} blocks` : 'No defense yet',
+    },
   ];
 
   view.innerHTML = `
     <div class="page-head">
-      <h2>Season Dashboard</h2>
-      <p class="muted">${DB.league.season} · ${DB.league.full} · ${DB.league.venue}</p>
+      <h2>${DB.league.season} Overview</h2>
+      <p class="muted">Starts ${fmtDate(DB.league.startDate)} · ${DB.league.weeks} weeks</p>
     </div>
 
     <div class="stat-cards">
@@ -82,7 +111,7 @@ function renderDashboard() {
           <div class="stat-icon">${c.icon}</div>
           <div class="stat-body">
             <div class="stat-value">${c.value}</div>
-            <div class="stat-label">${c.label}</div>
+            <div class="stat-label">${c.label}${c.info ? ' ' + infoIcon(c.info) : ''}</div>
             <div class="stat-sub">${c.sub}</div>
           </div>
         </div>`).join('')}
@@ -115,16 +144,16 @@ function renderDashboard() {
       <section class="panel">
         <div class="panel-head">
           <h3>⭐ Top players ${infoIcon(ratingInfoHtml())}</h3>
-          <span class="muted small">rating</span>
+          <button class="text-link" data-goto="teams" data-scroll="#full-roster">View all →</button>
         </div>
         <ul class="leader-list">
-          ${rated.slice(0, 7).map((p, i) => `
+          ${rated.length ? rated.slice(0, 7).map((p, i) => `
             <li>
               <span class="lead-rank">${i + 1}</span>
               <span class="lead-name">${playerLink(p.playerId)}<small>${teamBadge(p.teamId)}</small></span>
               <span class="lead-stat">${p.goals}G · ${p.assists}A</span>
               <span class="rating-badge">${p.rating}</span>
-            </li>`).join('')}
+            </li>`).join('') : '<li class="muted">No games played yet. <button class="text-link" data-goto="teams" data-scroll="#full-roster">See roster →</button></li>'}
         </ul>
       </section>
     </div>
@@ -138,7 +167,7 @@ function renderDashboard() {
       </section>
       <section class="panel">
         <div class="panel-head"><h3>📋 Recent results</h3></div>
-        <div class="fixture-list">${[...finals].slice(-4).reverse().map(resultRow).join('')}</div>
+        <div class="fixture-list">${finals.length ? [...finals].slice(-4).reverse().map(resultRow).join('') : '<p class="muted">No results yet.</p>'}</div>
       </section>
     </div>
 
@@ -164,17 +193,31 @@ function ratingInfoHtml() {
   return '<b>How ratings work</b><span class="gl">' + DB.rating.describe + '</span>' +
     '<span class="gl">Weights: ' + Object.entries(w).map(([k, v]) => `${k} ${v > 0 ? '+' : ''}${v}`).join(', ') + '</span>';
 }
+function goldenTorpedoInfoHtml() {
+  const w = DB.awards.torpedo;
+  return '<b>Golden Torpedo</b>' +
+    '<span class="gl">Awarded to the league’s top offensive player for the season.</span>' +
+    `<span class="gl"><b>How it’s calculated</b> — Offense score = Goals×${w.goals} + Assists×${w.assists}. Highest score wins; ties break by Goals.</span>` +
+    '<span class="gl">Goals are weighted higher so finishers lead, but playmakers still climb the board with assists.</span>';
+}
+function goldenGloveInfoHtml() {
+  const w = DB.awards.glove;
+  return '<b>Golden Glove</b>' +
+    '<span class="gl">Awarded to the league’s top defensive player for the season.</span>' +
+    `<span class="gl"><b>How it’s calculated</b> — Defense score = Blocks×${w.blocks} + Steals×${w.steals}. Highest score wins; ties break by Blocks.</span>` +
+    '<span class="gl">Blocks are weighted higher so shot-stoppers lead, but takeaways still count toward the award.</span>';
+}
 
 function fixtureRow(m) {
   return `<div class="fixture">
-      <span class="fx-date">${fmtDate(m.date)} · R${m.round}</span>
+      <span class="fx-date">${fmtDate(m.date)} · W${m.round}</span>
       <span class="fx-teams">${teamPill(m.home)} <em>vs</em> ${teamPill(m.away)}</span>
     </div>`;
 }
 function resultRow(m) {
   const hw = m.homeScore > m.awayScore, aw = m.awayScore > m.homeScore;
   return `<div class="fixture">
-      <span class="fx-date">${fmtDate(m.date)} · R${m.round}</span>
+      <span class="fx-date">${fmtDate(m.date)} · W${m.round}</span>
       <span class="fx-teams">${teamPill(m.home)}
         <b class="score ${hw ? 'win' : ''}">${m.homeScore}</b><em>–</em><b class="score ${aw ? 'win' : ''}">${m.awayScore}</b>
         ${teamPill(m.away)}</span>
@@ -182,72 +225,15 @@ function resultRow(m) {
 }
 
 /* =============================================================================
-   TEAMS
-   ============================================================================ */
-function renderTeams() {
-  const standings = DB.standings();
-  const rankOf = {}; standings.forEach((s, i) => (rankOf[s.teamId] = i + 1));
-  const totals = DB.playerTotals();
-
-  view.innerHTML = `
-    <div class="page-head"><h2>Teams</h2><p class="muted">Rosters, records and form. Tap a player for their profile.</p></div>
-    <div class="team-grid">
-      ${DB.teams.map((t) => {
-        const s = standings.find((x) => x.teamId === t.id);
-        const roster = DB.rosterOf(t.id);
-        const next = DB.nextGameFor(t.id);
-        const tt = DB.teamTotals(t.id);
-        return `
-          <section class="team-card ${teamHighlight === t.id ? 'flash' : ''}" id="team-${t.id}" style="--tc:${t.color}">
-            <div class="team-card-head">
-              <span class="team-emoji">${t.emoji}</span>
-              <div><h3>${t.name}</h3><span class="muted small">Captain: ${t.captain}</span></div>
-              <span class="team-rank">#${rankOf[t.id]}</span>
-            </div>
-            <div class="team-record">
-              <span><b>${s.w}</b>W</span><span><b>${s.d}</b>D</span><span><b>${s.l}</b>L</span>
-              <span class="sep"></span><span><b>${s.pts}</b> pts</span>
-            </div>
-            <div class="team-mini-stats">
-              <span>🥅 ${tt.goals}</span><span>🎯 ${tt.assists}</span><span>🖐️ ${tt.steals}</span><span>🧱 ${tt.blocks}</span>
-            </div>
-            <ul class="roster-mini">
-              ${roster.map((p) => `
-                <li>
-                  <span class="rm-name">${playerLink(p.id)}${p.name === t.captain ? ' <span class="cap">C</span>' : ''} ${levelTag(p.level)}</span>
-                  <span class="rm-pos">${p.pos}</span>
-                  <span class="rm-goals">${totals[p.id].goals}G</span>
-                </li>`).join('')}
-            </ul>
-            <div class="team-next">${next ? `Next: ${fmtDate(next.date)} vs ${DB.teamName(next.home === t.id ? next.away : next.home)}` : 'Season complete'}</div>
-          </section>`;
-      }).join('')}
-    </div>
-
-    <section class="panel">
-      <div class="panel-head"><h3>🧢 Free agents</h3><span class="muted small">guest into lineups</span></div>
-      <div class="fa-grid">
-        ${DB.freeAgents().map((p) => `
-          <div class="fa-chip">${playerLink(p.id)} ${levelTag(p.level)}</div>`).join('')}
-      </div>
-    </section>
-  `;
-
-  if (teamHighlight) {
-    const node = $(`#team-${teamHighlight}`);
-    node?.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    setTimeout(() => node?.classList.remove('flash'), 1600);
-    teamHighlight = null;
-  }
-}
-
-/* =============================================================================
-   ROSTER
+   TEAMS & ROSTER
    ============================================================================ */
 let rosterSort = { key: 'rating', dir: -1 };
 let rosterFilter = 'all';
 
-function renderRoster() {
+function renderTeamsRoster() {
+  const standings = DB.standings();
+  const rankOf = {}; standings.forEach((s, i) => (rankOf[s.teamId] = i + 1));
+  const totals = DB.playerTotals();
   const rated = DB.ratedPlayers();
   const cols = [
     ['rating', 'Rating'], ['name', 'Name'], ['teamId', 'Team'], ['level', 'Lvl'], ['pos', 'Pos'],
@@ -268,30 +254,53 @@ function renderRoster() {
         <td class="strong">${playerLink(p.playerId)}</td>
         <td>${teamPill(p.teamId)}</td>
         <td>${levelTag(p.level)}</td>
-        <td><span class="pos-tag">${p.pos}</span></td>
+        <td>${posTag(p)}</td>
         <td>${p.goals}</td><td>${p.assists}</td><td>${p.steals}</td>
         <td>${p.blocks}</td><td>${p.turnovers}</td><td>${p.matches}</td>
       </tr>`).join('');
   };
 
   view.innerHTML = `
-    <div class="page-head"><h2>Player Roster</h2>
-      <p class="muted">${rated.length} players · click a name for their profile · click a column to sort.</p></div>
+    <div class="page-head"><h2>Teams &amp; Roster</h2></div>
 
-    <div class="toolbar">
-      <div class="seg" id="team-filter">
-        <button class="seg-btn active" data-team="all">All</button>
-        ${DB.teams.map((t) => `<button class="seg-btn" data-team="${t.id}">${t.emoji} ${t.name}</button>`).join('')}
-        <button class="seg-btn" data-team="fa">🧢 Free agents</button>
-      </div>
+    <div class="team-grid">
+      ${DB.teams.map((t) => {
+        const s = standings.find((x) => x.teamId === t.id);
+        const roster = DB.rosterOf(t.id);
+        const next = DB.nextGameFor(t.id);
+        const tt = DB.teamTotals(t.id);
+        return `
+          <section class="team-card ${teamHighlight === t.id ? 'flash' : ''}" id="team-${t.id}" style="--tc:${t.color}">
+            <div class="team-card-head">
+              <div><h3>${t.name}</h3><span class="muted small">Captain: ${t.captain}</span></div>
+              <span class="team-rank">#${rankOf[t.id]}</span>
+            </div>
+            <div class="team-record">
+              <span><b>${s.w}</b>W</span><span><b>${s.d}</b>D</span><span><b>${s.l}</b>L</span>
+              <span class="sep"></span><span><b>${s.pts}</b> pts</span>
+            </div>
+            <div class="team-mini-stats">
+              <span>🥅 ${tt.goals}</span><span>🎯 ${tt.assists}</span><span>🖐️ ${tt.steals}</span><span>🧱 ${tt.blocks}</span>
+            </div>
+            <ul class="roster-mini">
+              ${roster.map((p) => `
+                <li>
+                  <span class="rm-name">${playerLink(p.id)}${p.name === t.captain ? ' <span class="cap">C</span>' : ''} ${levelTag(p.level)}</span>
+                  <span class="rm-pos">${playerPos(p, totals[p.id].matches) || '—'}</span>
+                  <span class="rm-goals">${totals[p.id].goals}G</span>
+                </li>`).join('')}
+            </ul>
+            <div class="team-next">${next ? `Next: ${fmtDate(next.date)} vs ${DB.teamName(next.home === t.id ? next.away : next.home)}` : 'Season complete'}</div>
+          </section>`;
+      }).join('')}
     </div>
 
-    <section class="panel">
-      <table class="tbl roster">
-        <thead><tr>${cols.map(([k, l]) =>
-          `<th data-key="${k}" class="sortable">${l}${k === 'rating' ? ' ' + infoIcon(ratingInfoHtml()) : ''}</th>`).join('')}</tr></thead>
-        <tbody id="roster-body"></tbody>
-      </table>
+    <section class="panel fa-panel">
+      <div class="panel-head"><h3>🧢 Free agents</h3><span class="muted small">guest into lineups</span></div>
+      <div class="fa-grid">
+        ${DB.freeAgents().map((p) => `
+          <div class="fa-chip">${playerLink(p.id)} ${levelTag(p.level)}</div>`).join('')}
+      </div>
     </section>
 
     <section class="panel formula">
@@ -302,14 +311,44 @@ function renderRoster() {
           `<span class="weight ${v < 0 ? 'neg' : ''}">${k}: ${v > 0 ? '+' : ''}${v}</span>`).join('')}
       </div>
     </section>
+
+    <div class="toolbar">
+      <div class="seg" id="team-filter">
+        <button class="seg-btn active" data-team="all">All</button>
+        ${DB.teams.map((t) => `<button class="seg-btn" data-team="${t.id}">${t.name}</button>`).join('')}
+        <button class="seg-btn" data-team="fa">🧢 Free agents</button>
+      </div>
+    </div>
+
+    <section class="panel" id="full-roster">
+      <div class="panel-head">
+        <h3>👤 Full roster</h3>
+        <span class="muted small">${rated.length} players</span>
+      </div>
+      <table class="tbl roster">
+        <thead><tr>${cols.map(([k, l]) => {
+          const sorted = k === rosterSort.key
+            ? (rosterSort.dir === 1 ? ' sorted-asc' : ' sorted-desc') : '';
+          return `<th data-key="${k}" class="sortable${sorted}">${l}${k === 'rating' ? ' ' + infoIcon(ratingInfoHtml()) : ''}</th>`;
+        }).join('')}</tr></thead>
+        <tbody id="roster-body"></tbody>
+      </table>
+    </section>
   `;
+
+  if (teamHighlight) {
+    const node = $(`#team-${teamHighlight}`);
+    node?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    setTimeout(() => node?.classList.remove('flash'), 1600);
+    teamHighlight = null;
+  }
 
   $$('#team-filter .seg-btn').forEach((b) => b.addEventListener('click', () => {
     $$('#team-filter .seg-btn').forEach((x) => x.classList.remove('active'));
     b.classList.add('active'); rosterFilter = b.dataset.team; draw();
   }));
   $$('.roster th.sortable').forEach((th) => th.addEventListener('click', (e) => {
-    if (e.target.closest('.info')) return; // don't sort when using info icon
+    if (e.target.closest('.info')) return;
     const key = th.dataset.key;
     rosterSort.dir = rosterSort.key === key ? -rosterSort.dir : -1;
     rosterSort.key = key;
@@ -328,14 +367,13 @@ function renderSchedule() {
   DB.matches.forEach((m) => (byRound[m.round] = byRound[m.round] || []).push(m));
 
   view.innerHTML = `
-    <div class="page-head"><h2>Schedule &amp; Results</h2>
-      <p class="muted">Double round-robin · Sunday nights at ${DB.league.venue}</p></div>
+    <div class="page-head"><h2>Schedule &amp; Results</h2></div>
     <div class="rounds">
       ${Object.keys(byRound).map((r) => {
         const games = byRound[r];
         const played = games.every((g) => g.status === 'final');
         return `<section class="panel round">
-            <div class="panel-head"><h3>Round ${r}</h3>
+            <div class="panel-head"><h3>Week ${r}</h3>
               <span class="badge ${played ? 'done' : 'up'}">${played ? 'Final' : 'Upcoming'} · ${fmtDate(games[0].date)}</span></div>
             <div class="fixture-list">${games.map((g) => g.status === 'final' ? resultRow(g) : fixtureRow(g)).join('')}</div>
           </section>`;
@@ -346,7 +384,7 @@ function renderSchedule() {
 /* =============================================================================
    STATS (+ player spotlight tile)
    ============================================================================ */
-let spotlightTeam = 'makos';
+let spotlightTeam = 'capybara';
 let spotlightPlayer = null;
 
 function renderStats() {
@@ -362,7 +400,7 @@ function renderStats() {
       <div class="panel-head"><h3>🔦 Player spotlight</h3><span class="muted small">filter by roster</span></div>
       <div class="spot-controls">
         <div class="seg" id="spot-team">
-          ${DB.teams.map((t) => `<button class="seg-btn" data-team="${t.id}">${t.emoji} ${t.name}</button>`).join('')}
+          ${DB.teams.map((t) => `<button class="seg-btn" data-team="${t.id}">${t.name}</button>`).join('')}
           <button class="seg-btn" data-team="fa">🧢 Free agents</button>
         </div>
         <select id="spot-player" class="select"></select>
@@ -415,7 +453,7 @@ function renderStats() {
           <li><b>Top scorers / Steals leaders</b> — season totals summed from every final box score.</li>
           <li><b>Goal share</b> — each team’s Goals For as a slice of all goals scored.</li>
           <li><b>Team profile</b> — six dimensions (Attack, Defense, Playmaking, Steals, Blocks, Discipline) min-max normalized to 0–100 across the four teams, so the best on each axis reaches the rim.</li>
-          <li><b>Points progression</b> — cumulative league points after each round.</li>
+          <li><b>Points progression</b> — cumulative league points after each week.</li>
         </ul>
       </div>
     </section>
@@ -464,7 +502,7 @@ function renderStats() {
     });
     DB.teams.forEach((t) => series[t.id].push(running[t.id]));
   });
-  ChartHub.line('c-progress', rounds.map((r) => `R${r}`),
+  ChartHub.line('c-progress', rounds.map((r) => `W${r}`),
     DB.teams.map((t) => ({ label: t.name, data: series[t.id], borderColor: t.color, backgroundColor: t.color + '22', tension: 0.3, fill: false })));
 
   // spotlight wiring
@@ -497,7 +535,7 @@ function drawSpotlight() {
         <div class="spot-avatar" style="--tc:${teamColor(p.teamId)}">${p.name[0]}</div>
         <div>
           <h4>${playerLink(p.playerId)} ${levelTag(p.level)}</h4>
-          <p class="muted small">${teamBadge(p.teamId)} · ${p.pos}${att != null ? ` · ${att}% avail.` : ''}</p>
+          <p class="muted small">${teamBadge(p.teamId)}${posSuffix(p)}${att != null ? ` · ${att}% avail.` : ''}</p>
         </div>
         <div class="spot-rating">${p.matches ? p.rating : '—'}<small>rating</small></div>
       </div>
@@ -522,7 +560,7 @@ function renderMedia() {
   const thumb = (hue) => `linear-gradient(135deg, hsl(${hue} 70% 45%), hsl(${(hue + 40) % 360} 65% 30%))`;
 
   view.innerHTML = `
-    <div class="page-head"><h2>Media</h2><p class="muted">Featured footage and per-game clip folders.</p></div>
+    <div class="page-head"><h2>Media</h2></div>
 
     <a class="featured" href="${f.url}" target="_blank" rel="noopener" style="background:${thumb(f.hue)}">
       <span class="media-tag">${f.tag}</span>
@@ -535,9 +573,9 @@ function renderMedia() {
       <div class="media-controls">
         <div class="seg" id="media-team">
           <button class="seg-btn ${mediaFilter.team === 'all' ? 'active' : ''}" data-team="all">All</button>
-          ${DB.teams.map((t) => `<button class="seg-btn ${mediaFilter.team === t.id ? 'active' : ''}" data-team="${t.id}">${t.emoji} ${t.name}</button>`).join('')}
+          ${DB.teams.map((t) => `<button class="seg-btn ${mediaFilter.team === t.id ? 'active' : ''}" data-team="${t.id}">${t.name}</button>`).join('')}
         </div>
-        <input id="media-search" class="select search" type="search" placeholder="Search team or round (e.g. Makos, R5)…" value="${mediaFilter.q}" />
+        <input id="media-search" class="select search" type="search" placeholder="Search team or week (e.g. Capybara, W5)…" value="${mediaFilter.q}" />
       </div>
       <div id="game-film" class="media-grid"></div>
     </section>
@@ -545,14 +583,14 @@ function renderMedia() {
     <p class="muted small center">Clip folders resolve to <code>${MEDIA.filmBase}&lt;game&gt;/</code> — set <code>MEDIA.filmBase</code> in <code>js/content.js</code> to wherever your clips live.</p>
   `;
 
-  const games = [...DB.matches].sort((a, b) => b.round - a.round);
+  const games = [...DB.matches].sort((a, b) => a.round - b.round || a.id.localeCompare(b.id));
 
   const draw = () => {
     const q = mediaFilter.q.trim().toLowerCase();
     const rows = games.filter((m) => {
       if (mediaFilter.team !== 'all' && m.home !== mediaFilter.team && m.away !== mediaFilter.team) return false;
       if (!q) return true;
-      const hay = `${DB.teamName(m.home)} vs ${DB.teamName(m.away)} r${m.round} ${m.date}`.toLowerCase();
+      const hay = `${DB.teamName(m.home)} vs ${DB.teamName(m.away)} w${m.round} r${m.round} ${m.date}`.toLowerCase();
       return hay.split(/\s+/).some((w) => w.startsWith(q)) || hay.includes(q);
     });
 
@@ -566,7 +604,7 @@ function renderMedia() {
       return `
         <a class="media-card game-card" href="${href}" target="_blank" rel="noopener" title="Open clip folder: ${slug}">
           <div class="media-thumb game-thumb" style="background:linear-gradient(135deg, ${hueA}, ${hueB})">
-            <span class="media-tag">Round ${m.round}</span>
+            <span class="media-tag">Week ${m.round}</span>
             ${scoreline}
             <span class="media-kind">📁</span>
           </div>
@@ -601,8 +639,7 @@ function renderAttendance() {
   const statusMap = { in: ['In', 'in'], maybe: ['Maybe', 'maybe'], out: ['Out', 'out'] };
 
   view.innerHTML = `
-    <div class="page-head"><h2>Attendance &amp; Availability</h2>
-      <p class="muted">Who’s in for upcoming Sunday league nights at ${DB.league.venue}.</p></div>
+    <div class="page-head"><h2>Attendance &amp; Availability</h2></div>
 
     ${nights.length === 0 ? '<section class="panel"><p class="muted">No upcoming nights — season complete.</p></section>' : `
     <div class="att-summary">
@@ -623,7 +660,7 @@ function renderAttendance() {
     <div class="toolbar">
       <div class="seg" id="att-filter">
         <button class="seg-btn active" data-team="all">All</button>
-        ${DB.teams.map((t) => `<button class="seg-btn" data-team="${t.id}">${t.emoji} ${t.name}</button>`).join('')}
+        ${DB.teams.map((t) => `<button class="seg-btn" data-team="${t.id}">${t.name}</button>`).join('')}
         <button class="seg-btn" data-team="fa">🧢 Free agents</button>
       </div>
     </div>
@@ -664,7 +701,7 @@ function renderAttendance() {
    ============================================================================ */
 function renderFaq() {
   view.innerHTML = `
-    <div class="page-head"><h2>Rules &amp; FAQ</h2><p class="muted">How torpedo is played, and common questions.</p></div>
+    <div class="page-head"><h2>Rules &amp; FAQ</h2><p class="muted">How torpedo is played, common questions, and the research library.</p></div>
     <section class="panel">
       <div class="panel-head"><h3>📏 Rules of the game</h3></div>
       <div class="rules-grid">${RULES.map((r) => `<div class="rule"><h4>${r.title}</h4><p>${r.body}</p></div>`).join('')}</div>
@@ -672,15 +709,7 @@ function renderFaq() {
     <section class="panel">
       <div class="panel-head"><h3>❓ Frequently asked</h3></div>
       <div class="accordion">${FAQ.map((f, i) => `<details ${i === 0 ? 'open' : ''}><summary>${f.q}</summary><p>${f.a}</p></details>`).join('')}</div>
-    </section>`;
-}
-
-/* =============================================================================
-   RESEARCH
-   ============================================================================ */
-function renderResearch() {
-  view.innerHTML = `
-    <div class="page-head"><h2>Research Library</h2><p class="muted">Scientific studies relevant to UTL &amp; Underwater Rugby (UWR).</p></div>
+    </section>
     <section class="panel intro"><p>${RESEARCH.intro}</p></section>
     ${RESEARCH.categories.map((cat) => `
       <section class="panel">
@@ -715,7 +744,7 @@ function openProfile(id) {
         <div class="prof-avatar" style="--tc:${teamColor(p.teamId)}">${p.name[0]}</div>
         <div>
           <h2>${p.name} ${levelTag(p.level)}</h2>
-          <p class="muted">${teamBadge(p.teamId)} · ${p.pos}${att != null ? ` · ${att}% availability` : ''}</p>
+          <p class="muted">${teamBadge(p.teamId)}${posSuffix(p)}${att != null ? ` · ${att}% availability` : ''}</p>
         </div>
       </div>
       <div class="prof-rating">${p.matches ? p.rating : '—'}<small>rating</small></div>
@@ -733,7 +762,7 @@ function openProfile(id) {
         <h4>Game log</h4>
         ${log.length ? `
         <table class="tbl gamelog">
-          <thead><tr><th>R</th><th>Opp</th><th>Res</th><th>G</th><th>A</th><th>S</th><th>B</th><th>TO</th></tr></thead>
+          <thead><tr><th>W</th><th>Opp</th><th>Res</th><th>G</th><th>A</th><th>S</th><th>B</th><th>TO</th></tr></thead>
           <tbody>${log.map((g) => `
             <tr>
               <td>${g.round}</td>
@@ -767,22 +796,40 @@ function closeProfile() {
    ROUTER + THEMING + GLOBAL CLICK DELEGATION
    ============================================================================ */
 const ROUTES = {
-  dashboard: renderDashboard, teams: renderTeams, roster: renderRoster,
+  overview: renderDashboard, teams: renderTeamsRoster,
   schedule: renderSchedule, stats: renderStats, media: renderMedia,
-  attendance: renderAttendance, research: renderResearch, faq: renderFaq,
+  attendance: renderAttendance, faq: renderFaq,
 };
 
 function go(tab) {
+  if (tab === 'research' || tab === 'dashboard') tab = 'overview';
+  if (tab === 'roster') tab = 'teams';
   $$('#tabs .tab-btn').forEach((b) => b.classList.toggle('active', b.dataset.tab === tab));
   (ROUTES[tab] || renderDashboard)();
   wrapTables(view);
   $('#tabs').classList.remove('open');
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  if (scrollTarget) {
+    const sel = scrollTarget;
+    scrollTarget = null;
+    requestAnimationFrame(() => {
+      const node = $(sel);
+      if (node) node.scrollIntoView({ block: 'start', behavior: 'smooth' });
+      else window.scrollTo({ top: 0, behavior: 'smooth' });
+    });
+  } else {
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
   try { localStorage.setItem('atxutl.tab', tab); } catch (e) {}
 }
 
 function initClicks() {
   document.body.addEventListener('click', (e) => {
+    const goTo = e.target.closest('[data-goto]');
+    if (goTo) {
+      scrollTarget = goTo.dataset.scroll || null;
+      go(goTo.dataset.goto);
+      return;
+    }
     const pl = e.target.closest('[data-player]');
     if (pl) { openProfile(pl.dataset.player); return; }
     const tm = e.target.closest('[data-team]');
@@ -798,24 +845,18 @@ function initTabs() {
 }
 
 function applyTheme() {
-  let theme = 'dark', preset = 'aqua';
-  try { theme = localStorage.getItem('atxutl.theme') || 'dark'; preset = localStorage.getItem('atxutl.preset') || 'aqua'; } catch (e) {}
+  let theme = 'dark';
+  try { theme = localStorage.getItem('atxutl.theme') || 'dark'; } catch (e) {}
   document.documentElement.dataset.theme = theme;
-  document.documentElement.dataset.preset = preset;
   $('#theme-toggle').textContent = theme === 'dark' ? '🌙' : '☀️';
-  $$('.preset-picker .chip').forEach((c) => c.classList.toggle('active', c.dataset.preset === preset));
 }
 function initTheme() {
   $('#theme-toggle').addEventListener('click', () => {
     const next = document.documentElement.dataset.theme === 'dark' ? 'light' : 'dark';
     try { localStorage.setItem('atxutl.theme', next); } catch (e) {}
     applyTheme();
-    go(localStorage.getItem('atxutl.tab') || 'dashboard');
+    go(localStorage.getItem('atxutl.tab') || 'overview');
   });
-  $$('.preset-picker .chip').forEach((c) => c.addEventListener('click', () => {
-    try { localStorage.setItem('atxutl.preset', c.dataset.preset); } catch (e) {}
-    applyTheme();
-  }));
 }
 
 /* ---------- boot ---------------------------------------------------------- */
@@ -825,6 +866,8 @@ initTheme();
 initClicks();
 $('#brand-sub').textContent = DB.league.full;
 $('#footer-venue').textContent = DB.league.venue;
-let startTab = 'dashboard';
-try { startTab = localStorage.getItem('atxutl.tab') || 'dashboard'; } catch (e) {}
+let startTab = 'overview';
+try { startTab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
+if (startTab === 'dashboard') startTab = 'overview';
+if (startTab === 'roster') startTab = 'teams';
 go(startTab);

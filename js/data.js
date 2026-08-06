@@ -1,7 +1,7 @@
 /* =============================================================================
    ATX UTL — League data (single source of truth)
    -----------------------------------------------------------------------------
-   Roster is the real ATX UTL Season 1 active-player list (teams + free agents).
+   Roster is the real ATX UTL active-player list (teams + free agents).
    Match results, box scores, guest appearances and availability are produced by
    a SEEDED random generator so the demo data is realistic yet stable across
    reloads (change LEAGUE.seed to reshuffle the whole season).
@@ -14,9 +14,11 @@ const LEAGUE = {
   name: 'ATX UTL',
   full: 'Austin Underwater Torpedo League',
   venue: 'Deepend Fitness — Austin, Texas',
-  season: 'Season 1',
+  season: 'Season 5',
+  startDate: '2026-08-23',
+  weeks: 8,
   poolDepth: '14 ft',
-  seed: 20260721,
+  seed: 20260823,
 };
 
 /* ---- Rating formula (transparent, shown in the UI) ----------------------- */
@@ -27,6 +29,14 @@ const RATING = {
     'Rating = (Goals×3 + Assists×2 + Steals×1.5 + Blocks×2 − Turnovers×1.5) ÷ (Matches Played + 2), ' +
     'then normalized across the league onto a 1–10 scale. The “+2” steadies small samples so a ' +
     'player with only one or two games can’t top the table on a fluke.',
+};
+
+/* ---- Season awards (Overview cards) — weighted so both stats count ------- */
+const AWARDS = {
+  // Golden Torpedo: offense — goals count twice assists
+  torpedo: { goals: 2, assists: 1 },
+  // Golden Glove: defense — blocks count twice steals
+  glove: { blocks: 2, steals: 1 },
 };
 
 /* ---- Column glossary (info panes) ---------------------------------------- */
@@ -43,56 +53,45 @@ const STANDINGS_GLOSSARY = [
 
 /* ---- Teams --------------------------------------------------------------- */
 const TEAMS = [
-  { id: 'carp',   name: 'Carp',           emoji: '🐟', color: '#f59e0b', captain: 'George' },
-  { id: 'makos',  name: 'Makos',          emoji: '🦈', color: '#0ea5e9', captain: 'Reuben' },
-  { id: 'legion', name: 'Legion',         emoji: '⚔️', color: '#ef4444', captain: 'SK' },
-  { id: 'crocs',  name: 'Chlorine Crocs', emoji: '🐊', color: '#22c55e', captain: 'Sage' },
+  { id: 'capybara', name: 'Capybara',      color: '#0ea5e9', captain: 'Reuben' },
+  { id: 'team1',    name: 'Hellfish',      color: '#22c55e', captain: 'Rich' },
+  { id: 'team2',    name: 'Team 2',        color: '#f59e0b', captain: 'Zach' },
+  { id: 'team3',    name: 'Splash Damage', color: '#ef4444', captain: 'River' },
 ];
 
 /* ---- Players (real active roster). skill 0..1 gently biases box scores.
         teamId 'fa' = free agent (guests into lineups). level: Pro/Rookie/IR.  */
 const PLAYERS = [
-  // Makos
-  { id: 'reuben',  name: 'Reuben',  teamId: 'makos',  level: 'Pro',    pos: 'Striker',  skill: 0.78 },
-  { id: 'lesley',  name: 'Lesley',  teamId: 'makos',  level: 'Pro',    pos: 'Striker',  skill: 0.90 },
-  { id: 'jamese',  name: 'James E', teamId: 'makos',  level: 'Pro',    pos: 'Defender', skill: 0.70 },
-  { id: 'walter',  name: 'Walter',  teamId: 'makos',  level: 'Pro',    pos: 'Utility',  skill: 0.85 },
-  { id: 'shaneye', name: 'Shaneye', teamId: 'makos',  level: 'Rookie', pos: 'Utility',  skill: 0.42 },
-  { id: 'sherris', name: 'Sherris', teamId: 'makos',  level: 'Rookie', pos: 'Defender', skill: 0.40 },
+  // Team captains (only rostered players)
+  { id: 'reuben', name: 'Reuben', teamId: 'capybara', level: 'Pro', pos: 'Striker',  skill: 0.78 },
+  { id: 'rich',   name: 'Rich',   teamId: 'team1',    level: 'Pro', pos: 'Defender', skill: 0.64 },
+  { id: 'zach',   name: 'Zach',   teamId: 'team2',    level: 'Pro', pos: 'Striker',  skill: 0.75 },
+  { id: 'river',  name: 'River',  teamId: 'team3',    level: 'Pro', pos: 'Striker',  skill: 0.76 },
 
-  // Carp
-  { id: 'george',  name: 'George',  teamId: 'carp',   level: 'Pro',    pos: 'Striker',  skill: 0.92 },
-  { id: 'jamesb',  name: 'James B', teamId: 'carp',   level: 'Pro',    pos: 'Defender', skill: 0.68 },
-  { id: 'kellie',  name: 'Kellie',  teamId: 'carp',   level: 'Pro',    pos: 'Utility',  skill: 0.64 },
-  { id: 'manny',   name: 'Manny',   teamId: 'carp',   level: 'Pro',    pos: 'Striker',  skill: 0.70 },
-  { id: 'max',     name: 'Max',     teamId: 'carp',   level: 'Pro',    pos: 'Striker',  skill: 0.72 },
-  { id: 'shea',    name: 'Shea',    teamId: 'carp',   level: 'Pro',    pos: 'Goalie',   skill: 0.60 },
-
-  // Legion
-  { id: 'sk',      name: 'SK',      teamId: 'legion', level: 'Pro',    pos: 'Striker',  skill: 0.80 },
-  { id: 'benb',    name: 'Ben B',   teamId: 'legion', level: 'Pro',    pos: 'Defender', skill: 0.66 },
-  { id: 'diana',   name: 'Diana',   teamId: 'legion', level: 'Rookie', pos: 'Utility',  skill: 0.40 },
-  { id: 'emma',    name: 'Emma',    teamId: 'legion', level: 'Rookie', pos: 'Utility',  skill: 0.38 },
-  { id: 'rachel',  name: 'Rachel',  teamId: 'legion', level: 'Pro',    pos: 'Defender', skill: 0.60 },
-
-  // Chlorine Crocs
-  { id: 'sage',    name: 'Sage',    teamId: 'crocs',  level: 'Pro',    pos: 'Striker',  skill: 0.80 },
-  { id: 'eddy',    name: 'Eddy',    teamId: 'crocs',  level: 'Pro',    pos: 'Utility',  skill: 0.62 },
-  { id: 'glenn',   name: 'Glenn',   teamId: 'crocs',  level: 'Pro',    pos: 'Defender', skill: 0.82 },
-  { id: 'rich',    name: 'Rich',    teamId: 'crocs',  level: 'Pro',    pos: 'Defender', skill: 0.64 },
-  { id: 'allie',   name: 'Allie',   teamId: 'crocs',  level: 'Rookie', pos: 'Utility',  skill: 0.42 },
-  { id: 'vivian',  name: 'Vivian',  teamId: 'crocs',  level: 'Rookie', pos: 'Utility',  skill: 0.40 },
-
-  // Free agents (no fixed team — guest into lineups)
-  { id: 'jeremy',  name: 'Jeremy',      teamId: 'fa', level: 'Rookie',   pos: 'Utility',  skill: 0.45 },
-  { id: 'john',    name: 'John',        teamId: 'fa', level: 'Pro',      pos: 'Striker',  skill: 0.66 },
-  { id: 'jp',      name: 'JP',          teamId: 'fa', level: 'Pro (IR)', pos: 'Utility',  skill: 0.00 },
-  { id: 'justin',  name: 'Justin',      teamId: 'fa', level: 'Pro',      pos: 'Defender', skill: 0.60 },
-  { id: 'lon',     name: 'Lon',         teamId: 'fa', level: 'Pro',      pos: 'Utility',  skill: 0.58 },
-  { id: 'patrick', name: 'Patrick',     teamId: 'fa', level: 'Pro',      pos: 'Striker',  skill: 0.63 },
-  { id: 'scheese', name: 'Sean Cheese', teamId: 'fa', level: 'Pro',      pos: 'Utility',  skill: 0.61 },
-  { id: 'scroc',   name: 'Sean Croc',   teamId: 'fa', level: 'Pro',      pos: 'Defender', skill: 0.59 },
-  { id: 'travis',  name: 'Travis',      teamId: 'fa', level: 'Pro',      pos: 'Utility',  skill: 0.64 },
+  // Free agents (guest into lineups)
+  { id: 'lesley',  name: 'Lesley',      teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.90 },
+  { id: 'jamese',  name: 'James E',     teamId: 'fa', level: 'Pro',    pos: 'Defender', skill: 0.70 },
+  { id: 'walter',  name: 'Walter',      teamId: 'fa', level: 'Pro',    pos: 'Utility',  skill: 0.85 },
+  { id: 'shaneye', name: 'Shaneye',     teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.42 },
+  { id: 'jamesb',  name: 'James B',     teamId: 'fa', level: 'Pro',    pos: 'Defender', skill: 0.68 },
+  { id: 'kellie',  name: 'Kellie',      teamId: 'fa', level: 'Pro',    pos: 'Utility',  skill: 0.64 },
+  { id: 'manny',   name: 'Manny',       teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.70 },
+  { id: 'max',     name: 'Max',         teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.72 },
+  { id: 'sk',      name: 'SK',          teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.80 },
+  { id: 'benb',    name: 'Ben B',       teamId: 'fa', level: 'Pro',    pos: 'Defender', skill: 0.66 },
+  { id: 'emma',        name: 'Emma',        teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.38 },
+  { id: 'jacqueline',  name: 'Jacqueline',  teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.41 },
+  { id: 'eric',        name: 'Eric',        teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.39 },
+  { id: 'liam',        name: 'Liam',        teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.40 },
+  { id: 'jack',        name: 'Jack',        teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.38 },
+  { id: 'sage',        name: 'Sage',        teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.80 },
+  { id: 'eddy',    name: 'Eddy',        teamId: 'fa', level: 'Pro',    pos: 'Utility',  skill: 0.62 },
+  { id: 'glenn',   name: 'Glenn',       teamId: 'fa', level: 'Pro',    pos: 'Defender', skill: 0.82 },
+  { id: 'justin',  name: 'Justin',      teamId: 'fa', level: 'Pro',    pos: 'Defender', skill: 0.60 },
+  { id: 'patrick', name: 'Patrick',     teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.63 },
+  { id: 'scheese', name: 'Sean Cheese', teamId: 'fa', level: 'Pro',    pos: 'Utility',  skill: 0.61 },
+  { id: 'scroc',   name: 'Sean Croc',   teamId: 'fa', level: 'Pro',    pos: 'Defender', skill: 0.59 },
+  { id: 'travis',  name: 'Travis',      teamId: 'fa', level: 'Pro',    pos: 'Utility',  skill: 0.64 },
 ];
 
 /* ===========================================================================
@@ -118,35 +117,30 @@ const nextGuest = () => {
   return PLAYERS.find((p) => p.id === id);
 };
 
-/* ---- Build a double round-robin schedule (each pair plays twice) --------- */
+/* ---- Build an 8-week balanced schedule (each team plays once per week) --- */
+function addDays(iso, days) {
+  const [y, m, d] = iso.split('-').map(Number);
+  return new Date(y, m - 1, d + days).toLocaleDateString('en-CA');
+}
+
 function buildSchedule() {
-  const ids = TEAMS.map((t) => t.id);
-  const pairs = [];
-  for (let i = 0; i < ids.length; i++)
-    for (let j = i + 1; j < ids.length; j++) pairs.push([ids[i], ids[j]]);
-
-  const startDate = new Date('2026-06-07T19:00:00'); // Sunday league nights
+  // 16 games · 8 per team · pairings 2–3× each · 4 home games each
+  // First/second Sunday slot: team1 & team2 4/4; capybara 5/3; team3 3/5 (best possible)
+  const rounds = [
+    [['team3', 'team2'], ['capybara', 'team1']],
+    [['team1', 'team3'], ['team2', 'capybara']],
+    [['team1', 'team2'], ['capybara', 'team3']],
+    [['team1', 'capybara'], ['team3', 'team2']],
+    [['team2', 'capybara'], ['team3', 'team1']],
+    [['team3', 'capybara'], ['team2', 'team1']],
+    [['capybara', 'team1'], ['team2', 'team3']],
+    [['capybara', 'team2'], ['team1', 'team3']],
+  ];
   const matches = [];
-  let round = 0;
-
-  [pairs, pairs.map(([a, b]) => [b, a])].forEach((leg) => {
-    const remaining = [...leg];
-    while (remaining.length) {
-      round++;
-      const used = new Set();
-      const dayGames = [];
-      for (let k = 0; k < remaining.length && dayGames.length < 2; ) {
-        const [h, a] = remaining[k];
-        if (!used.has(h) && !used.has(a)) {
-          used.add(h); used.add(a);
-          dayGames.push(remaining.splice(k, 1)[0]);
-        } else k++;
-      }
-      const date = new Date(startDate);
-      date.setDate(startDate.getDate() + (round - 1) * 7);
-      dayGames.forEach(([home, away], gi) =>
-        matches.push({ id: `r${round}g${gi}`, round, date: date.toISOString().slice(0, 10), home, away }));
-    }
+  rounds.forEach((games, i) => {
+    const iso = addDays(LEAGUE.startDate, i * 7);
+    games.forEach(([home, away], gi) =>
+      matches.push({ id: `r${i + 1}g${gi}`, round: i + 1, date: iso, home, away }));
   });
   return matches;
 }
@@ -197,15 +191,11 @@ function playMatch(match) {
   };
 }
 
-/* ---- Assemble season: ~70% of rounds played, remainder upcoming ---------- */
+/* ---- Assemble season: no games played yet — all fixtures upcoming -------- */
 const MATCHES = (() => {
   const sched = buildSchedule();
-  const totalRounds = Math.max(...sched.map((m) => m.round));
-  const playedThrough = Math.ceil(totalRounds * 0.7);
   return sched.map((m) =>
-    m.round <= playedThrough
-      ? { ...m, status: 'final', ...playMatch(m) }
-      : { ...m, status: 'scheduled', homeScore: null, awayScore: null, box: [], homeLineup: [], awayLineup: [] });
+    ({ ...m, status: 'scheduled', homeScore: null, awayScore: null, box: [], homeLineup: [], awayLineup: [] }));
 })();
 
 /* ---- Availability for upcoming league nights ----------------------------- */
@@ -239,11 +229,21 @@ const AVAILABILITY = (() => {
 const DB = {
   league: LEAGUE,
   rating: RATING,
+  awards: AWARDS,
   glossary: STANDINGS_GLOSSARY,
   teams: TEAMS,
   players: PLAYERS,
   matches: MATCHES,
   availability: AVAILABILITY,
+
+  torpedoScore(p) {
+    const w = AWARDS.torpedo;
+    return p.goals * w.goals + p.assists * w.assists;
+  },
+  gloveScore(p) {
+    const w = AWARDS.glove;
+    return p.blocks * w.blocks + p.steals * w.steals;
+  },
 
   team: (id) => TEAMS.find((t) => t.id === id),
   player: (id) => PLAYERS.find((p) => p.id === id),
@@ -301,7 +301,8 @@ const DB = {
       };
     });
     const played = raw.filter((r) => r.matches > 0).map((r) => r.eff);
-    const min = Math.min(...played), max = Math.max(...played);
+    const min = played.length ? Math.min(...played) : 0;
+    const max = played.length ? Math.max(...played) : 0;
     return raw
       .map((r) => ({
         ...r,
