@@ -148,9 +148,9 @@ img, canvas, video, table { max-width: 100%; }
 .table-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 8px; }
 .tbl { width: 100%; border-collapse: collapse; font-size: 14px; }
 .standings { min-width: 460px; }
-.roster { min-width: 680px; }
+.roster { min-width: 820px; }
 .att-table { min-width: 560px; }
-.gamelog { min-width: 380px; }
+.gamelog { min-width: 480px; }
 .tbl th, .tbl td { text-align: center; padding: 9px 8px; border-bottom: 1px solid var(--border); }
 .tbl th { color: var(--text-muted); font-weight: 600; font-size: 12px; text-transform: uppercase; letter-spacing: .4px; }
 .tbl td:nth-child(2), .tbl th:nth-child(2) { text-align: left; }
@@ -316,23 +316,27 @@ th.sorted-desc::after { content: " ▼"; color: var(--accent); opacity: 1; }
 .lvl-tag.rookie { background: color-mix(in srgb, #a78bfa 24%, transparent); color: #c4b5fd; }
 .lvl-tag.ir { background: color-mix(in srgb, #ef4444 22%, transparent); color: #fca5a5; }
 
-/* ---- Info pane (hover) --------------------------------------------------- */
-.info { position: relative; display: inline-flex; }
-.info-i { cursor: help; color: var(--text-muted); font-size: 13px; margin-left: 4px; }
-.info-i:hover { color: var(--accent); }
+/* ---- Info pane (viewport-aware; opened via JS) --------------------------- */
+.info { position: relative; display: inline-flex; vertical-align: middle; }
+.info-i {
+  cursor: help; color: var(--text-muted); font-size: 13px; margin-left: 4px;
+  border: 0; background: none; padding: 0; font: inherit; line-height: 1;
+}
+.info-i:hover, .info-i:focus-visible { color: var(--accent); outline: none; }
 .info-pop {
-  position: absolute; top: 130%; left: 0; z-index: 50;
-  width: min(280px, calc(100vw - 32px));
+  position: fixed; z-index: 400;
+  width: min(280px, calc(100vw - 24px));
+  max-height: min(70vh, calc(100vh - 24px));
+  overflow-y: auto; -webkit-overflow-scrolling: touch;
   display: none; flex-direction: column; gap: 6px;
   background: var(--surface-2); border: 1px solid var(--border); border-radius: 12px;
   padding: 12px; box-shadow: var(--shadow); font-weight: 400; font-size: 12.5px; color: var(--text-muted);
   text-transform: none; letter-spacing: normal; text-align: left; white-space: normal;
+  pointer-events: auto;
 }
-/* Keep popovers on-screen for cards near the right edge */
-.stat-card:nth-last-child(-n+2) .info-pop { left: auto; right: 0; }
+.info-pop.is-open { display: flex; }
 .info-pop b { color: var(--text); }
 .info-pop .gl { display: block; }
-.info:hover .info-pop, .info-i:focus + .info-pop { display: flex; }
 
 /* ---- Free agents grid ---------------------------------------------------- */
 .fa-panel { margin-top: 8px; }

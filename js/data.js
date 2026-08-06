@@ -23,10 +23,10 @@ const LEAGUE = {
 
 /* ---- Rating formula (transparent, shown in the UI) ----------------------- */
 const RATING = {
-  weights: { goals: 3, assists: 2, steals: 1.5, blocks: 2, turnovers: -1.5 },
+  weights: { goals: 3, assists: 2, steals: 1.5, blocks: 3, turnovers: -1.5 },
   prior: 2, // small-sample shrinkage: divide by (matches + prior)
   describe:
-    'Rating = (Goals×3 + Assists×2 + Steals×1.5 + Blocks×2 − Turnovers×1.5) ÷ (Matches Played + 2), ' +
+    'Rating = (Goals×3 + Assists×2 + Steals×1.5 + Blocks×3 − Turnovers×1.5) ÷ (Matches Played + 2), ' +
     'then normalized across the league onto a 1–10 scale. The “+2” steadies small samples so a ' +
     'player with only one or two games can’t top the table on a fluke.',
 };
@@ -164,6 +164,8 @@ function boxFor(players, goalsScored) {
     steals: rint(0, p.skill > 0.6 ? 4 : 3),
     blocks: p.pos === 'Goalie' || p.pos === 'Defender' ? rint(0, 3) : rint(0, 1),
     turnovers: rint(0, 3),
+    swimOffs: rint(0, p.skill > 0.65 ? 2 : 1), // swim-off wins
+    shots: 0, // scoring chances (filled below; always ≥ goals)
   }));
   for (let g = 0; g < goalsScored; g++) {
     let r = rng() * totalSkill;
@@ -172,6 +174,11 @@ function boxFor(players, goalsScored) {
       if (r <= 0) { s.goals++; break; }
     }
   }
+  // Shots / scoring chances ≥ goals (missed looks + finishes)
+  stats.forEach((s) => {
+    const p = players.find((x) => x.id === s.playerId);
+    s.shots = s.goals + rint(0, p.skill > 0.7 ? 4 : 3);
+  });
   return stats;
 }
 
@@ -277,12 +284,15 @@ const DB = {
   playerTotals() {
     const totals = {};
     PLAYERS.forEach((p) => (totals[p.id] = {
-      playerId: p.id, goals: 0, assists: 0, steals: 0, blocks: 0, turnovers: 0, matches: 0,
+      playerId: p.id, goals: 0, assists: 0, steals: 0, blocks: 0, turnovers: 0,
+      swimOffs: 0, shots: 0, matches: 0,
     }));
     this.finals().forEach((m) => m.box.forEach((b) => {
       const t = totals[b.playerId];
-      t.goals += b.goals; t.assists += b.assists; t.steals += b.steals;
-      t.blocks += b.blocks; t.turnovers += b.turnovers; t.matches++;
+      if (!t) return;
+      t.goals += b.goals || 0; t.assists += b.assists || 0; t.steals += b.steals || 0;
+      t.blocks += b.blocks || 0; t.turnovers += b.turnovers || 0;
+      t.swimOffs += b.swimOffs || 0; t.shots += b.shots || 0; t.matches++;
     }));
     return totals;
   },
@@ -320,8 +330,9 @@ const DB = {
       const t = totals[p.id];
       acc.goals += t.goals; acc.assists += t.assists; acc.steals += t.steals;
       acc.blocks += t.blocks; acc.turnovers += t.turnovers;
+      acc.swimOffs += t.swimOffs; acc.shots += t.shots;
       return acc;
-    }, { goals: 0, assists: 0, steals: 0, blocks: 0, turnovers: 0 });
+    }, { goals: 0, assists: 0, steals: 0, blocks: 0, turnovers: 0, swimOffs: 0, shots: 0 });
   },
 
   /* Per-match log for one player (used by profiles) */

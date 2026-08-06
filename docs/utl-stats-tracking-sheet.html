@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>ATX UTL — Stats Tracking Sheet (Season 5)</title>
+<style>
+  @page { size: letter; margin: 0.55in; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Segoe UI", Calibri, Arial, sans-serif;
+    color: #0b2038;
+    font-size: 10.5pt;
+    line-height: 1.35;
+    margin: 0;
+  }
+  h1 {
+    margin: 0 0 4px;
+    font-size: 18pt;
+    letter-spacing: 0.2px;
+  }
+  .sub {
+    color: #5b7189;
+    font-size: 10pt;
+    margin: 0 0 14px;
+  }
+  h2 {
+    margin: 16px 0 8px;
+    font-size: 12pt;
+    border-bottom: 2px solid #0ea5e9;
+    padding-bottom: 3px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 6px;
+  }
+  th, td {
+    border: 1px solid #c9d5e3;
+    padding: 7px 8px;
+    vertical-align: top;
+    text-align: left;
+  }
+  th {
+    background: #e8f4fc;
+    font-size: 9.5pt;
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    color: #34506b;
+  }
+  td.key {
+    width: 42px;
+    font-weight: 800;
+    text-align: center;
+    background: #f4f9fd;
+    color: #0ea5e9;
+  }
+  td.name { width: 130px; font-weight: 700; }
+  .note {
+    background: #f7fafc;
+    border: 1px solid #d7e3ef;
+    border-radius: 6px;
+    padding: 8px 10px;
+    margin: 8px 0 0;
+    font-size: 9.5pt;
+    color: #3d556d;
+  }
+  .grid2 {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 4px;
+  }
+  .card {
+    border: 1px solid #c9d5e3;
+    border-radius: 6px;
+    padding: 9px 10px;
+    background: #fff;
+  }
+  .card h3 {
+    margin: 0 0 5px;
+    font-size: 10.5pt;
+  }
+  .card p { margin: 0 0 4px; }
+  .card ul { margin: 4px 0 0; padding-left: 16px; }
+  .formula {
+    font-family: Consolas, "Courier New", monospace;
+    font-size: 9pt;
+    background: #f0f6fb;
+    padding: 2px 5px;
+    border-radius: 3px;
+  }
+  footer {
+    margin-top: 14px;
+    font-size: 8.5pt;
+    color: #7a8fa3;
+    border-top: 1px solid #d7e3ef;
+    padding-top: 6px;
+  }
+</style>
+</head>
+<body>
+  <h1>ATX UTL — Stats Tracking Sheet</h1>
+  <p class="sub">Season 5 · Scorer’s guide · Austin Underwater Torpedo League</p>
+
+  <h2>Player box score</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Key</th>
+        <th>Stat</th>
+        <th>When to credit</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="key">G</td>
+        <td class="name">Goals</td>
+        <td>Torpedo fully placed in the opponent’s goal on a legal play. One value per score (no 2s/3s). Closest to a soccer/hockey goal.</td>
+      </tr>
+      <tr>
+        <td class="key">A</td>
+        <td class="name">Assists</td>
+        <td>The last completed underwater pass or hand-off that directly leads to a teammate’s goal (primary assist). Credit one assist per goal when earned.</td>
+      </tr>
+      <tr>
+        <td class="key">S</td>
+        <td class="name">Steals</td>
+        <td>Taking the torpedo from the carrier, or forcing an immediate change of possession while they still held it (takeaway). If the carrier already released / turned it over before contact, that is their <b>Turnover</b> — not your Steal.</td>
+      </tr>
+      <tr>
+        <td class="key">B</td>
+        <td class="name">Blocks</td>
+        <td>Stopping a scoring chance or goal-bound pass (deny entry to goal / cut off a shot). Not every wrap or swim contact — only a clear denial of a look at goal. <b>Steal</b> = take the torpedo; <b>Block</b> = kill the chance.</td>
+      </tr>
+      <tr>
+        <td class="key">TO</td>
+        <td class="name">Turnovers</td>
+        <td>Possession ends without a shot or goal because of that player: surfacing with the torpedo, errant pass, stripped while carrying, or illegal score attempt (e.g. scoring off a swim-off with no prior pass). Lower is better.</td>
+      </tr>
+      <tr>
+        <td class="key">SO</td>
+        <td class="name">Swim-off wins</td>
+        <td>Wins the swim-off — first clean underwater possession for your team after the restart buzzer. Hockey faceoff analog. Tracked for possession; not used in Rating.</td>
+      </tr>
+      <tr>
+        <td class="key">SH</td>
+        <td class="name">Shots / scoring chances</td>
+        <td>A deliberate look at goal: a shot or clear scoring chance (includes goals). Always ≥ Goals. Missed finishes still count as SH. Not used in Rating.</td>
+      </tr>
+      <tr>
+        <td class="key">MP</td>
+        <td class="name">Matches Played</td>
+        <td>Matches the player appeared in this season. Free agents accrue MP via guest appearances.</td>
+      </tr>
+    </tbody>
+  </table>
+  <div class="note">
+    <b>Quick rule:</b> Steal vs Block vs Turnover — Steal = you take the torpedo; Block = you deny the chance; Turnover = they lose possession (including surface-with-torpedo).
+  </div>
+
+  <h2>Team / standings</h2>
+  <table>
+    <thead>
+      <tr><th>Key</th><th>Meaning</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="key">P</td><td>Played — matches completed</td></tr>
+      <tr><td class="key">W / D / L</td><td>Wins (3 pts) · Draws (1 pt) · Losses (0 pts)</td></tr>
+      <tr><td class="key">GF / GA / GD</td><td>Goals For · Goals Against · Goal Difference (GF − GA)</td></tr>
+      <tr><td class="key">Pts</td><td>Ranking total — sort by Pts, then GD, then GF</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Rating &amp; season awards</h2>
+  <div class="grid2">
+    <div class="card">
+      <h3>⭐ Player rating (1–10)</h3>
+      <p>Uses core box only: <b>G, A, S, B, TO</b> (not SO or SH).</p>
+      <p class="formula">Score = G×3 + A×2 + S×1.5 + B×3 − TO×1.5</p>
+      <p class="formula">Eff = Score ÷ (MP + 2)</p>
+      <p>Then normalize league Eff onto a 1–10 scale. The +2 prior steadies small samples.</p>
+    </div>
+    <div class="card">
+      <h3>🔥 Golden Torpedo (offense)</h3>
+      <p class="formula">Goals×2 + Assists×1</p>
+      <p>Highest score wins. Ties break by Goals.</p>
+      <h3 style="margin-top:10px">🧤 Golden Glove (defense)</h3>
+      <p class="formula">Blocks×2 + Steals×1</p>
+      <p>Highest score wins. Ties break by Blocks.</p>
+    </div>
+  </div>
+
+  <h2>Match card (blank)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th>Player</th><th>Team</th><th>G</th><th>A</th><th>S</th><th>B</th><th>TO</th><th>SO</th><th>SH</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td style="height:22px"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td style="height:22px"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td style="height:22px"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td style="height:22px"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td style="height:22px"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td style="height:22px"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td style="height:22px"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td style="height:22px"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td style="height:22px"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+      <tr><td style="height:22px"></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>
+    </tbody>
+  </table>
+  <p class="note"><b>Week ____</b> &nbsp;·&nbsp; <b>Date ________</b> &nbsp;·&nbsp; <b>Home ________</b> vs <b>Away ________</b> &nbsp;·&nbsp; <b>Final ____ – ____</b></p>
+
+  <footer>
+    ATX UTL Season 5 · Stats tracking reference · Share with captains / scorers · Definitions match the league site glossary
+  </footer>
+</body>
+</html>

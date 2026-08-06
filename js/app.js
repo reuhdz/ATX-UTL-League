@@ -48,8 +48,82 @@ function posSuffix(p) {
   return p.matches ? ` · ${p.pos}` : '';
 }
 function infoIcon(html) {
-  return `<span class="info"><span class="info-i" tabindex="0" role="button" aria-label="More info">ⓘ</span><span class="info-pop">${html}</span></span>`;
+  return `<span class="info"><button type="button" class="info-i" aria-label="More info" aria-expanded="false">ⓘ</button><span class="info-pop" role="tooltip">${html}</span></span>`;
 }
+
+function closeAllInfoPops(except) {
+  $$('.info-pop.is-open').forEach((pop) => {
+    if (except && pop === except) return;
+    pop.classList.remove('is-open');
+    const btn = pop.previousElementSibling;
+    if (btn?.classList?.contains('info-i')) btn.setAttribute('aria-expanded', 'false');
+  });
+}
+
+function positionInfoPop(info) {
+  const pop = info.querySelector('.info-pop');
+  const icon = info.querySelector('.info-i');
+  if (!pop || !icon) return;
+  pop.classList.add('is-open');
+  icon.setAttribute('aria-expanded', 'true');
+
+  const pad = 12;
+  // Measure after display so size is correct
+  const ir = icon.getBoundingClientRect();
+  const pw = pop.offsetWidth;
+  const ph = pop.offsetHeight;
+  let left = ir.left + ir.width / 2 - pw / 2;
+  let top = ir.bottom + 8;
+
+  if (left + pw > window.innerWidth - pad) left = window.innerWidth - pad - pw;
+  if (left < pad) left = pad;
+
+  if (top + ph > window.innerHeight - pad) top = ir.top - ph - 8;
+  if (top < pad) top = pad;
+
+  pop.style.left = `${Math.round(left)}px`;
+  pop.style.top = `${Math.round(top)}px`;
+}
+
+function bindInfoPops(root = document) {
+  $$('.info', root).forEach((info) => {
+    if (info.dataset.bound) return;
+    info.dataset.bound = '1';
+    const icon = info.querySelector('.info-i');
+    const pop = info.querySelector('.info-pop');
+    if (!icon || !pop) return;
+    let hideTimer = null;
+
+    const show = () => {
+      clearTimeout(hideTimer);
+      closeAllInfoPops(pop);
+      positionInfoPop(info);
+    };
+    const hide = () => {
+      pop.classList.remove('is-open');
+      icon.setAttribute('aria-expanded', 'false');
+    };
+    const scheduleHide = () => {
+      if (!window.matchMedia('(hover: hover)').matches) return;
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(hide, 140);
+    };
+
+    icon.addEventListener('mouseenter', () => {
+      if (window.matchMedia('(hover: hover)').matches) show();
+    });
+    pop.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+    info.addEventListener('mouseleave', scheduleHide);
+    pop.addEventListener('mouseleave', scheduleHide);
+    icon.addEventListener('click', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (pop.classList.contains('is-open')) hide();
+      else show();
+    });
+  });
+}
+
 /* Wrap wide tables so they scroll horizontally inside their panel (mobile) */
 function wrapTables(root) {
   $$('table.tbl', root).forEach((t) => {
@@ -60,6 +134,7 @@ function wrapTables(root) {
       w.appendChild(t);
     }
   });
+  bindInfoPops(root);
 }
 
 /* =============================================================================
@@ -237,7 +312,8 @@ function renderTeamsRoster() {
   const rated = DB.ratedPlayers();
   const cols = [
     ['rating', 'Rating'], ['name', 'Name'], ['teamId', 'Team'], ['level', 'Lvl'], ['pos', 'Pos'],
-    ['goals', 'G'], ['assists', 'A'], ['steals', 'S'], ['blocks', 'B'], ['turnovers', 'TO'], ['matches', 'MP'],
+    ['goals', 'G'], ['assists', 'A'], ['steals', 'S'], ['blocks', 'B'], ['turnovers', 'TO'],
+    ['swimOffs', 'SO'], ['shots', 'SH'], ['matches', 'MP'],
   ];
 
   const draw = () => {
@@ -256,7 +332,8 @@ function renderTeamsRoster() {
         <td>${levelTag(p.level)}</td>
         <td>${posTag(p)}</td>
         <td>${p.goals}</td><td>${p.assists}</td><td>${p.steals}</td>
-        <td>${p.blocks}</td><td>${p.turnovers}</td><td>${p.matches}</td>
+        <td>${p.blocks}</td><td>${p.turnovers}</td>
+        <td>${p.swimOffs}</td><td>${p.shots}</td><td>${p.matches}</td>
       </tr>`).join('');
   };
 
@@ -280,7 +357,8 @@ function renderTeamsRoster() {
               <span class="sep"></span><span><b>${s.pts}</b> pts</span>
             </div>
             <div class="team-mini-stats">
-              <span>🥅 ${tt.goals}</span><span>🎯 ${tt.assists}</span><span>🖐️ ${tt.steals}</span><span>🧱 ${tt.blocks}</span>
+              <span>🥅 ${tt.goals}</span><span>🅰️ ${tt.assists}</span><span>🖐️ ${tt.steals}</span>
+              <span>🧱 ${tt.blocks}</span><span>🏁 ${tt.swimOffs} SO</span><span>🏹 ${tt.shots} SH</span>
             </div>
             <ul class="roster-mini">
               ${roster.map((p) => `
@@ -541,7 +619,8 @@ function drawSpotlight() {
       </div>
       <div class="mini-stats">
         ${stat('Goals', p.goals)}${stat('Assists', p.assists)}${stat('Steals', p.steals)}
-        ${stat('Blocks', p.blocks)}${stat('Turnovers', p.turnovers)}${stat('Matches', p.matches)}
+        ${stat('Blocks', p.blocks)}${stat('Turnovers', p.turnovers)}${stat('Swim-offs', p.swimOffs)}
+        ${stat('Shots', p.shots)}${stat('Matches', p.matches)}
       </div>
       <div class="chart-wrap sm"><canvas id="c-spotlight"></canvas></div>
     </div>`;
@@ -753,7 +832,8 @@ function openProfile(id) {
 
     <div class="mini-stats">
       ${stat('Goals', p.goals)}${stat('Assists', p.assists)}${stat('Steals', p.steals)}
-      ${stat('Blocks', p.blocks)}${stat('Turnovers', p.turnovers)}${stat('Matches', p.matches)}
+      ${stat('Blocks', p.blocks)}${stat('Turnovers', p.turnovers)}${stat('Swim-offs', p.swimOffs)}
+      ${stat('Shots', p.shots)}${stat('Matches', p.matches)}
     </div>
 
     <div class="prof-grid">
@@ -762,13 +842,14 @@ function openProfile(id) {
         <h4>Game log</h4>
         ${log.length ? `
         <table class="tbl gamelog">
-          <thead><tr><th>W</th><th>Opp</th><th>Res</th><th>G</th><th>A</th><th>S</th><th>B</th><th>TO</th></tr></thead>
+          <thead><tr><th>W</th><th>Opp</th><th>Res</th><th>G</th><th>A</th><th>S</th><th>B</th><th>TO</th><th>SO</th><th>SH</th></tr></thead>
           <tbody>${log.map((g) => `
             <tr>
               <td>${g.round}</td>
               <td>${teamBadge(g.opp)}${g.guest ? ' <span class="guest">guest</span>' : ''}</td>
               <td><span class="res ${g.result}">${g.result} ${g.gf}-${g.ga}</span></td>
               <td>${g.goals}</td><td>${g.assists}</td><td>${g.steals}</td><td>${g.blocks}</td><td>${g.turnovers}</td>
+              <td>${g.swimOffs || 0}</td><td>${g.shots || 0}</td>
             </tr>`).join('')}</tbody>
         </table>` : '<p class="muted">No league matches played yet this season.</p>'}
       </div>
@@ -824,6 +905,7 @@ function go(tab) {
 
 function initClicks() {
   document.body.addEventListener('click', (e) => {
+    if (!e.target.closest('.info')) closeAllInfoPops();
     const goTo = e.target.closest('[data-goto]');
     if (goTo) {
       scrollTarget = goTo.dataset.scroll || null;
@@ -836,7 +918,19 @@ function initClicks() {
     if (tm && !tm.classList.contains('seg-btn')) { teamHighlight = tm.dataset.team; go('teams'); return; }
   });
   $('#profile-modal').addEventListener('click', (e) => { if (e.target.id === 'profile-modal') closeProfile(); });
-  document.addEventListener('keydown', (e) => { if (e.key === 'Escape') closeProfile(); });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') { closeAllInfoPops(); closeProfile(); }
+  });
+  window.addEventListener('resize', () => {
+    $$('.info-pop.is-open').forEach((pop) => {
+      const info = pop.closest('.info');
+      if (info) positionInfoPop(info);
+    });
+  }, { passive: true });
+  window.addEventListener('scroll', (e) => {
+    if (e.target?.closest?.('.info-pop')) return;
+    closeAllInfoPops();
+  }, { passive: true, capture: true });
 }
 
 function initTabs() {

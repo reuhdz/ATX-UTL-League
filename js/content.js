@@ -72,9 +72,10 @@ const FAQ = [
   {
     q: 'How are player ratings calculated?',
     a:
-      'Each player’s box-score (goals, assists, steals, blocks, turnovers) is weighted, ' +
-      'divided by matches played, then normalized across the league onto a 1–10 scale. ' +
-      'The exact weights are shown on the Roster tab.',
+      'Each player’s core box-score (goals, assists, steals, blocks, turnovers) is weighted, ' +
+      'divided by matches played (+2 prior), then normalized across the league onto a 1–10 scale. ' +
+      'Swim-off wins and shots are tracked separately and do not feed the rating. ' +
+      'Exact weights are on the Teams & Roster tab.',
   },
   {
     q: 'Do I need freediving experience to play?',
@@ -241,14 +242,58 @@ const MEDIA = {
   ],
 };
 
-/* ---- Player stat index (Stats page glossary) ----------------------------- */
+/* ---- Player stat index (Stats page glossary / scorer’s sheet) ------------ */
 const PLAYER_STAT_INDEX = [
-  { key: 'G',  name: 'Goals',          desc: 'Torpedo placed in the opponent’s goal — the primary scoring stat.' },
-  { key: 'A',  name: 'Assists',        desc: 'A pass or hand-off that directly leads to a teammate’s goal.' },
-  { key: 'S',  name: 'Steals',         desc: 'Taking the torpedo away from an opponent (a takeaway / turnover forced).' },
-  { key: 'B',  name: 'Blocks',         desc: 'Stopping a shot or intercepting a pass — usually defenders and goalies.' },
-  { key: 'TO', name: 'Turnovers',      desc: 'Losing possession — surfacing with the torpedo, a bad pass, or losing a wrap-up. Lower is better (weighted negatively in Rating).' },
-  { key: 'MP', name: 'Matches Played', desc: 'Games the player appeared in this season. Free agents accrue this via guest appearances.' },
+  {
+    key: 'G', name: 'Goals',
+    desc:
+      'Torpedo fully placed in the opponent’s goal on a legal play. Closest to a soccer/hockey goal. ' +
+      'One value per score — no 2s/3s.',
+  },
+  {
+    key: 'A', name: 'Assists',
+    desc:
+      'The last completed underwater pass or hand-off that directly leads to a teammate’s goal ' +
+      '(primary assist). Credit one assist per goal when earned.',
+  },
+  {
+    key: 'S', name: 'Steals',
+    desc:
+      'Taking the torpedo from the carrier, or forcing an immediate change of possession while they ' +
+      'still held it (takeaway). Do not credit a steal if the carrier already released / turned it over ' +
+      'before contact — that is their Turnover.',
+  },
+  {
+    key: 'B', name: 'Blocks',
+    desc:
+      'Stopping a scoring chance or goal-bound pass (deny entry to goal / cut off a shot). ' +
+      'Not every wrap or swim contact — only a clear denial of a look at goal. Distinct from a Steal ' +
+      '(steal = take the torpedo; block = kill the chance without necessarily ending with possession).',
+  },
+  {
+    key: 'TO', name: 'Turnovers',
+    desc:
+      'Possession ends without a shot or goal because of that player: surfacing with the torpedo, ' +
+      'errant pass, stripped while carrying, or illegal score attempt (e.g. scoring off a swim-off ' +
+      'with no prior pass). Lower is better; weighted negatively in Rating.',
+  },
+  {
+    key: 'SO', name: 'Swim-off wins',
+    desc:
+      'Wins the swim-off — first clean underwater possession for your team after the restart buzzer. ' +
+      'Hockey faceoff analog. Tracked for possession; not used in Rating.',
+  },
+  {
+    key: 'SH', name: 'Shots / scoring chances',
+    desc:
+      'A deliberate look at goal: a shot or clear scoring chance (includes goals). Always ≥ Goals. ' +
+      'Missed finishes still count as SH. Borrowed from soccer/hockey shot tracking. Not used in Rating.',
+  },
+  {
+    key: 'MP', name: 'Matches Played',
+    desc:
+      'Matches the player appeared in this season. Free agents accrue MP via guest appearances.',
+  },
 ];
 
 /* ---- Team-profile radar dimensions (6 axes) ------------------------------ */
@@ -256,8 +301,8 @@ const TEAM_PROFILE_INDEX = [
   { key: 'Attack',     desc: 'Goals For — how much the team scores.' },
   { key: 'Defense',    desc: 'Goals Against, inverted — fewer conceded ranks higher.' },
   { key: 'Playmaking', desc: 'Total assists — passing that creates goals.' },
-  { key: 'Steals',     desc: 'Total takeaways won from opponents.' },
-  { key: 'Blocks',     desc: 'Shots and passes stopped.' },
+  { key: 'Steals',     desc: 'Total takeaways (torpedo stripped from the carrier).' },
+  { key: 'Blocks',     desc: 'Scoring chances denied (not the same as steals).' },
   { key: 'Discipline', desc: 'Turnovers, inverted — fewer giveaways ranks higher.' },
 ];
 
