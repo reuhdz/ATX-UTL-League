@@ -302,7 +302,7 @@ function resultRow(m) {
 /* =============================================================================
    TEAMS & ROSTER
    ============================================================================ */
-let rosterSort = { key: 'name', dir: 1 };
+let rosterSort = { key: 'rating', dir: -1 };
 let rosterView = 'season5'; // 'season5' | 'overall'
 
 function renderTeamsRoster() {
@@ -337,7 +337,7 @@ function renderTeamsRoster() {
     const seasonView = rosterView === 'season5';
     const cols = colsFor(rosterView);
     // If current sort key isn't in this view (e.g. teamId on overall), fall back
-    if (!cols.some(([k]) => k === rosterSort.key)) rosterSort = { key: 'name', dir: 1 };
+    if (!cols.some(([k]) => k === rosterSort.key)) rosterSort = { key: 'rating', dir: -1 };
 
     const { key, dir } = rosterSort;
     // Season 5 = current-season stats; Overall = all-seasons career stats (no team col)
