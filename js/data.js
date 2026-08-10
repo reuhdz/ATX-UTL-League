@@ -59,35 +59,46 @@ const TEAMS = [
   { id: 'team3',    name: 'Splash Damage', color: '#ef4444', captain: 'River' },
 ];
 
+/* ---- Season 5 roster (no team affiliation — pool for the current season) - */
+const SEASON5_ROSTER = [
+  'reuben', 'rich', 'river', 'zach', 'eric', 'justin',
+  'bonney', 'max', 'lesley', 'michal', 'sk', 'jacqueline',
+];
+
 /* ---- Players (real active roster). skill 0..1 gently biases box scores.
-        teamId 'fa' = free agent (guests into lineups). level: Pro/Rookie/IR.  */
+        teamId 'fa' = no fixed team (overall roster has no team affiliation).
+        Captains keep a teamId so schedule scaffolding still has a home club.
+        level: Pro/Rookie/IR.  */
 const PLAYERS = [
-  // Team captains (only rostered players)
+  // Season 5 captains (schedule scaffolding only — roster UI shows no teams)
   { id: 'reuben', name: 'Reuben', teamId: 'capybara', level: 'Pro', pos: 'Striker',  skill: 0.78 },
   { id: 'rich',   name: 'Rich',   teamId: 'team1',    level: 'Pro', pos: 'Defender', skill: 0.64 },
   { id: 'zach',   name: 'Zach',   teamId: 'team2',    level: 'Pro', pos: 'Striker',  skill: 0.75 },
   { id: 'river',  name: 'River',  teamId: 'team3',    level: 'Pro', pos: 'Striker',  skill: 0.76 },
 
-  // Free agents (guest into lineups)
-  { id: 'lesley',  name: 'Lesley',      teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.90 },
+  // Season 5 pool + broader overall roster (no team affiliation)
+  { id: 'lesley',      name: 'Lesley',      teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.90 },
+  { id: 'bonney',      name: 'Bonney',      teamId: 'fa', level: 'Pro',    pos: 'Defender', skill: 0.68, aka: 'James B' },
+  { id: 'max',         name: 'Max',         teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.72 },
+  { id: 'sk',          name: 'SK',          teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.80 },
+  { id: 'justin',      name: 'Justin',      teamId: 'fa', level: 'Pro',    pos: 'Defender', skill: 0.60 },
+  { id: 'eric',        name: 'Eric',        teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.39 },
+  { id: 'michal',      name: 'Michal',      teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.45 },
+  { id: 'jacqueline',  name: 'Jacqueline',  teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.41 },
+
+  // Overall roster (additional ATX players)
   { id: 'jamese',  name: 'James E',     teamId: 'fa', level: 'Pro',    pos: 'Defender', skill: 0.70 },
   { id: 'walter',  name: 'Walter',      teamId: 'fa', level: 'Pro',    pos: 'Utility',  skill: 0.85 },
   { id: 'shaneye', name: 'Shaneye',     teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.42 },
-  { id: 'jamesb',  name: 'James B',     teamId: 'fa', level: 'Pro',    pos: 'Defender', skill: 0.68 },
   { id: 'kellie',  name: 'Kellie',      teamId: 'fa', level: 'Pro',    pos: 'Utility',  skill: 0.64 },
   { id: 'manny',   name: 'Manny',       teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.70 },
-  { id: 'max',     name: 'Max',         teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.72 },
-  { id: 'sk',      name: 'SK',          teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.80 },
   { id: 'benb',    name: 'Ben B',       teamId: 'fa', level: 'Pro',    pos: 'Defender', skill: 0.66 },
-  { id: 'emma',        name: 'Emma',        teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.38 },
-  { id: 'jacqueline',  name: 'Jacqueline',  teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.41 },
-  { id: 'eric',        name: 'Eric',        teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.39 },
-  { id: 'liam',        name: 'Liam',        teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.40 },
-  { id: 'jack',        name: 'Jack',        teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.38 },
-  { id: 'sage',        name: 'Sage',        teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.80 },
+  { id: 'emma',    name: 'Emma',        teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.38 },
+  { id: 'liam',    name: 'Liam',        teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.40 },
+  { id: 'jack',    name: 'Jack',        teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.38 },
+  { id: 'sage',    name: 'Sage',        teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.80 },
   { id: 'eddy',    name: 'Eddy',        teamId: 'fa', level: 'Pro',    pos: 'Utility',  skill: 0.62 },
   { id: 'glenn',   name: 'Glenn',       teamId: 'fa', level: 'Pro',    pos: 'Defender', skill: 0.82 },
-  { id: 'justin',  name: 'Justin',      teamId: 'fa', level: 'Pro',    pos: 'Defender', skill: 0.60 },
   { id: 'patrick', name: 'Patrick',     teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.63 },
   { id: 'scheese', name: 'Sean Cheese', teamId: 'fa', level: 'Pro',    pos: 'Utility',  skill: 0.61 },
   { id: 'scroc',   name: 'Sean Croc',   teamId: 'fa', level: 'Pro',    pos: 'Defender', skill: 0.59 },
@@ -240,6 +251,7 @@ const DB = {
   glossary: STANDINGS_GLOSSARY,
   teams: TEAMS,
   players: PLAYERS,
+  season5RosterIds: SEASON5_ROSTER,
   matches: MATCHES,
   availability: AVAILABILITY,
 
@@ -257,6 +269,8 @@ const DB = {
   teamName: (id) => (id === 'fa' ? 'Free Agent' : (TEAMS.find((t) => t.id === id) || {}).name || id),
   rosterOf: (tid) => rosterOf(tid),
   freeAgents: () => PLAYERS.filter((p) => p.teamId === 'fa'),
+  season5Roster: () => SEASON5_ROSTER.map((id) => PLAYERS.find((p) => p.id === id)).filter(Boolean),
+  isSeason5: (id) => SEASON5_ROSTER.includes(id),
 
   finals: () => MATCHES.filter((m) => m.status === 'final'),
   upcoming: () => MATCHES.filter((m) => m.status === 'scheduled'),
