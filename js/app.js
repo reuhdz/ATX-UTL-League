@@ -219,7 +219,7 @@ function renderDashboard() {
       <section class="panel">
         <div class="panel-head">
           <h3>⭐ Top players ${infoIcon(ratingInfoHtml())}</h3>
-          <button class="text-link" data-goto="teams" data-scroll="#full-roster">View all →</button>
+          <button class="text-link" data-goto="teams" data-scroll="#season5-roster">View roster →</button>
         </div>
         <ul class="leader-list">
           ${rated.length ? rated.slice(0, 7).map((p, i) => `
@@ -228,7 +228,7 @@ function renderDashboard() {
               <span class="lead-name">${playerLink(p.playerId)}<small>${teamBadge(p.teamId)}</small></span>
               <span class="lead-stat">${p.goals}G · ${p.assists}A</span>
               <span class="rating-badge">${p.rating}</span>
-            </li>`).join('') : '<li class="muted">No games played yet. <button class="text-link" data-goto="teams" data-scroll="#full-roster">See roster →</button></li>'}
+            </li>`).join('') : '<li class="muted">No games played yet. <button class="text-link" data-goto="teams" data-scroll="#season5-roster">See roster →</button></li>'}
         </ul>
       </section>
     </div>
@@ -302,33 +302,34 @@ function resultRow(m) {
 /* =============================================================================
    TEAMS & ROSTER
    ============================================================================ */
-let rosterSort = { key: 'rating', dir: -1 };
-let rosterFilter = 'all';
+let rosterSort = { key: 'name', dir: 1 };
+
+function akaSuffix(p) {
+  return p.aka ? ` <span class="aka">(${p.aka})</span>` : '';
+}
 
 function renderTeamsRoster() {
   const standings = DB.standings();
   const rankOf = {}; standings.forEach((s, i) => (rankOf[s.teamId] = i + 1));
   const totals = DB.playerTotals();
   const rated = DB.ratedPlayers();
+  const season5 = DB.season5Roster();
   const cols = [
-    ['rating', 'Rating'], ['name', 'Name'], ['teamId', 'Team'], ['level', 'Lvl'], ['pos', 'Pos'],
+    ['rating', 'Rating'], ['name', 'Name'], ['level', 'Lvl'], ['pos', 'Pos'],
     ['goals', 'G'], ['assists', 'A'], ['steals', 'S'], ['blocks', 'B'], ['turnovers', 'TO'],
     ['swimOffs', 'SO'], ['shots', 'SH'], ['matches', 'MP'],
   ];
 
   const draw = () => {
-    let rows = rated.filter((p) =>
-      rosterFilter === 'all' ? true : rosterFilter === 'fa' ? p.teamId === 'fa' : p.teamId === rosterFilter);
     const { key, dir } = rosterSort;
-    rows = [...rows].sort((a, b) => {
+    const rows = [...rated].sort((a, b) => {
       const av = a[key], bv = b[key];
       return typeof av === 'string' ? av.localeCompare(bv) * dir : (av - bv) * dir;
     });
     $('#roster-body').innerHTML = rows.map((p) => `
-      <tr>
+      <tr${DB.isSeason5(p.playerId) ? ' class="season5-row"' : ''}>
         <td>${p.matches ? `<span class="rating-badge">${p.rating}</span>` : '<span class="muted">—</span>'}</td>
-        <td class="strong">${playerLink(p.playerId)}</td>
-        <td>${teamPill(p.teamId)}</td>
+        <td class="strong">${playerLink(p.playerId)}${akaSuffix(p)}${DB.isSeason5(p.playerId) ? ' <span class="s5-tag">S5</span>' : ''}</td>
         <td>${levelTag(p.level)}</td>
         <td>${posTag(p)}</td>
         <td>${p.goals}</td><td>${p.assists}</td><td>${p.steals}</td>
@@ -338,12 +339,37 @@ function renderTeamsRoster() {
   };
 
   view.innerHTML = `
-    <div class="page-head"><h2>Teams &amp; Roster</h2></div>
+    <div class="page-head">
+      <h2>Teams &amp; Roster</h2>
+      <p class="muted">Season 5 pool and the full ATX roster — no team affiliations.</p>
+    </div>
+
+    <section class="panel" id="season5-roster">
+      <div class="panel-head">
+        <h3>🌊 Season 5 roster</h3>
+        <span class="muted small">${season5.length} players · no team affiliation</span>
+      </div>
+      <div class="season-roster-grid">
+        ${season5.map((p) => {
+          const t = totals[p.id];
+          return `
+            <div class="season-player">
+              <div class="season-player-top">
+                <span class="sp-name">${playerLink(p.id)}${akaSuffix(p)}</span>
+                ${levelTag(p.level)}
+              </div>
+              <div class="season-player-meta">
+                <span>${playerPos(p, t.matches) || '—'}</span>
+                <span>${t.matches ? `${t.goals}G · ${t.matches}MP` : 'Season not started'}</span>
+              </div>
+            </div>`;
+        }).join('')}
+      </div>
+    </section>
 
     <div class="team-grid">
       ${DB.teams.map((t) => {
         const s = standings.find((x) => x.teamId === t.id);
-        const roster = DB.rosterOf(t.id);
         const next = DB.nextGameFor(t.id);
         const tt = DB.teamTotals(t.id);
         return `
@@ -360,26 +386,11 @@ function renderTeamsRoster() {
               <span>🥅 ${tt.goals}</span><span>🅰️ ${tt.assists}</span><span>🖐️ ${tt.steals}</span>
               <span>🧱 ${tt.blocks}</span><span>🏁 ${tt.swimOffs} SO</span><span>🏹 ${tt.shots} SH</span>
             </div>
-            <ul class="roster-mini">
-              ${roster.map((p) => `
-                <li>
-                  <span class="rm-name">${playerLink(p.id)}${p.name === t.captain ? ' <span class="cap">C</span>' : ''} ${levelTag(p.level)}</span>
-                  <span class="rm-pos">${playerPos(p, totals[p.id].matches) || '—'}</span>
-                  <span class="rm-goals">${totals[p.id].goals}G</span>
-                </li>`).join('')}
-            </ul>
+            <p class="muted small team-roster-note">Player pool is shared — see Season 5 roster above.</p>
             <div class="team-next">${next ? `Next: ${fmtDate(next.date)} vs ${DB.teamName(next.home === t.id ? next.away : next.home)}` : 'Season complete'}</div>
           </section>`;
       }).join('')}
     </div>
-
-    <section class="panel fa-panel">
-      <div class="panel-head"><h3>🧢 Free agents</h3><span class="muted small">guest into lineups</span></div>
-      <div class="fa-grid">
-        ${DB.freeAgents().map((p) => `
-          <div class="fa-chip">${playerLink(p.id)} ${levelTag(p.level)}</div>`).join('')}
-      </div>
-    </section>
 
     <section class="panel formula">
       <h3>🧮 How ratings are calculated</h3>
@@ -390,18 +401,10 @@ function renderTeamsRoster() {
       </div>
     </section>
 
-    <div class="toolbar">
-      <div class="seg" id="team-filter">
-        <button class="seg-btn active" data-team="all">All</button>
-        ${DB.teams.map((t) => `<button class="seg-btn" data-team="${t.id}">${t.name}</button>`).join('')}
-        <button class="seg-btn" data-team="fa">🧢 Free agents</button>
-      </div>
-    </div>
-
     <section class="panel" id="full-roster">
       <div class="panel-head">
-        <h3>👤 Full roster</h3>
-        <span class="muted small">${rated.length} players</span>
+        <h3>👤 Overall roster</h3>
+        <span class="muted small">${rated.length} players · no team affiliation</span>
       </div>
       <table class="tbl roster">
         <thead><tr>${cols.map(([k, l]) => {
@@ -421,10 +424,6 @@ function renderTeamsRoster() {
     teamHighlight = null;
   }
 
-  $$('#team-filter .seg-btn').forEach((b) => b.addEventListener('click', () => {
-    $$('#team-filter .seg-btn').forEach((x) => x.classList.remove('active'));
-    b.classList.add('active'); rosterFilter = b.dataset.team; draw();
-  }));
   $$('.roster th.sortable').forEach((th) => th.addEventListener('click', (e) => {
     if (e.target.closest('.info')) return;
     const key = th.dataset.key;
@@ -822,8 +821,8 @@ function openProfile(id) {
       <div class="prof-id">
         <div class="prof-avatar" style="--tc:${teamColor(p.teamId)}">${p.name[0]}</div>
         <div>
-          <h2>${p.name} ${levelTag(p.level)}</h2>
-          <p class="muted">${teamBadge(p.teamId)}${posSuffix(p)}${att != null ? ` · ${att}% availability` : ''}</p>
+          <h2>${p.name}${akaSuffix(p)} ${levelTag(p.level)}${DB.isSeason5(p.playerId) ? ' <span class="s5-tag">S5</span>' : ''}</h2>
+          <p class="muted">${DB.isSeason5(p.playerId) ? 'Season 5 roster' : 'ATX roster'}${posSuffix(p)}${att != null ? ` · ${att}% availability` : ''}</p>
         </div>
       </div>
       <div class="prof-rating">${p.matches ? p.rating : '—'}<small>rating</small></div>
