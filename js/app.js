@@ -305,10 +305,6 @@ function resultRow(m) {
 let rosterSort = { key: 'name', dir: 1 };
 let rosterView = 'season5'; // 'season5' | 'overall'
 
-function akaSuffix(p) {
-  return p.aka ? ` <span class="aka">(${p.aka})</span>` : '';
-}
-
 function renderTeamsRoster() {
   const standings = DB.standings();
   const rankOf = {}; standings.forEach((s, i) => (rankOf[s.teamId] = i + 1));
@@ -362,7 +358,7 @@ function renderTeamsRoster() {
     $('#roster-body').innerHTML = rows.map((p) => `
       <tr>
         <td>${p.matches ? `<span class="rating-badge">${p.rating}</span>` : '<span class="muted">—</span>'}</td>
-        <td class="strong">${playerLink(p.playerId)}${akaSuffix(p)}</td>
+        <td class="strong">${playerLink(p.playerId)}</td>
         ${seasonView ? `<td>${teamPill(p.teamId)}</td>` : ''}
         <td>${levelTag(p.level)}</td>
         <td>${posTag(p)}</td>
@@ -851,7 +847,7 @@ function openProfile(id) {
       <div class="prof-id">
         <div class="prof-avatar" style="--tc:${teamColor(p.teamId)}">${p.name[0]}</div>
         <div>
-          <h2>${p.name}${akaSuffix(p)} ${levelTag(p.level)}${DB.isSeason5(p.playerId) ? ' <span class="s5-tag">S5</span>' : ''}</h2>
+          <h2>${p.name} ${levelTag(p.level)}${DB.isSeason5(p.playerId) ? ' <span class="s5-tag">S5</span>' : ''}</h2>
           <p class="muted">${DB.isSeason5(p.playerId) ? teamBadge(p.teamId) : 'ATX roster'}${posSuffix(p)}${att != null ? ` · ${att}% availability` : ''}</p>
         </div>
       </div>
