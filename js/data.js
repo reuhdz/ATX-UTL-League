@@ -59,24 +59,24 @@ const TEAMS = [
   { id: 'team3',    name: 'Splash Damage', color: '#ef4444', captain: 'River' },
 ];
 
-/* ---- Season 5 roster (no team affiliation — pool for the current season) - */
+/* ---- Season 5 roster (captains keep team affiliation; others are FA) ----- */
 const SEASON5_ROSTER = [
   'reuben', 'rich', 'river', 'zach', 'eric', 'justin',
   'bonney', 'max', 'lesley', 'michal', 'sk', 'jacqueline',
 ];
 
 /* ---- Players (real active roster). skill 0..1 gently biases box scores.
-        teamId 'fa' = no fixed team (overall roster has no team affiliation).
-        Captains keep a teamId so schedule scaffolding still has a home club.
+        teamId 'fa' = free agent / unassigned. Season 5 captains have teams.
+        Overall roster view hides team affiliation; Season 5 view shows it.
         level: Pro/Rookie/IR.  */
 const PLAYERS = [
-  // Season 5 captains (schedule scaffolding only — roster UI shows no teams)
+  // Season 5 captains (team-affiliated)
   { id: 'reuben', name: 'Reuben', teamId: 'capybara', level: 'Pro', pos: 'Striker',  skill: 0.78 },
   { id: 'rich',   name: 'Rich',   teamId: 'team1',    level: 'Pro', pos: 'Defender', skill: 0.64 },
   { id: 'zach',   name: 'Zach',   teamId: 'team2',    level: 'Pro', pos: 'Striker',  skill: 0.75 },
   { id: 'river',  name: 'River',  teamId: 'team3',    level: 'Pro', pos: 'Striker',  skill: 0.76 },
 
-  // Season 5 pool + broader overall roster (no team affiliation)
+  // Season 5 pool (unassigned) + broader overall roster
   { id: 'lesley',      name: 'Lesley',      teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.90 },
   { id: 'bonney',      name: 'Bonney',      teamId: 'fa', level: 'Pro',    pos: 'Defender', skill: 0.68, aka: 'James B' },
   { id: 'max',         name: 'Max',         teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.72 },
@@ -119,6 +119,43 @@ function makeRng(seed) {
 }
 const rng = makeRng(LEAGUE.seed);
 const rint = (min, max) => Math.floor(rng() * (max - min + 1)) + min;
+
+/* ---- Prior seasons (1–4) career totals — separate seed so Season 5 RNG
+        / schedule stay untouched. Overall roster = prior + Season 5. -------- */
+const STAT_ZERO = () => ({
+  goals: 0, assists: 0, steals: 0, blocks: 0, turnovers: 0,
+  swimOffs: 0, shots: 0, matches: 0,
+});
+const NEW_LEAGUE_IDS = new Set([
+  'michal', 'jacqueline', 'eric', 'emma', 'liam', 'jack', 'shaneye',
+]);
+const PRIOR_CAREER = (() => {
+  const crng = makeRng(20190101);
+  const cint = (min, max) => Math.floor(crng() * (max - min + 1)) + min;
+  const out = {};
+  PLAYERS.forEach((p) => {
+    if (NEW_LEAGUE_IDS.has(p.id) || p.level === 'Pro (IR)') {
+      out[p.id] = STAT_ZERO();
+      return;
+    }
+    const seasonsPlayed = p.level === 'Rookie' ? cint(0, 1) : cint(2, 4);
+    if (!seasonsPlayed) {
+      out[p.id] = STAT_ZERO();
+      return;
+    }
+    const mp = seasonsPlayed * cint(5, 10);
+    const rate = (base) => Math.max(0, Math.round(mp * base * (0.65 + crng() * 0.7)));
+    const goals = rate(p.skill * 0.55);
+    const assists = rate(p.skill * 0.4);
+    const steals = rate(0.35 + p.skill * 0.25);
+    const blocks = rate((p.pos === 'Defender' || p.pos === 'Goalie' ? 0.45 : 0.18) + p.skill * 0.15);
+    const turnovers = rate(0.28);
+    const swimOffs = rate(p.skill * 0.22);
+    const shots = goals + rate(0.5 + p.skill * 0.35);
+    out[p.id] = { goals, assists, steals, blocks, turnovers, swimOffs, shots, matches: mp };
+  });
+  return out;
+})();
 
 const rosterOf = (tid) => PLAYERS.filter((p) => p.teamId === tid);
 const FA_POOL = PLAYERS.filter((p) => p.teamId === 'fa' && p.level !== 'Pro (IR)').map((p) => p.id);
@@ -311,8 +348,29 @@ const DB = {
     return totals;
   },
 
-  ratedPlayers() {
-    const totals = this.playerTotals();
+  /* All-time totals: prior seasons (1–4) + current Season 5 box scores */
+  careerTotals() {
+    const season = this.playerTotals();
+    const totals = {};
+    PLAYERS.forEach((p) => {
+      const prior = PRIOR_CAREER[p.id] || STAT_ZERO();
+      const cur = season[p.id];
+      totals[p.id] = {
+        playerId: p.id,
+        goals: prior.goals + cur.goals,
+        assists: prior.assists + cur.assists,
+        steals: prior.steals + cur.steals,
+        blocks: prior.blocks + cur.blocks,
+        turnovers: prior.turnovers + cur.turnovers,
+        swimOffs: prior.swimOffs + cur.swimOffs,
+        shots: prior.shots + cur.shots,
+        matches: prior.matches + cur.matches,
+      };
+    });
+    return totals;
+  },
+
+  _rateFromTotals(totals) {
     const w = RATING.weights;
     const raw = PLAYERS.map((p) => {
       const t = totals[p.id];
@@ -321,7 +379,7 @@ const DB = {
       return {
         ...p, ...t,
         perMatch: t.matches ? score / t.matches : 0,
-        eff: t.matches ? score / (t.matches + RATING.prior) : 0, // shrunk toward 0 for small samples
+        eff: t.matches ? score / (t.matches + RATING.prior) : 0,
       };
     });
     const played = raw.filter((r) => r.matches > 0).map((r) => r.eff);
@@ -336,7 +394,11 @@ const DB = {
       .sort((a, b) => b.rating - a.rating || b.goals - a.goals);
   },
 
+  ratedPlayers() { return this._rateFromTotals(this.playerTotals()); },
+  ratedCareerPlayers() { return this._rateFromTotals(this.careerTotals()); },
+
   ratedPlayer(id) { return this.ratedPlayers().find((p) => p.playerId === id); },
+  ratedCareerPlayer(id) { return this.ratedCareerPlayers().find((p) => p.playerId === id); },
 
   teamTotals(teamId) {
     const totals = this.playerTotals();
