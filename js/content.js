@@ -232,7 +232,7 @@ const MEDIA = {
   items: [
     { kind: 'photo', title: 'Capybara vs Splash Damage — Week 4 opener', team: 'capybara', date: '2026-09-13', tag: 'Game photo', hue: 200 },
     { kind: 'video', title: 'Lesley’s buzzer-beater from the throw-off', team: 'capybara', date: '2026-09-13', tag: 'Highlight', hue: 195 },
-    { kind: 'photo', title: 'Team 2 defensive wall holds the line', team: 'team2', date: '2026-09-06', tag: 'Game photo', hue: 38 },
+    { kind: 'photo', title: 'Lone Starfish defensive wall holds the line', team: 'team2', date: '2026-09-06', tag: 'Game photo', hue: 38 },
     { kind: 'video', title: 'Manny hat-trick reel', team: 'team2', date: '2026-09-06', tag: 'Highlight', hue: 40 },
     { kind: 'photo', title: 'Hellfish pre-dive huddle', team: 'team1', date: '2026-08-30', tag: 'Behind the scenes', hue: 140 },
     { kind: 'video', title: 'Glenn’s goal-line steal of the season', team: 'team1', date: '2026-08-30', tag: 'Highlight', hue: 150 },
