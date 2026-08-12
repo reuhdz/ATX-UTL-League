@@ -54,7 +54,7 @@ const STANDINGS_GLOSSARY = [
 /* ---- Teams --------------------------------------------------------------- */
 const TEAMS = [
   { id: 'capybara', name: 'Capybara',      color: '#0ea5e9', captain: 'Reuben' },
-  { id: 'team1',    name: 'Hellfish',      color: '#22c55e', captain: 'Rich' },
+  { id: 'team1',    name: 'Flying Hellfish', color: '#22c55e', captain: 'Rich' },
   { id: 'team2',    name: 'Lone Starfish', color: '#f59e0b', captain: 'Zach' },
   { id: 'team3',    name: 'Splash Damage', color: '#ef4444', captain: 'River' },
 ];
