@@ -63,6 +63,7 @@ const TEAMS = [
 const SEASON5_ROSTER = [
   'reuben', 'rich', 'river', 'zach', 'eric', 'justin',
   'bonney', 'max', 'lesley', 'michal', 'sk', 'jacqueline',
+  'kellie', 'sage', 'walter', 'glenn', 'liam',
 ];
 
 /* ---- Players (real active roster). skill 0..1 gently biases box scores.

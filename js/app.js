@@ -369,7 +369,7 @@ function renderTeamsRoster() {
 
     const title = seasonView ? '🌊 Season 5 roster' : '👤 Overall roster';
     const meta = seasonView
-      ? `${season5Count} players · Season 5 stats · captains team-affiliated`
+      ? `${season5Count} players · Season 5 stats`
       : `${careerRated.length} players · all-seasons stats · no team affiliation`;
     $('#roster-title').textContent = title;
     $('#roster-meta').textContent = meta;
