@@ -8,7 +8,7 @@
 <title>ATX UTL — Season 5 Dashboard</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%8A%3C/text%3E%3C/svg%3E" />
 <meta http-equiv="Cache-Control" content="no-cache" />
-<link rel="stylesheet" href="css/styles.css?v=20260817b" />
+<link rel="stylesheet" href="css/styles.css?v=20260817c" />
 </head>
 <body>
 <!-- ============================ HEADER ============================ -->
@@ -35,6 +35,7 @@
   <button class="tab-btn" data-tab="media" role="tab">🎬 Media</button>
   <button class="tab-btn" data-tab="teams" role="tab">Teams &amp; Roster</button>
   <button class="tab-btn" data-tab="attendance" role="tab">✅ Attendance</button>
+  <button class="tab-btn" data-tab="draft" role="tab">🎯 Draft</button>
   <button class="tab-btn" data-tab="faq" role="tab">📖 Rules &amp; FAQ</button>
 </nav>
 
@@ -51,10 +52,14 @@
   <span>ATX UTL · Season 5 · starts Aug 23, 2026</span>
 </footer>
 
-<script src="vendor/chart.umd.js?v=20260817b"></script>
-<script src="js/data.js?v=20260817b"></script>
-<script src="js/content.js?v=20260817b"></script>
-<script src="js/charts.js?v=20260817b"></script>
-<script src="js/app.js?v=20260817b"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
+<script src="vendor/chart.umd.js?v=20260817c"></script>
+<script src="js/data.js?v=20260817c"></script>
+<script src="js/content.js?v=20260817c"></script>
+<script src="js/charts.js?v=20260817c"></script>
+<script src="js/firebase-config.js?v=20260817c"></script>
+<script src="js/draft.js?v=20260817c"></script>
+<script src="js/app.js?v=20260817c"></script>
 </body>
 </html>

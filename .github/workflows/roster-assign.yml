@@ -1,0 +1,82 @@
+name: Roster assign (team update)
+
+# Triggered by repository_dispatch from a trusted Worker/backend that holds
+# a GitHub token. Payload:
+#   client_payload:
+#     playerId: "lesley"
+#     teamId: "capybara"   # or "fa"
+on:
+  repository_dispatch:
+    types: [roster_assign]
+  workflow_dispatch:
+    inputs:
+      playerId:
+        description: Player id (e.g. lesley)
+        required: true
+        type: string
+      teamId:
+        description: Team id (capybara|team1|team2|team3|fa)
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  assign:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update player teamId in js/data.js
+        env:
+          PLAYER_ID: ${{ github.event.client_payload.playerId || inputs.playerId }}
+          TEAM_ID: ${{ github.event.client_payload.teamId || inputs.teamId }}
+        run: |
+          set -euo pipefail
+          test -n "$PLAYER_ID"
+          test -n "$TEAM_ID"
+          case "$TEAM_ID" in
+            capybara|team1|team2|team3|fa) ;;
+            *) echo "Invalid teamId: $TEAM_ID"; exit 1 ;;
+          esac
+          python3 - <<'PY'
+          import os, re, pathlib
+          player = os.environ["PLAYER_ID"]
+          team = os.environ["TEAM_ID"]
+          path = pathlib.Path("js/data.js")
+          text = path.read_text()
+          # Match a player object by id and replace its teamId value.
+          pattern = rf"(id:\s*'{re.escape(player)}'[\s\S]*?teamId:\s*)'[^']*'"
+          new_text, n = re.subn(pattern, rf"\1'{team}'", text, count=1)
+          if n != 1:
+              raise SystemExit(f"Could not uniquely update player '{player}' (matches={n})")
+          path.write_text(new_text)
+          print(f"Updated {player} -> {team}")
+          PY
+
+      - name: Bump cache-bust query on index assets
+        run: |
+          python3 - <<'PY'
+          import pathlib, re, time
+          path = pathlib.Path("index.html")
+          text = path.read_text()
+          stamp = time.strftime("%Y%m%d%H%M")
+          text2, n = re.subn(r"(\?v=)[0-9A-Za-z._-]+", rf"\1{stamp}", text)
+          if n < 1:
+              raise SystemExit("No ?v= cache bust markers found in index.html")
+          path.write_text(text2)
+          print(f"Cache bust -> {stamp} ({n} replacements)")
+          PY
+
+      - name: Commit and push
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add js/data.js index.html
+          if git diff --staged --quiet; then
+            echo "No changes"
+            exit 0
+          fi
+          git commit -m "Assign ${{ github.event.client_payload.playerId || inputs.playerId }} to ${{ github.event.client_payload.teamId || inputs.teamId }}"
+          git push
