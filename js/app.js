@@ -993,8 +993,12 @@ function renderDraft() {
   view.innerHTML = `
     <div class="page-head">
       <h2>Draft Room</h2>
-      <p class="muted">Snake order: River → Zach → Reuben → Rich. Captains pick with their team PIN; master PIN can pick any turn.</p>
     </div>
+
+    <section class="panel">
+      <div class="panel-head"><h3>🏟️ Team boards</h3></div>
+      <div id="draft-team-boards" class="draft-team-boards"></div>
+    </section>
 
     <section class="panel">
       <div class="panel-head">
@@ -1014,11 +1018,6 @@ function renderDraft() {
       <div class="panel-head tight"><h4>Recent picks</h4></div>
       <div id="draft-picks"></div>
       <p id="draft-live-msg" class="draft-msg"></p>
-    </section>
-
-    <section class="panel">
-      <div class="panel-head"><h3>🏟️ Team boards</h3></div>
-      <div id="draft-team-boards" class="draft-team-boards"></div>
     </section>
   `;
 

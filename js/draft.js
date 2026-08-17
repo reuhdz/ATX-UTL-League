@@ -115,10 +115,15 @@ const DraftHub = (() => {
 
   function applyAssignments(map) {
     assignments = map || {};
+    const captains = new Set(captainIds());
     const players = window.DB?.players || [];
     players.forEach((p) => {
-      const base = BASE_TEAMS[p.id] ?? 'fa';
-      p.teamId = assignments[p.id]?.teamId || base;
+      if (assignments[p.id]?.teamId) {
+        p.teamId = assignments[p.id].teamId;
+        return;
+      }
+      // No live override: captains keep club, everyone else is a free agent
+      p.teamId = captains.has(p.id) ? (BASE_TEAMS[p.id] || p.teamId) : 'fa';
     });
   }
 
@@ -221,19 +226,34 @@ const DraftHub = (() => {
   }
 
   async function clearDraftAssignments() {
-    // Wipe live overrides so everyone returns to base teams:
-    // captains stay on their clubs; drafted players revert to free agents.
+    // Wipe live overrides so drafted players return to free agents.
+    // Captains keep their clubs; everyone else is forced back to 'fa'.
+    const captains = new Set(captainIds());
+
     if (mode === 'firebase') {
       try {
-        await db.ref('rosterAssignments').set({});
+        // remove() clears the node for all clients; set({}) can leave stale children
+        // in some edge cases depending on listener timing.
+        await db.ref('rosterAssignments').remove();
       } catch (e) {
         throw new Error(`Could not clear roster assignments: ${e.message || e}`);
       }
     } else {
       writeLocal('roster', {});
-      applyAssignments({});
-      emit();
     }
+
+    assignments = {};
+    const players = window.DB?.players || [];
+    players.forEach((p) => {
+      if (captains.has(p.id)) {
+        p.teamId = BASE_TEAMS[p.id] || p.teamId;
+      } else {
+        // Drafted players (and the rest of the pool) become free agents again
+        p.teamId = 'fa';
+        BASE_TEAMS[p.id] = 'fa';
+      }
+    });
+    emit();
   }
 
   async function startDraft() {
