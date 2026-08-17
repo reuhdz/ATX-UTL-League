@@ -1,11 +1,10 @@
 /* =============================================================================
-   Draft hub — Firebase live draft + team assignment form
+   Draft hub — Firebase live draft
    -----------------------------------------------------------------------------
    Paths in Realtime Database:
      /drafts/{roomId}     live draft state
      /rosterAssignments   { [playerId]: { teamId, updatedAt, by } }
-   When Firebase is disabled/unconfigured, falls back to localStorage so the
-   UI is still usable for single-device testing.
+   Falls back to localStorage when Firebase is unavailable.
    ============================================================================ */
 
 const DraftHub = (() => {
@@ -18,7 +17,7 @@ const DraftHub = (() => {
   );
 
   let db = null;
-  let mode = 'local'; // 'firebase' | 'local'
+  let mode = 'local';
   let connectionError = null;
   let connected = false;
   let unsubDraft = null;
@@ -60,10 +59,35 @@ const DraftHub = (() => {
     try { localStorage.setItem(localKey(kind), JSON.stringify(value)); } catch (e) { /* ignore */ }
   }
 
+  function captainIds() {
+    return cfg().captainIds || ['river', 'zach', 'reuben', 'rich'];
+  }
+
+  function draftTeamOrder() {
+    return cfg().draftOrder || ['team3', 'team2', 'capybara', 'team1'];
+  }
+
+  function normalizePin(pin) {
+    return String(pin || '').trim().toLowerCase();
+  }
+
+  function teamPin(teamId) {
+    return normalizePin((cfg().teamPins || {})[teamId]);
+  }
+
+  function checkTeamPin(pin, teamId) {
+    const expected = teamPin(teamId);
+    return !!expected && normalizePin(pin) === expected;
+  }
+
+  function isAnyCaptainPin(pin) {
+    return Object.keys(cfg().teamPins || {}).some((tid) => checkTeamPin(pin, tid));
+  }
+
   function defaultDraft() {
-    const pool = (window.DB?.season5RosterIds || []).slice();
-    const teamIds = (window.DB?.teams || []).map((t) => t.id);
-    // Snake order across 4 rounds of picks (enough for a full S5 pool)
+    const captains = new Set(captainIds());
+    const pool = (window.DB?.season5RosterIds || []).filter((id) => !captains.has(id));
+    const teamIds = draftTeamOrder();
     const order = [];
     const rounds = Math.ceil(pool.length / Math.max(teamIds.length, 1));
     for (let r = 0; r < rounds; r++) {
@@ -94,12 +118,9 @@ const DraftHub = (() => {
       const res = await fetch(`${url.replace(/\/$/, '')}/.json`, { method: 'GET' });
       const text = await res.text();
       if (res.status === 404) {
-        throw new Error(
-          'Realtime Database not found at databaseURL (404). In Firebase Console create Build → Realtime Database (not Firestore), then paste the exact DB URL into js/firebase-config.js.'
-        );
+        throw new Error('Realtime Database not found at databaseURL (404).');
       }
       if (res.status === 401 || res.status === 403 || text.includes('Permission denied')) {
-        // Reachable but locked — still a valid DB URL.
         return { ok: true, locked: true };
       }
       return { ok: true, locked: false };
@@ -110,7 +131,6 @@ const DraftHub = (() => {
   }
 
   async function init() {
-    // Capture base teams once DB is present
     (window.DB?.players || []).forEach((p) => {
       if (!(p.id in BASE_TEAMS)) BASE_TEAMS[p.id] = p.teamId;
     });
@@ -131,11 +151,6 @@ const DraftHub = (() => {
       }
     } else {
       mode = 'local';
-      if (!window.firebase) {
-        connectionError = 'Firebase SDK failed to load (CDN blocked?).';
-      } else if (!fbCfg().enabled) {
-        connectionError = 'Firebase config enabled flag is false.';
-      }
     }
 
     if (mode === 'firebase') {
@@ -160,12 +175,11 @@ const DraftHub = (() => {
         connectionError = `Roster sync error: ${err?.message || err}`;
         emit();
       });
-      // Ensure draft node exists
       try {
         const snap = await draftRef.once('value');
         if (!snap.exists()) await draftRef.set(defaultDraft());
       } catch (e) {
-        connectionError = `Cannot write draft state: ${e.message || e}. Check Realtime Database rules (test mode).`;
+        connectionError = `Cannot write draft state: ${e.message || e}`;
         mode = 'local';
         draftState = readLocal('draft', defaultDraft());
         applyAssignments(readLocal('roster', {}));
@@ -178,10 +192,6 @@ const DraftHub = (() => {
     }
 
     return { mode, configured: mode === 'firebase', connectionError };
-  }
-
-  function checkPin(pin) {
-    return String(pin || '') === String(cfg().commissionerPin || '');
   }
 
   async function setDraft(next) {
@@ -201,41 +211,43 @@ const DraftHub = (() => {
     }
   }
 
-  async function startDraft(pin) {
-    if (!checkPin(pin)) throw new Error('Wrong commissioner PIN');
+  async function startDraft() {
     const fresh = defaultDraft();
     fresh.status = 'live';
     await setDraft(fresh);
   }
 
   async function resetDraft(pin) {
-    if (!checkPin(pin)) throw new Error('Wrong commissioner PIN');
+    if (!isAnyCaptainPin(pin)) throw new Error('Enter a captain PIN to reset');
     await setDraft(defaultDraft());
   }
 
   async function makePick(playerId, pin) {
-    if (!checkPin(pin)) throw new Error('Wrong commissioner PIN');
     const d = { ...(draftState || defaultDraft()) };
     if (d.status !== 'live') throw new Error('Draft is not live');
     if (!d.pool.includes(playerId)) throw new Error('Player not in pool');
     const teamId = d.order[d.pickIndex];
     if (!teamId) throw new Error('Draft is complete');
+    if (!checkTeamPin(pin, teamId)) {
+      const name = window.DB?.teamName(teamId) || teamId;
+      throw new Error(`Only ${name}'s captain can pick now (wrong PIN)`);
+    }
 
     d.pool = d.pool.filter((id) => id !== playerId);
     d.picks = [...(d.picks || []), { playerId, teamId, at: Date.now() }];
     d.pickIndex += 1;
     if (d.pickIndex >= d.order.length || d.pool.length === 0) d.status = 'done';
     await setDraft(d);
-    await assignTeam(playerId, teamId, pin, { fromDraft: true });
+    await assignTeam(playerId, teamId, { fromDraft: true });
   }
 
-  async function syncGithub(playerId, teamId, pin) {
+  async function syncGithub(playerId, teamId) {
     const endpoint = cfg().rosterSync?.endpoint;
     if (!endpoint) return { skipped: true, reason: 'No rosterSync.endpoint configured' };
     const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ playerId, teamId, pin }),
+      body: JSON.stringify({ playerId, teamId }),
     });
     if (!res.ok) {
       const text = await res.text().catch(() => '');
@@ -244,8 +256,7 @@ const DraftHub = (() => {
     return res.json().catch(() => ({ ok: true }));
   }
 
-  async function assignTeam(playerId, teamId, pin, opts = {}) {
-    if (!checkPin(pin)) throw new Error('Wrong commissioner PIN');
+  async function assignTeam(playerId, teamId, opts = {}) {
     const validTeam = teamId === 'fa' || (window.DB?.teams || []).some((t) => t.id === teamId);
     if (!validTeam) throw new Error('Unknown team');
     if (!window.DB?.player(playerId)) throw new Error('Unknown player');
@@ -266,8 +277,8 @@ const DraftHub = (() => {
     }
 
     let github = { skipped: true };
-    if (!opts.fromDraft || opts.syncGithub) {
-      try { github = await syncGithub(playerId, teamId, pin); }
+    if (opts.syncGithub) {
+      try { github = await syncGithub(playerId, teamId); }
       catch (e) { github = { ok: false, error: e.message }; }
     }
     return { ok: true, github };
@@ -289,9 +300,9 @@ const DraftHub = (() => {
   }
 
   return {
-    init, onChange, status, checkPin,
+    init, onChange, status,
     startDraft, resetDraft, makePick, assignTeam,
-    defaultDraft,
+    defaultDraft, teamPin, checkTeamPin, draftTeamOrder,
   };
 })();
 

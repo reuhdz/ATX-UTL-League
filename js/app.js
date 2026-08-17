@@ -900,7 +900,7 @@ function closeProfile() {
 }
 
 /* =============================================================================
-   DRAFT (Firebase live draft + team assignment form)
+   DRAFT (Firebase live draft)
    ============================================================================ */
 let draftUnsub = null;
 
@@ -913,40 +913,39 @@ function renderDraft() {
     el.textContent = text || '';
   };
 
+  const boardOrder = () => {
+    const order = DraftHub.draftTeamOrder();
+    return order.map((id) => DB.team(id)).filter(Boolean);
+  };
+
   const paint = () => {
     const st = DraftHub.status();
     const d = st.draft || DraftHub.defaultDraft();
-    const teams = DB.teams;
     const teamName = (id) => DB.teamName(id);
     const currentTeamId = st.currentTeamId;
     const pool = d.pool || [];
     const picks = d.picks || [];
 
-    const modeLabel = st.configured
-      ? (st.connected ? 'Firebase live · connected' : 'Firebase live · connecting…')
-      : 'Local mode (not multi-device)';
-
-    if ($('#draft-mode-pill')) $('#draft-mode-pill').textContent = modeLabel;
-    if ($('#draft-conn-msg')) {
-      if (st.connectionError) {
-        $('#draft-conn-msg').className = 'draft-msg err';
-        $('#draft-conn-msg').textContent = st.connectionError;
-      } else if (st.configured) {
-        $('#draft-conn-msg').className = 'draft-msg ok';
-        $('#draft-conn-msg').textContent = `Syncing via ${st.databaseURL}`;
-      } else {
-        $('#draft-conn-msg').className = 'draft-msg';
-        $('#draft-conn-msg').textContent = 'Using this device only until Realtime Database is connected.';
-      }
-    }
     if ($('#draft-status-pill')) {
       $('#draft-status-pill').textContent = d.status || 'idle';
       $('#draft-status-pill').dataset.state = d.status || 'idle';
     }
     if ($('#draft-turn')) {
-      $('#draft-turn').innerHTML = d.status === 'live' && currentTeamId
-        ? `On the clock: <b>${teamName(currentTeamId)}</b> · pick #${(d.pickIndex || 0) + 1}`
-        : d.status === 'done' ? 'Draft complete' : 'Draft not started';
+      if (d.status === 'live' && currentTeamId) {
+        const t = DB.team(currentTeamId);
+        $('#draft-turn').innerHTML =
+          `On the clock: <b>${teamName(currentTeamId)}</b> (${t?.captain || 'Captain'}) · pick #${(d.pickIndex || 0) + 1}`;
+      } else if (d.status === 'done') {
+        $('#draft-turn').textContent = 'Draft complete';
+      } else {
+        $('#draft-turn').textContent = 'Draft not started';
+      }
+    }
+    if ($('#draft-pin')) {
+      const t = currentTeamId ? DB.team(currentTeamId) : null;
+      $('#draft-pin').placeholder = d.status === 'live' && t
+        ? `${t.captain}'s PIN`
+        : 'Captain PIN';
     }
 
     if ($('#draft-pool')) {
@@ -979,102 +978,54 @@ function renderDraft() {
     }
 
     if ($('#draft-team-boards')) {
-      $('#draft-team-boards').innerHTML = teams.map((t) => {
+      $('#draft-team-boards').innerHTML = boardOrder().map((t) => {
         const roster = DB.rosterOf(t.id);
-        return `<div class="draft-team-card" style="--tc:${t.color}">
-          <h4>${t.name}</h4>
+        const onClock = d.status === 'live' && currentTeamId === t.id;
+        return `<div class="draft-team-card${onClock ? ' on-clock' : ''}" style="--tc:${t.color}">
+          <h4>${t.name}${onClock ? ' · on the clock' : ''}</h4>
+          <p class="muted small">Captain: ${t.captain}</p>
           <ul>${roster.map((p) => `<li>${playerLink(p.id)}${p.name === t.captain ? ' <span class="cap">C</span>' : ''}</li>`).join('') || '<li class="muted">—</li>'}</ul>
         </div>`;
       }).join('');
-    }
-
-    // Keep assign form player list in sync with current teams
-    if ($('#assign-player') && document.activeElement !== $('#assign-player')) {
-      const selected = $('#assign-player').value;
-      $('#assign-player').innerHTML = DB.season5Roster()
-        .slice()
-        .sort((a, b) => a.name.localeCompare(b.name))
-        .map((p) => `<option value="${p.id}">${p.name} (${DB.teamName(p.teamId)})</option>`)
-        .join('');
-      if (selected) $('#assign-player').value = selected;
     }
   };
 
   view.innerHTML = `
     <div class="page-head">
       <h2>Draft Room</h2>
-      <p class="muted">Live Firebase draft + one-click team assignment for Season 5.</p>
+      <p class="muted">Snake order: River → Zach → Reuben → Rich. Captains pick with their team PIN.</p>
     </div>
 
     <section class="panel">
       <div class="panel-head">
-        <h3>⚙️ Setup</h3>
-        <span class="pill draft-mode" id="draft-mode-pill">…</span>
+        <h3>🎯 Season 5 draft</h3>
+        <span class="pill draft-state" id="draft-status-pill">idle</span>
       </div>
-      <ol class="draft-setup">
-        <li>Create a Firebase project and enable <b>Realtime Database</b> (not Firestore).</li>
-        <li>Paste the web config into <code>js/firebase-config.js</code> and set <code>enabled: true</code>.</li>
-        <li>Set <code>databaseURL</code> to the exact URL from Realtime Database (often ends in <code>firebasedatabase.app</code>).</li>
-        <li>Change <code>commissionerPin</code> in that file (default is <code>deepend</code>).</li>
-        <li>Optional GitHub auto-commit: set <code>rosterSync.endpoint</code> to a Worker that triggers the <code>roster_assign</code> Action.</li>
-      </ol>
-      <p id="draft-conn-msg" class="draft-msg"></p>
-      <p class="muted small">Without a working Realtime Database, picks stay on one device only.</p>
+      <div class="draft-controls">
+        <label class="draft-field">PIN
+          <input id="draft-pin" class="input" type="password" autocomplete="off" placeholder="Captain PIN" />
+        </label>
+        <button type="button" class="btn" id="draft-start">Start draft</button>
+        <button type="button" class="btn btn-ghost" id="draft-reset">Reset</button>
+      </div>
+      <p id="draft-turn" class="draft-turn muted">Draft not started</p>
+      <div class="panel-head tight"><h4>Available pool</h4></div>
+      <div id="draft-pool" class="draft-pool"></div>
+      <div class="panel-head tight"><h4>Recent picks</h4></div>
+      <div id="draft-picks"></div>
+      <p id="draft-live-msg" class="draft-msg"></p>
     </section>
 
-    <div class="draft-grid">
-      <section class="panel">
-        <div class="panel-head">
-          <h3>📡 Live draft</h3>
-          <span class="pill draft-state" id="draft-status-pill">idle</span>
-        </div>
-        <div class="draft-controls">
-          <label class="draft-field">PIN
-            <input id="draft-pin" class="input" type="password" autocomplete="off" placeholder="Commissioner PIN" />
-          </label>
-          <button type="button" class="btn" id="draft-start">Start draft</button>
-          <button type="button" class="btn btn-ghost" id="draft-reset">Reset</button>
-        </div>
-        <p id="draft-turn" class="draft-turn muted">Draft not started</p>
-        <div class="panel-head tight"><h4>Available pool</h4></div>
-        <div id="draft-pool" class="draft-pool"></div>
-        <div class="panel-head tight"><h4>Recent picks</h4></div>
-        <div id="draft-picks"></div>
-        <p id="draft-live-msg" class="draft-msg"></p>
-      </section>
-
-      <section class="panel">
-        <div class="panel-head"><h3>📝 Assign team (form)</h3></div>
-        <p class="muted small">Select a Season 5 player and team, then submit. Updates live roster via Firebase (and GitHub if sync endpoint is set).</p>
-        <form id="assign-form" class="assign-form">
-          <label class="draft-field">Player
-            <select id="assign-player" class="select" required></select>
-          </label>
-          <label class="draft-field">Team
-            <select id="assign-team" class="select" required>
-              ${DB.teams.map((t) => `<option value="${t.id}">${t.name}</option>`).join('')}
-              <option value="fa">Free Agent</option>
-            </select>
-          </label>
-          <label class="draft-field">PIN
-            <input id="assign-pin" class="input" type="password" autocomplete="off" placeholder="Commissioner PIN" required />
-          </label>
-          <button type="submit" class="btn">Submit assignment</button>
-        </form>
-        <p id="assign-msg" class="draft-msg"></p>
-      </section>
-    </div>
-
     <section class="panel">
-      <div class="panel-head"><h3>🏟️ Live team boards</h3></div>
+      <div class="panel-head"><h3>🏟️ Team boards</h3></div>
       <div id="draft-team-boards" class="draft-team-boards"></div>
     </section>
   `;
 
   $('#draft-start')?.addEventListener('click', async () => {
     try {
-      await DraftHub.startDraft(pinVal());
-      setMsg('#draft-live-msg', 'Draft is live', 'ok');
+      await DraftHub.startDraft();
+      setMsg('#draft-live-msg', 'Draft is live — River / Splash Damage is on the clock', 'ok');
     } catch (e) {
       setMsg('#draft-live-msg', e.message || String(e), 'err');
     }
@@ -1085,24 +1036,6 @@ function renderDraft() {
       setMsg('#draft-live-msg', 'Draft reset', 'ok');
     } catch (e) {
       setMsg('#draft-live-msg', e.message || String(e), 'err');
-    }
-  });
-  $('#assign-form')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const playerId = $('#assign-player').value;
-    const teamId = $('#assign-team').value;
-    const pin = ($('#assign-pin').value || '').trim();
-    try {
-      const res = await DraftHub.assignTeam(playerId, teamId, pin, { syncGithub: true });
-      const name = DB.player(playerId)?.name || playerId;
-      let msg = `Assigned ${name} → ${DB.teamName(teamId)}`;
-      if (res.github?.skipped) msg += ' · live roster updated (GitHub sync not configured)';
-      else if (res.github?.ok === false) msg += ` · GitHub sync error: ${res.github.error}`;
-      else if (!res.github?.skipped) msg += ' · GitHub sync requested';
-      setMsg('#assign-msg', msg, res.github?.ok === false ? 'err' : 'ok');
-      paint();
-    } catch (err) {
-      setMsg('#assign-msg', err.message || String(err), 'err');
     }
   });
 

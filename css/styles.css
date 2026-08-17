@@ -552,9 +552,8 @@ code { background: var(--surface-2); padding: 2px 6px; border-radius: 6px; font-
 .draft-team-boards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
 @media (max-width: 900px) { .draft-team-boards { grid-template-columns: repeat(2, 1fr); } }
 @media (max-width: 520px) { .draft-team-boards { grid-template-columns: 1fr; } }
-.draft-team-card {
-  background: var(--surface-2); border: 1px solid var(--border); border-top: 3px solid var(--tc);
-  border-radius: var(--radius-sm); padding: 12px;
+.draft-team-card.on-clock {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--tc) 55%, transparent);
 }
 .draft-team-card h4 { margin: 0 0 8px; font-size: 14px; }
 .draft-team-card ul { list-style: none; margin: 0; padding: 0; font-size: 13px; }

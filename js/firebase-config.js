@@ -1,10 +1,8 @@
 /* =============================================================================
-   Firebase + roster-sync config
+   Firebase + draft config
    -----------------------------------------------------------------------------
    Project: utl-draft
-   Make sure Realtime Database is created in Firebase Console.
-   If connection fails, copy the exact databaseURL from:
-   Build → Realtime Database → Data tab (browser URL / SDK snippet).
+   Captain PINs = "utl" + team name as one lowercase word.
    ============================================================================ */
 
 window.FIREBASE_CONFIG = {
@@ -19,14 +17,20 @@ window.FIREBASE_CONFIG = {
   measurementId: 'G-LV5WXWP332',
 };
 
-/* Commissioner PIN checked client-side (casual protection). Change this. */
 window.DRAFT_CONFIG = {
   roomId: 'season5',
-  commissionerPin: 'deepend',
-  /* Optional HTTPS endpoint that accepts:
-       POST { playerId, teamId, pin }
-     and triggers the roster-assign GitHub Action / commits to main. */
+  /* Snake draft first-round order by captain: River, Zach, Reuben, Rich */
+  draftOrder: ['team3', 'team2', 'capybara', 'team1'],
+  /* Captains are pre-assigned and excluded from the draft pool */
+  captainIds: ['river', 'zach', 'reuben', 'rich'],
+  /* utl + team name (one word, lowercase) */
+  teamPins: {
+    team3: 'utlsplashdamage',   // River — Splash Damage
+    team2: 'utllonestarfish',   // Zach — Lone Starfish
+    capybara: 'utlcapybara',    // Reuben — Capybara
+    team1: 'utlflyinghellfish', // Rich — Flying Hellfish
+  },
   rosterSync: {
-    endpoint: '', // e.g. 'https://roster-sync.your-worker.workers.dev'
+    endpoint: '',
   },
 };
