@@ -741,15 +741,16 @@ function renderAttendance() {
   const nights = DB.availability.nights;
   const table = DB.availability.table;
   const statusMap = { in: ['In', 'in'], maybe: ['Maybe', 'maybe'], out: ['Out', 'out'] };
+  const seasonPlayers = DB.season5Roster().filter((p) => p.level !== 'Pro (IR)');
 
   view.innerHTML = `
-    <div class="page-head"><h2>Attendance &amp; Availability</h2></div>
+    <div class="page-head"><h2>Attendance &amp; Availability</h2><p class="muted">Season 5 roster only.</p></div>
 
     ${nights.length === 0 ? '<section class="panel"><p class="muted">No upcoming nights — season complete.</p></section>' : `
     <div class="att-summary">
       ${nights.map((d) => {
         const counts = { in: 0, maybe: 0, out: 0 };
-        Object.values(table[d]).forEach((s) => counts[s]++);
+        seasonPlayers.forEach((p) => { const s = table[d][p.id]; if (s) counts[s]++; });
         return `<div class="att-night">
             <div class="att-date">${fmtDate(d)}</div>
             <div class="att-counts">
@@ -780,14 +781,14 @@ function renderAttendance() {
   if (!nights.length) return;
 
   const draw = () => {
-    const players = DB.players.filter((p) => p.level !== 'Pro (IR)').filter((p) =>
+    const players = seasonPlayers.filter((p) =>
       attFilter === 'all' ? true : attFilter === 'fa' ? p.teamId === 'fa' : p.teamId === attFilter);
     $('#att-body').innerHTML = players.map((p) => `
       <tr>
         <td class="lft strong">${playerLink(p.id)} ${levelTag(p.level)}</td>
         <td>${teamPill(p.teamId)}</td>
         ${nights.map((d) => {
-          const [lbl, cls] = statusMap[table[d][p.id]];
+          const [lbl, cls] = statusMap[table[d][p.id] || 'maybe'];
           return `<td><span class="pill ${cls}">${lbl}</span></td>`;
         }).join('')}
         <td class="strong">${DB.attendancePct(p.id)}%</td>

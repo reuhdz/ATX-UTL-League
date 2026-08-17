@@ -229,7 +229,7 @@ const MATCHES = (() => {
     ({ ...m, status: 'scheduled', homeScore: null, awayScore: null, box: [], homeLineup: [], awayLineup: [] }));
 })();
 
-/* ---- Availability for upcoming league nights ----------------------------- */
+/* ---- Availability for upcoming league nights (Season 5 roster only) ------ */
 const AVAILABILITY = (() => {
   // upcoming scheduled nights, then extend to at least 4 future Sunday nights
   const nights = [...new Set(MATCHES.filter((m) => m.status === 'scheduled').map((m) => m.date))].sort();
@@ -239,17 +239,13 @@ const AVAILABILITY = (() => {
     cursor.setDate(cursor.getDate() + 7);
     nights.push(cursor.toISOString().slice(0, 10));
   }
-  const playable = PLAYERS.filter((p) => p.level !== 'Pro (IR)');
+  const playable = SEASON5_ROSTER
+    .map((id) => PLAYERS.find((p) => p.id === id))
+    .filter((p) => p && p.level !== 'Pro (IR)');
   const out = {};
   nights.forEach((date) => {
     out[date] = {};
-    playable.forEach((p) => {
-      const r = rng();
-      const rostered = p.teamId !== 'fa';
-      out[date][p.id] = rostered
-        ? (r < 0.62 ? 'in' : r < 0.86 ? 'maybe' : 'out')
-        : (r < 0.4 ? 'in' : r < 0.7 ? 'maybe' : 'out');
-    });
+    playable.forEach((p) => { out[date][p.id] = 'maybe'; });
   });
   return { nights, table: out };
 })();
