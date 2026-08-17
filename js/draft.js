@@ -176,9 +176,8 @@ const DraftHub = (() => {
     expireTimer = setInterval(() => {
       const d = draftState;
       if (!d || d.status !== 'live' || !d.turnStartedAt) return;
-      const left = turnRemainingMs(d);
-      emit(); // keep clocks painting
-      if (left === 0) {
+      // Do not emit() on every tick — that remounts the pool and eats clicks.
+      if (turnRemainingMs(d) === 0) {
         expireTurn().catch(() => { /* another client may win the race */ });
       }
     }, 250);

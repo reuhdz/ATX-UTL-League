@@ -989,7 +989,9 @@ function renderDraft() {
 
     paintClock();
 
-    if ($('#draft-pool')) {
+    const poolKey = `${d.status}|${pool.join(',')}`;
+    if ($('#draft-pool') && $('#draft-pool').dataset.key !== poolKey) {
+      $('#draft-pool').dataset.key = poolKey;
       $('#draft-pool').innerHTML = pool.length
         ? pool.map((id) => {
             const p = DB.player(id);
@@ -998,18 +1000,16 @@ function renderDraft() {
         : '<p class="muted">Pool empty.</p>';
       $$('#draft-pool [data-pick]').forEach((btn) => {
         btn.disabled = d.status !== 'live';
-        btn.addEventListener('click', async () => {
-          try {
-            await DraftHub.makePick(btn.dataset.pick, pinVal());
-            setMsg('#draft-live-msg', `Picked ${DB.player(btn.dataset.pick)?.name}`, 'ok');
-          } catch (e) {
-            setMsg('#draft-live-msg', e.message || String(e), 'err');
-          }
-        });
+      });
+    } else if ($('#draft-pool')) {
+      $$('#draft-pool [data-pick]').forEach((btn) => {
+        btn.disabled = d.status !== 'live';
       });
     }
 
-    if ($('#draft-picks')) {
+    const picksKey = JSON.stringify(picks);
+    if ($('#draft-picks') && $('#draft-picks').dataset.key !== picksKey) {
+      $('#draft-picks').dataset.key = picksKey;
       $('#draft-picks').innerHTML = picks.length
         ? `<ol class="draft-pick-list">${[...picks].reverse().map((pk) => {
             if (pk.skipped) {
@@ -1021,7 +1021,9 @@ function renderDraft() {
         : '<p class="muted">No picks yet.</p>';
     }
 
-    if ($('#draft-team-boards')) {
+    const boardsKey = `${d.status}|${currentTeamId || ''}|${JSON.stringify(ready)}|${boardOrder().map((t) => `${t.id}:${DB.rosterOf(t.id).map((p) => p.id).join(',')}`).join(';')}`;
+    if ($('#draft-team-boards') && $('#draft-team-boards').dataset.key !== boardsKey) {
+      $('#draft-team-boards').dataset.key = boardsKey;
       $('#draft-team-boards').innerHTML = boardOrder().map((t) => {
         const roster = DB.rosterOf(t.id);
         const onClock = d.status === 'live' && currentTeamId === t.id;
@@ -1068,6 +1070,19 @@ function renderDraft() {
       <p id="draft-live-msg" class="draft-msg"></p>
     </section>
   `;
+
+  // Event delegation so pool remounts never drop the first click
+  $('#draft-pool')?.addEventListener('click', async (e) => {
+    const btn = e.target.closest('[data-pick]');
+    if (!btn || btn.disabled) return;
+    e.preventDefault();
+    try {
+      await DraftHub.makePick(btn.dataset.pick, pinVal());
+      setMsg('#draft-live-msg', `Picked ${DB.player(btn.dataset.pick)?.name}`, 'ok');
+    } catch (err) {
+      setMsg('#draft-live-msg', err.message || String(err), 'err');
+    }
+  });
 
   $('#draft-start')?.addEventListener('click', async () => {
     try {
