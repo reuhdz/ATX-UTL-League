@@ -19,15 +19,18 @@ const DraftHub = (() => {
 
   let db = null;
   let mode = 'local'; // 'firebase' | 'local'
+  let connectionError = null;
+  let connected = false;
   let unsubDraft = null;
   let unsubRoster = null;
+  let unsubConn = null;
   let draftState = null;
   let assignments = {};
   const listeners = new Set();
 
   function emit() {
     listeners.forEach((fn) => {
-      try { fn({ draft: draftState, assignments }); } catch (e) { /* ignore */ }
+      try { fn({ draft: draftState, assignments, mode, connectionError, connected }); } catch (e) { /* ignore */ }
     });
   }
 
@@ -86,47 +89,95 @@ const DraftHub = (() => {
     });
   }
 
+  async function probeDatabase(url) {
+    try {
+      const res = await fetch(`${url.replace(/\/$/, '')}/.json`, { method: 'GET' });
+      const text = await res.text();
+      if (res.status === 404) {
+        throw new Error(
+          'Realtime Database not found at databaseURL (404). In Firebase Console create Build → Realtime Database (not Firestore), then paste the exact DB URL into js/firebase-config.js.'
+        );
+      }
+      if (res.status === 401 || res.status === 403 || text.includes('Permission denied')) {
+        // Reachable but locked — still a valid DB URL.
+        return { ok: true, locked: true };
+      }
+      return { ok: true, locked: false };
+    } catch (e) {
+      if (e.message.includes('Realtime Database not found')) throw e;
+      throw new Error(`Cannot reach databaseURL (${url}): ${e.message}`);
+    }
+  }
+
   async function init() {
     // Capture base teams once DB is present
     (window.DB?.players || []).forEach((p) => {
       if (!(p.id in BASE_TEAMS)) BASE_TEAMS[p.id] = p.teamId;
     });
 
+    connectionError = null;
+    connected = false;
+
     if (isConfigured()) {
       try {
+        await probeDatabase(fbCfg().databaseURL);
         if (!firebase.apps.length) firebase.initializeApp(fbCfg());
         db = firebase.database();
         mode = 'firebase';
       } catch (e) {
         console.warn('Firebase init failed, using local mode', e);
+        connectionError = e.message || String(e);
         mode = 'local';
       }
     } else {
       mode = 'local';
+      if (!window.firebase) {
+        connectionError = 'Firebase SDK failed to load (CDN blocked?).';
+      } else if (!fbCfg().enabled) {
+        connectionError = 'Firebase config enabled flag is false.';
+      }
     }
 
     if (mode === 'firebase') {
       const draftRef = db.ref(`drafts/${roomId()}`);
       const rosterRef = db.ref('rosterAssignments');
+      unsubConn = db.ref('.info/connected').on('value', (snap) => {
+        connected = !!snap.val();
+        emit();
+      });
       unsubDraft = draftRef.on('value', (snap) => {
         draftState = snap.val() || defaultDraft();
+        connectionError = null;
+        emit();
+      }, (err) => {
+        connectionError = `Draft sync error: ${err?.message || err}`;
         emit();
       });
       unsubRoster = rosterRef.on('value', (snap) => {
         applyAssignments(snap.val() || {});
         emit();
+      }, (err) => {
+        connectionError = `Roster sync error: ${err?.message || err}`;
+        emit();
       });
       // Ensure draft node exists
-      draftRef.once('value').then((snap) => {
-        if (!snap.exists()) draftRef.set(defaultDraft());
-      });
+      try {
+        const snap = await draftRef.once('value');
+        if (!snap.exists()) await draftRef.set(defaultDraft());
+      } catch (e) {
+        connectionError = `Cannot write draft state: ${e.message || e}. Check Realtime Database rules (test mode).`;
+        mode = 'local';
+        draftState = readLocal('draft', defaultDraft());
+        applyAssignments(readLocal('roster', {}));
+        emit();
+      }
     } else {
       draftState = readLocal('draft', defaultDraft());
       applyAssignments(readLocal('roster', {}));
       emit();
     }
 
-    return { mode, configured: mode === 'firebase' };
+    return { mode, configured: mode === 'firebase', connectionError };
   }
 
   function checkPin(pin) {
@@ -137,7 +188,13 @@ const DraftHub = (() => {
     next = { ...next, updatedAt: Date.now() };
     draftState = next;
     if (mode === 'firebase') {
-      await db.ref(`drafts/${roomId()}`).set(next);
+      try {
+        await db.ref(`drafts/${roomId()}`).set(next);
+      } catch (e) {
+        connectionError = `Draft write failed: ${e.message || e}`;
+        emit();
+        throw new Error(connectionError);
+      }
     } else {
       writeLocal('draft', next);
       emit();
@@ -197,7 +254,11 @@ const DraftHub = (() => {
     const next = { ...assignments, [playerId]: entry };
 
     if (mode === 'firebase') {
-      await db.ref(`rosterAssignments/${playerId}`).set(entry);
+      try {
+        await db.ref(`rosterAssignments/${playerId}`).set(entry);
+      } catch (e) {
+        throw new Error(`Roster write failed: ${e.message || e}`);
+      }
     } else {
       writeLocal('roster', next);
       applyAssignments(next);
@@ -216,8 +277,11 @@ const DraftHub = (() => {
     return {
       mode,
       configured: mode === 'firebase',
+      connected,
+      connectionError,
       draft: draftState,
       assignments,
+      databaseURL: fbCfg().databaseURL || '',
       currentTeamId: draftState?.status === 'live'
         ? draftState.order?.[draftState.pickIndex] || null
         : null,
