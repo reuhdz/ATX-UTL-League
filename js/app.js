@@ -903,6 +903,15 @@ function closeProfile() {
    DRAFT (Firebase live draft)
    ============================================================================ */
 let draftUnsub = null;
+let draftClockTimer = null;
+
+function formatClock(ms) {
+  if (ms == null) return '--:--';
+  const total = Math.ceil(ms / 1000);
+  const m = Math.floor(total / 60);
+  const s = total % 60;
+  return `${m}:${String(s).padStart(2, '0')}`;
+}
 
 function renderDraft() {
   const pinVal = () => ($('#draft-pin')?.value || '').trim();
@@ -918,6 +927,21 @@ function renderDraft() {
     return order.map((id) => DB.team(id)).filter(Boolean);
   };
 
+  const paintClock = () => {
+    const st = DraftHub.status();
+    const clock = $('#draft-clock');
+    if (!clock) return;
+    if (st.draft?.status === 'live' && st.turnRemainingMs != null) {
+      clock.textContent = formatClock(st.turnRemainingMs);
+      clock.dataset.expired = st.turnRemainingMs <= 0 ? '1' : '0';
+      clock.hidden = false;
+    } else {
+      clock.textContent = '--:--';
+      clock.dataset.expired = '0';
+      clock.hidden = st.draft?.status !== 'live';
+    }
+  };
+
   const paint = () => {
     const st = DraftHub.status();
     const d = st.draft || DraftHub.defaultDraft();
@@ -925,10 +949,12 @@ function renderDraft() {
     const currentTeamId = st.currentTeamId;
     const pool = d.pool || [];
     const picks = d.picks || [];
+    const ready = d.ready || {};
 
     if ($('#draft-status-pill')) {
-      $('#draft-status-pill').textContent = d.status || 'idle';
-      $('#draft-status-pill').dataset.state = d.status || 'idle';
+      const label = d.status === 'waiting' ? 'waiting for captains' : (d.status || 'waiting');
+      $('#draft-status-pill').textContent = label;
+      $('#draft-status-pill').dataset.state = d.status || 'waiting';
     }
     if ($('#draft-turn')) {
       if (d.status === 'live' && currentTeamId) {
@@ -937,16 +963,31 @@ function renderDraft() {
           `On the clock: <b>${teamName(currentTeamId)}</b> (${t?.captain || 'Captain'}) · pick #${(d.pickIndex || 0) + 1}`;
       } else if (d.status === 'done') {
         $('#draft-turn').textContent = 'Draft complete';
+      } else if (d.status === 'waiting') {
+        const pending = DraftHub.draftTeamOrder()
+          .filter((id) => !ready[id])
+          .map((id) => DB.team(id)?.captain || id);
+        $('#draft-turn').textContent = pending.length
+          ? `Waiting on: ${pending.join(', ')}`
+          : 'All captains ready — starting…';
       } else {
         $('#draft-turn').textContent = 'Draft not started';
       }
     }
     if ($('#draft-pin')) {
-      const t = currentTeamId ? DB.team(currentTeamId) : null;
-      $('#draft-pin').placeholder = d.status === 'live' && t
-        ? `${t.captain}'s PIN`
-        : 'Captain PIN';
+      if (d.status === 'live' && currentTeamId) {
+        const t = DB.team(currentTeamId);
+        $('#draft-pin').placeholder = `${t?.captain || 'Captain'}'s PIN`;
+      } else {
+        $('#draft-pin').placeholder = 'Captain PIN to ready / master to start';
+      }
     }
+    if ($('#draft-start')) {
+      $('#draft-start').textContent = d.status === 'waiting' ? 'Ready / Start' : 'Start draft';
+      $('#draft-start').disabled = d.status === 'live' || d.status === 'done';
+    }
+
+    paintClock();
 
     if ($('#draft-pool')) {
       $('#draft-pool').innerHTML = pool.length
@@ -971,6 +1012,9 @@ function renderDraft() {
     if ($('#draft-picks')) {
       $('#draft-picks').innerHTML = picks.length
         ? `<ol class="draft-pick-list">${[...picks].reverse().map((pk) => {
+            if (pk.skipped) {
+              return `<li class="muted">Skipped → ${teamName(pk.teamId)}</li>`;
+            }
             const p = DB.player(pk.playerId);
             return `<li><span class="strong">${p?.name || pk.playerId}</span> → ${teamName(pk.teamId)}</li>`;
           }).join('')}</ol>`
@@ -981,8 +1025,9 @@ function renderDraft() {
       $('#draft-team-boards').innerHTML = boardOrder().map((t) => {
         const roster = DB.rosterOf(t.id);
         const onClock = d.status === 'live' && currentTeamId === t.id;
-        return `<div class="draft-team-card${onClock ? ' on-clock' : ''}" style="--tc:${t.color}">
-          <h4>${t.name}${onClock ? ' · on the clock' : ''}</h4>
+        const isReady = !!ready[t.id];
+        return `<div class="draft-team-card${onClock ? ' on-clock' : ''}${isReady && d.status === 'waiting' ? ' is-ready' : ''}" style="--tc:${t.color}">
+          <h4>${t.name}${onClock ? ' · on the clock' : ''}${isReady && d.status === 'waiting' ? ' · ready' : ''}</h4>
           <p class="muted small">Captain: ${t.captain}</p>
           <ul>${roster.map((p) => `<li>${playerLink(p.id)}${p.name === t.captain ? ' <span class="cap">C</span>' : ''}</li>`).join('') || '<li class="muted">—</li>'}</ul>
         </div>`;
@@ -1003,16 +1048,19 @@ function renderDraft() {
     <section class="panel">
       <div class="panel-head">
         <h3>🎯 Season 5 draft</h3>
-        <span class="pill draft-state" id="draft-status-pill">idle</span>
+        <div class="draft-head-meta">
+          <span class="draft-clock" id="draft-clock" hidden>--:--</span>
+          <span class="pill draft-state" id="draft-status-pill">waiting</span>
+        </div>
       </div>
       <div class="draft-controls">
         <label class="draft-field">PIN
-          <input id="draft-pin" class="input" type="password" autocomplete="off" placeholder="Captain PIN" />
+          <input id="draft-pin" class="input" type="password" autocomplete="off" placeholder="Captain PIN to ready / master to start" />
         </label>
-        <button type="button" class="btn" id="draft-start">Start draft</button>
+        <button type="button" class="btn" id="draft-start">Ready / Start</button>
         <button type="button" class="btn btn-ghost" id="draft-reset">Reset</button>
       </div>
-      <p id="draft-turn" class="draft-turn muted">Draft not started</p>
+      <p id="draft-turn" class="draft-turn muted">Waiting for captains</p>
       <div class="panel-head tight"><h4>Available pool</h4></div>
       <div id="draft-pool" class="draft-pool"></div>
       <div class="panel-head tight"><h4>Recent picks</h4></div>
@@ -1023,8 +1071,13 @@ function renderDraft() {
 
   $('#draft-start')?.addEventListener('click', async () => {
     try {
-      await DraftHub.startDraft();
-      setMsg('#draft-live-msg', 'Draft is live — River / Splash Damage is on the clock', 'ok');
+      const res = await DraftHub.startDraft(pinVal());
+      if (res.started) {
+        setMsg('#draft-live-msg', 'Draft is live — 2:00 on the clock', 'ok');
+      } else {
+        const name = DB.team(res.teamId)?.name || 'Team';
+        setMsg('#draft-live-msg', `${name} is ready — waiting for other captains`, 'ok');
+      }
     } catch (e) {
       setMsg('#draft-live-msg', e.message || String(e), 'err');
     }
@@ -1040,6 +1093,8 @@ function renderDraft() {
 
   if (draftUnsub) draftUnsub();
   draftUnsub = DraftHub.onChange(() => paint());
+  if (draftClockTimer) clearInterval(draftClockTimer);
+  draftClockTimer = setInterval(paintClock, 250);
   paint();
 }
 

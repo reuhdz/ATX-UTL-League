@@ -24,6 +24,7 @@ window.DRAFT_CONFIG = {
   /* Captains are pre-assigned and excluded from the draft pool */
   captainIds: ['river', 'zach', 'reuben', 'rich'],
   /* Master PIN can pick on any turn */
+  turnSeconds: 120, // 2 minutes per pick
   masterPin: 'utlmaster',
   /* utl + team name (one word, lowercase) */
   teamPins: {

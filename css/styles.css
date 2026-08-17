@@ -545,7 +545,16 @@ code { background: var(--surface-2); padding: 2px 6px; border-radius: 6px; font-
   background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent);
   text-transform: none; letter-spacing: 0;
 }
-.pill.draft-state[data-state="live"] { background: color-mix(in srgb, #22c55e 22%, transparent); color: #4ade80; }
+.draft-head-meta { display: flex; align-items: center; gap: 10px; }
+.draft-clock {
+  font-variant-numeric: tabular-nums; font-weight: 800; font-size: 22px;
+  color: var(--accent); min-width: 4ch; text-align: right;
+}
+.draft-clock[data-expired="1"] { color: #fca5a5; }
+.pill.draft-state[data-state="waiting"] { background: color-mix(in srgb, #f59e0b 22%, transparent); color: #fbbf24; }
+.draft-team-card.is-ready {
+  box-shadow: 0 0 0 2px color-mix(in srgb, #22c55e 45%, transparent);
+}
 .pill.draft-state[data-state="done"] { background: color-mix(in srgb, #a78bfa 22%, transparent); color: #c4b5fd; }
 .panel-head.tight { margin-top: 8px; margin-bottom: 8px; }
 .panel-head.tight h4 { margin: 0; font-size: 13px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .4px; }

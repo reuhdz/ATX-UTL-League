@@ -25,6 +25,7 @@ const DraftHub = (() => {
   let unsubConn = null;
   let draftState = null;
   let assignments = {};
+  let expireTimer = null;
   const listeners = new Set();
 
   function emit() {
@@ -67,6 +68,10 @@ const DraftHub = (() => {
     return cfg().draftOrder || ['team3', 'team2', 'capybara', 'team1'];
   }
 
+  function turnSeconds() {
+    return Number(cfg().turnSeconds) || 120;
+  }
+
   function normalizePin(pin) {
     return String(pin || '').trim().toLowerCase();
   }
@@ -93,6 +98,19 @@ const DraftHub = (() => {
     return checkMasterPin(pin) || isAnyCaptainPin(pin);
   }
 
+  function teamIdForCaptainPin(pin) {
+    const pins = cfg().teamPins || {};
+    return Object.keys(pins).find((tid) => checkTeamPin(pin, tid)) || null;
+  }
+
+  function emptyReady() {
+    return Object.fromEntries(draftTeamOrder().map((id) => [id, false]));
+  }
+
+  function allCaptainsReady(ready) {
+    return draftTeamOrder().every((id) => !!(ready && ready[id]));
+  }
+
   function defaultDraft() {
     const captains = new Set(captainIds());
     const pool = (window.DB?.season5RosterIds || []).filter((id) => !captains.has(id));
@@ -104,12 +122,33 @@ const DraftHub = (() => {
       order.push(...seq);
     }
     return {
-      status: 'idle',
+      status: 'waiting', // waiting for captains to ready / master start
       pickIndex: 0,
       order,
       pool,
       picks: [],
+      ready: emptyReady(),
+      turnStartedAt: null,
+      turnSeconds: turnSeconds(),
       updatedAt: Date.now(),
+    };
+  }
+
+  function normalizeDraft(raw) {
+    const base = defaultDraft();
+    if (!raw || typeof raw !== 'object') return base;
+    const ready = { ...base.ready, ...(raw.ready || {}) };
+    let status = raw.status || 'waiting';
+    if (status === 'idle') status = 'waiting';
+    return {
+      ...base,
+      ...raw,
+      status,
+      ready,
+      turnSeconds: raw.turnSeconds || turnSeconds(),
+      pool: Array.isArray(raw.pool) ? raw.pool : base.pool,
+      order: Array.isArray(raw.order) ? raw.order : base.order,
+      picks: Array.isArray(raw.picks) ? raw.picks : [],
     };
   }
 
@@ -122,9 +161,27 @@ const DraftHub = (() => {
         p.teamId = assignments[p.id].teamId;
         return;
       }
-      // No live override: captains keep club, everyone else is a free agent
       p.teamId = captains.has(p.id) ? (BASE_TEAMS[p.id] || p.teamId) : 'fa';
     });
+  }
+
+  function turnRemainingMs(d = draftState) {
+    if (!d || d.status !== 'live' || !d.turnStartedAt) return null;
+    const total = (d.turnSeconds || turnSeconds()) * 1000;
+    return Math.max(0, total - (Date.now() - d.turnStartedAt));
+  }
+
+  function scheduleExpireWatch() {
+    if (expireTimer) clearInterval(expireTimer);
+    expireTimer = setInterval(() => {
+      const d = draftState;
+      if (!d || d.status !== 'live' || !d.turnStartedAt) return;
+      const left = turnRemainingMs(d);
+      emit(); // keep clocks painting
+      if (left === 0) {
+        expireTurn().catch(() => { /* another client may win the race */ });
+      }
+    }, 250);
   }
 
   async function probeDatabase(url) {
@@ -175,7 +232,7 @@ const DraftHub = (() => {
         emit();
       });
       unsubDraft = draftRef.on('value', (snap) => {
-        draftState = snap.val() || defaultDraft();
+        draftState = normalizeDraft(snap.val());
         connectionError = null;
         emit();
       }, (err) => {
@@ -192,24 +249,26 @@ const DraftHub = (() => {
       try {
         const snap = await draftRef.once('value');
         if (!snap.exists()) await draftRef.set(defaultDraft());
+        else draftState = normalizeDraft(snap.val());
       } catch (e) {
         connectionError = `Cannot write draft state: ${e.message || e}`;
         mode = 'local';
-        draftState = readLocal('draft', defaultDraft());
+        draftState = normalizeDraft(readLocal('draft', defaultDraft()));
         applyAssignments(readLocal('roster', {}));
         emit();
       }
     } else {
-      draftState = readLocal('draft', defaultDraft());
+      draftState = normalizeDraft(readLocal('draft', defaultDraft()));
       applyAssignments(readLocal('roster', {}));
       emit();
     }
 
+    scheduleExpireWatch();
     return { mode, configured: mode === 'firebase', connectionError };
   }
 
   async function setDraft(next) {
-    next = { ...next, updatedAt: Date.now() };
+    next = normalizeDraft({ ...next, updatedAt: Date.now() });
     draftState = next;
     if (mode === 'firebase') {
       try {
@@ -226,14 +285,10 @@ const DraftHub = (() => {
   }
 
   async function clearDraftAssignments() {
-    // Wipe live overrides so drafted players return to free agents.
-    // Captains keep their clubs; everyone else is forced back to 'fa'.
     const captains = new Set(captainIds());
 
     if (mode === 'firebase') {
       try {
-        // remove() clears the node for all clients; set({}) can leave stale children
-        // in some edge cases depending on listener timing.
         await db.ref('rosterAssignments').remove();
       } catch (e) {
         throw new Error(`Could not clear roster assignments: ${e.message || e}`);
@@ -248,7 +303,6 @@ const DraftHub = (() => {
       if (captains.has(p.id)) {
         p.teamId = BASE_TEAMS[p.id] || p.teamId;
       } else {
-        // Drafted players (and the rest of the pool) become free agents again
         p.teamId = 'fa';
         BASE_TEAMS[p.id] = 'fa';
       }
@@ -256,10 +310,50 @@ const DraftHub = (() => {
     emit();
   }
 
-  async function startDraft() {
-    const fresh = defaultDraft();
-    fresh.status = 'live';
-    await setDraft(fresh);
+  function beginLive(from) {
+    return {
+      ...from,
+      status: 'live',
+      pickIndex: 0,
+      picks: [],
+      turnStartedAt: Date.now(),
+      turnSeconds: turnSeconds(),
+    };
+  }
+
+  async function startDraft(pin) {
+    const d = normalizeDraft(draftState || defaultDraft());
+    if (d.status === 'live') throw new Error('Draft is already live');
+    if (d.status === 'done') throw new Error('Draft is complete — reset first');
+
+    if (checkMasterPin(pin)) {
+      const ready = emptyReady();
+      draftTeamOrder().forEach((id) => { ready[id] = true; });
+      const next = beginLive({ ...d, ready, pool: defaultDraft().pool, order: defaultDraft().order });
+      await setDraft(next);
+      return { started: true, by: 'master' };
+    }
+
+    const teamId = teamIdForCaptainPin(pin);
+    if (!teamId) throw new Error('Enter your captain PIN to ready up (or master PIN to start)');
+
+    const ready = { ...(d.ready || emptyReady()), [teamId]: true };
+    let next = {
+      ...d,
+      status: 'waiting',
+      ready,
+      pool: d.pool?.length ? d.pool : defaultDraft().pool,
+      order: d.order?.length ? d.order : defaultDraft().order,
+    };
+
+    if (allCaptainsReady(ready)) {
+      next = beginLive(next);
+      await setDraft(next);
+      return { started: true, by: 'all-ready', teamId };
+    }
+
+    await setDraft(next);
+    return { started: false, teamId, ready };
   }
 
   async function resetDraft(pin) {
@@ -268,9 +362,63 @@ const DraftHub = (() => {
     await setDraft(defaultDraft());
   }
 
+  async function advanceTurn(d, extraPick) {
+    const picks = [...(d.picks || [])];
+    if (extraPick) picks.push(extraPick);
+    let pickIndex = (d.pickIndex || 0) + 1;
+    let status = d.status;
+    let turnStartedAt = Date.now();
+    if (pickIndex >= (d.order || []).length || (d.pool || []).length === 0) {
+      status = 'done';
+      turnStartedAt = null;
+    }
+    return { ...d, picks, pickIndex, status, turnStartedAt, turnSeconds: turnSeconds() };
+  }
+
+  async function expireTurn() {
+    const d = normalizeDraft(draftState || defaultDraft());
+    if (d.status !== 'live' || !d.turnStartedAt) return;
+    if (turnRemainingMs(d) > 0) return;
+
+    const teamId = d.order[d.pickIndex];
+    // Avoid double-skip across clients: only skip if this turnStartedAt is still current.
+    if (mode === 'firebase') {
+      const ref = db.ref(`drafts/${roomId()}`);
+      const result = await ref.transaction((cur) => {
+        if (!cur || cur.status !== 'live') return cur;
+        if (cur.turnStartedAt !== d.turnStartedAt) return cur; // already advanced
+        if (Date.now() - cur.turnStartedAt < (cur.turnSeconds || turnSeconds()) * 1000) return cur;
+        const skippedTeam = cur.order[cur.pickIndex];
+        const picks = [...(cur.picks || []), { skipped: true, teamId: skippedTeam, at: Date.now() }];
+        let pickIndex = (cur.pickIndex || 0) + 1;
+        let status = 'live';
+        let turnStartedAt = Date.now();
+        if (pickIndex >= (cur.order || []).length || (cur.pool || []).length === 0) {
+          status = 'done';
+          turnStartedAt = null;
+        }
+        return {
+          ...cur,
+          picks,
+          pickIndex,
+          status,
+          turnStartedAt,
+          turnSeconds: turnSeconds(),
+          updatedAt: Date.now(),
+        };
+      });
+      if (result.snapshot) draftState = normalizeDraft(result.snapshot.val());
+      emit();
+      return;
+    }
+
+    const next = await advanceTurn(d, { skipped: true, teamId, at: Date.now() });
+    await setDraft(next);
+  }
+
   async function makePick(playerId, pin) {
-    const d = { ...(draftState || defaultDraft()) };
-    if (d.status !== 'live') throw new Error('Draft is not live');
+    const d = normalizeDraft(draftState || defaultDraft());
+    if (d.status !== 'live') throw new Error('Draft is not live yet');
     if (!d.pool.includes(playerId)) throw new Error('Player not in pool');
     const teamId = d.order[d.pickIndex];
     if (!teamId) throw new Error('Draft is complete');
@@ -280,11 +428,20 @@ const DraftHub = (() => {
       throw new Error(`Only ${name}'s captain (or master PIN) can pick now`);
     }
 
-    d.pool = d.pool.filter((id) => id !== playerId);
-    d.picks = [...(d.picks || []), { playerId, teamId, at: Date.now(), byMaster: master }];
-    d.pickIndex += 1;
-    if (d.pickIndex >= d.order.length || d.pool.length === 0) d.status = 'done';
-    await setDraft(d);
+    const pool = d.pool.filter((id) => id !== playerId);
+    let next = {
+      ...d,
+      pool,
+      picks: [...(d.picks || []), { playerId, teamId, at: Date.now(), byMaster: master }],
+      pickIndex: (d.pickIndex || 0) + 1,
+      turnStartedAt: Date.now(),
+      turnSeconds: turnSeconds(),
+    };
+    if (next.pickIndex >= next.order.length || pool.length === 0) {
+      next.status = 'done';
+      next.turnStartedAt = null;
+    }
+    await setDraft(next);
     await assignTeam(playerId, teamId, { fromDraft: true });
   }
 
@@ -332,24 +489,25 @@ const DraftHub = (() => {
   }
 
   function status() {
+    const d = draftState ? normalizeDraft(draftState) : null;
     return {
       mode,
       configured: mode === 'firebase',
       connected,
       connectionError,
-      draft: draftState,
+      draft: d,
       assignments,
       databaseURL: fbCfg().databaseURL || '',
-      currentTeamId: draftState?.status === 'live'
-        ? draftState.order?.[draftState.pickIndex] || null
-        : null,
+      currentTeamId: d?.status === 'live' ? d.order?.[d.pickIndex] || null : null,
+      turnRemainingMs: turnRemainingMs(d),
+      turnSeconds: turnSeconds(),
     };
   }
 
   return {
     init, onChange, status,
-    startDraft, resetDraft, makePick, assignTeam,
-    defaultDraft, teamPin, checkTeamPin, draftTeamOrder,
+    startDraft, resetDraft, makePick, assignTeam, expireTurn,
+    defaultDraft, teamPin, checkTeamPin, draftTeamOrder, turnRemainingMs,
   };
 })();
 
