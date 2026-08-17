@@ -1188,7 +1188,8 @@ DraftHub.init().then(() => {
   DraftHub.onChange(() => {
     let tab = 'overview';
     try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
-    if (tab === 'teams' || tab === 'attendance' || tab === 'draft') go(tab);
+    // Draft tab paints itself; refresh roster-dependent tabs live.
+    if (tab === 'teams' || tab === 'attendance') go(tab);
   });
   let startTab = 'overview';
   try { startTab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
