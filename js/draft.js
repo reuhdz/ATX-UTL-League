@@ -80,8 +80,17 @@ const DraftHub = (() => {
     return !!expected && normalizePin(pin) === expected;
   }
 
+  function checkMasterPin(pin) {
+    const expected = normalizePin(cfg().masterPin || '');
+    return !!expected && normalizePin(pin) === expected;
+  }
+
   function isAnyCaptainPin(pin) {
     return Object.keys(cfg().teamPins || {}).some((tid) => checkTeamPin(pin, tid));
+  }
+
+  function canAuthorizeReset(pin) {
+    return checkMasterPin(pin) || isAnyCaptainPin(pin);
   }
 
   function defaultDraft() {
@@ -211,6 +220,22 @@ const DraftHub = (() => {
     }
   }
 
+  async function clearDraftAssignments() {
+    // Wipe live overrides so everyone returns to base teams:
+    // captains stay on their clubs; drafted players revert to free agents.
+    if (mode === 'firebase') {
+      try {
+        await db.ref('rosterAssignments').set({});
+      } catch (e) {
+        throw new Error(`Could not clear roster assignments: ${e.message || e}`);
+      }
+    } else {
+      writeLocal('roster', {});
+      applyAssignments({});
+      emit();
+    }
+  }
+
   async function startDraft() {
     const fresh = defaultDraft();
     fresh.status = 'live';
@@ -218,7 +243,8 @@ const DraftHub = (() => {
   }
 
   async function resetDraft(pin) {
-    if (!isAnyCaptainPin(pin)) throw new Error('Enter a captain PIN to reset');
+    if (!canAuthorizeReset(pin)) throw new Error('Enter master or captain PIN to reset');
+    await clearDraftAssignments();
     await setDraft(defaultDraft());
   }
 
@@ -228,13 +254,14 @@ const DraftHub = (() => {
     if (!d.pool.includes(playerId)) throw new Error('Player not in pool');
     const teamId = d.order[d.pickIndex];
     if (!teamId) throw new Error('Draft is complete');
-    if (!checkTeamPin(pin, teamId)) {
+    const master = checkMasterPin(pin);
+    if (!master && !checkTeamPin(pin, teamId)) {
       const name = window.DB?.teamName(teamId) || teamId;
-      throw new Error(`Only ${name}'s captain can pick now (wrong PIN)`);
+      throw new Error(`Only ${name}'s captain (or master PIN) can pick now`);
     }
 
     d.pool = d.pool.filter((id) => id !== playerId);
-    d.picks = [...(d.picks || []), { playerId, teamId, at: Date.now() }];
+    d.picks = [...(d.picks || []), { playerId, teamId, at: Date.now(), byMaster: master }];
     d.pickIndex += 1;
     if (d.pickIndex >= d.order.length || d.pool.length === 0) d.status = 'done';
     await setDraft(d);

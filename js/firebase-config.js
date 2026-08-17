@@ -23,6 +23,8 @@ window.DRAFT_CONFIG = {
   draftOrder: ['team3', 'team2', 'capybara', 'team1'],
   /* Captains are pre-assigned and excluded from the draft pool */
   captainIds: ['river', 'zach', 'reuben', 'rich'],
+  /* Master PIN can pick on any turn */
+  masterPin: 'utlmaster',
   /* utl + team name (one word, lowercase) */
   teamPins: {
     team3: 'utlsplashdamage',   // River — Splash Damage

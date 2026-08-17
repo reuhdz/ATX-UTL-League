@@ -993,7 +993,7 @@ function renderDraft() {
   view.innerHTML = `
     <div class="page-head">
       <h2>Draft Room</h2>
-      <p class="muted">Snake order: River → Zach → Reuben → Rich. Captains pick with their team PIN.</p>
+      <p class="muted">Snake order: River → Zach → Reuben → Rich. Captains pick with their team PIN; master PIN can pick any turn.</p>
     </div>
 
     <section class="panel">
@@ -1033,7 +1033,7 @@ function renderDraft() {
   $('#draft-reset')?.addEventListener('click', async () => {
     try {
       await DraftHub.resetDraft(pinVal());
-      setMsg('#draft-live-msg', 'Draft reset', 'ok');
+      setMsg('#draft-live-msg', 'Draft reset — drafted players returned to free agents', 'ok');
     } catch (e) {
       setMsg('#draft-live-msg', e.message || String(e), 'err');
     }
