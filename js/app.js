@@ -923,10 +923,22 @@ function renderDraft() {
     const picks = d.picks || [];
 
     const modeLabel = st.configured
-      ? 'Firebase live'
-      : 'Local mode (configure Firebase for multi-device)';
+      ? (st.connected ? 'Firebase live · connected' : 'Firebase live · connecting…')
+      : 'Local mode (not multi-device)';
 
     if ($('#draft-mode-pill')) $('#draft-mode-pill').textContent = modeLabel;
+    if ($('#draft-conn-msg')) {
+      if (st.connectionError) {
+        $('#draft-conn-msg').className = 'draft-msg err';
+        $('#draft-conn-msg').textContent = st.connectionError;
+      } else if (st.configured) {
+        $('#draft-conn-msg').className = 'draft-msg ok';
+        $('#draft-conn-msg').textContent = `Syncing via ${st.databaseURL}`;
+      } else {
+        $('#draft-conn-msg').className = 'draft-msg';
+        $('#draft-conn-msg').textContent = 'Using this device only until Realtime Database is connected.';
+      }
+    }
     if ($('#draft-status-pill')) {
       $('#draft-status-pill').textContent = d.status || 'idle';
       $('#draft-status-pill').dataset.state = d.status || 'idle';
@@ -1000,12 +1012,14 @@ function renderDraft() {
         <span class="pill draft-mode" id="draft-mode-pill">…</span>
       </div>
       <ol class="draft-setup">
-        <li>Create a Firebase project and enable <b>Realtime Database</b>.</li>
+        <li>Create a Firebase project and enable <b>Realtime Database</b> (not Firestore).</li>
         <li>Paste the web config into <code>js/firebase-config.js</code> and set <code>enabled: true</code>.</li>
+        <li>Set <code>databaseURL</code> to the exact URL from Realtime Database (often ends in <code>firebasedatabase.app</code>).</li>
         <li>Change <code>commissionerPin</code> in that file (default is <code>deepend</code>).</li>
         <li>Optional GitHub auto-commit: set <code>rosterSync.endpoint</code> to a Worker that triggers the <code>roster_assign</code> Action.</li>
       </ol>
-      <p class="muted small">Without Firebase, this tab runs in local mode on this device only.</p>
+      <p id="draft-conn-msg" class="draft-msg"></p>
+      <p class="muted small">Without a working Realtime Database, picks stay on one device only.</p>
     </section>
 
     <div class="draft-grid">
