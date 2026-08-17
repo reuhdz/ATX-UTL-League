@@ -63,7 +63,7 @@ const TEAMS = [
 const SEASON5_ROSTER = [
   'reuben', 'rich', 'river', 'zach', 'eric', 'justin',
   'bonney', 'max', 'lesley', 'michal', 'sk', 'jacqueline',
-  'kellie', 'sage', 'walter', 'glenn', 'liam',
+  'kellie', 'sage', 'walter', 'glenn', 'liam', 'eddy', 'jack',
 ];
 
 /* ---- Players (real active roster). skill 0..1 gently biases box scores.
@@ -96,7 +96,7 @@ const PLAYERS = [
   { id: 'benb',    name: 'Ben B',       teamId: 'fa', level: 'Pro',    pos: 'Defender', skill: 0.66 },
   { id: 'emma',    name: 'Emma',        teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.38 },
   { id: 'liam',    name: 'Liam',        teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.40 },
-  { id: 'jack',    name: 'Jack',        teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.38 },
+  { id: 'jack',    name: 'Jack Armstrong', teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.38 },
   { id: 'sage',    name: 'Sage',        teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.80 },
   { id: 'eddy',    name: 'Eddy',        teamId: 'fa', level: 'Pro',    pos: 'Utility',  skill: 0.62 },
   { id: 'glenn',   name: 'Glenn',       teamId: 'fa', level: 'Pro',    pos: 'Defender', skill: 0.82 },
