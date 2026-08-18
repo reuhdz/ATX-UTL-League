@@ -986,6 +986,9 @@ function renderDraft() {
       $('#draft-start').textContent = d.status === 'waiting' ? 'Ready / Start' : 'Start draft';
       $('#draft-start').disabled = d.status === 'live' || d.status === 'done';
     }
+    if ($('#draft-reset')) {
+      $('#draft-reset').disabled = !DraftHub.checkMasterPin(pinVal());
+    }
 
     paintClock();
 
@@ -1060,7 +1063,7 @@ function renderDraft() {
           <input id="draft-pin" class="input" type="password" autocomplete="off" placeholder="Captain PIN to ready / master to start" />
         </label>
         <button type="button" class="btn" id="draft-start">Ready / Start</button>
-        <button type="button" class="btn btn-ghost" id="draft-reset">Reset</button>
+        <button type="button" class="btn btn-ghost" id="draft-reset" disabled>Reset</button>
       </div>
       <p id="draft-turn" class="draft-turn muted">Waiting for captains</p>
       <div class="panel-head tight"><h4>Available pool</h4></div>
@@ -1081,6 +1084,12 @@ function renderDraft() {
       setMsg('#draft-live-msg', `Picked ${DB.player(btn.dataset.pick)?.name}`, 'ok');
     } catch (err) {
       setMsg('#draft-live-msg', err.message || String(err), 'err');
+    }
+  });
+
+  $('#draft-pin')?.addEventListener('input', () => {
+    if ($('#draft-reset')) {
+      $('#draft-reset').disabled = !DraftHub.checkMasterPin(pinVal());
     }
   });
 
