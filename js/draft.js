@@ -95,7 +95,7 @@ const DraftHub = (() => {
   }
 
   function canAuthorizeReset(pin) {
-    return checkMasterPin(pin) || isAnyCaptainPin(pin);
+    return checkMasterPin(pin);
   }
 
   function teamIdForCaptainPin(pin) {
@@ -356,7 +356,7 @@ const DraftHub = (() => {
   }
 
   async function resetDraft(pin) {
-    if (!canAuthorizeReset(pin)) throw new Error('Enter master or captain PIN to reset');
+    if (!canAuthorizeReset(pin)) throw new Error('Enter master PIN to reset');
     await clearDraftAssignments();
     await setDraft(defaultDraft());
   }
@@ -506,7 +506,7 @@ const DraftHub = (() => {
   return {
     init, onChange, status,
     startDraft, resetDraft, makePick, assignTeam, expireTurn,
-    defaultDraft, teamPin, checkTeamPin, draftTeamOrder, turnRemainingMs,
+    defaultDraft, teamPin, checkTeamPin, checkMasterPin, draftTeamOrder, turnRemainingMs,
   };
 })();
 
