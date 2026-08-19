@@ -736,69 +736,136 @@ function renderMedia() {
    ATTENDANCE / AVAILABILITY
    ============================================================================ */
 let attFilter = 'all';
+let attUnsub = null;
 
 function renderAttendance() {
-  const nights = DB.availability.nights;
-  const table = DB.availability.table;
   const statusMap = { in: ['In', 'in'], maybe: ['Maybe', 'maybe'], out: ['Out', 'out'] };
-  const seasonPlayers = DB.season5Roster().filter((p) => p.level !== 'Pro (IR)');
+  const seasonPlayers = () => DB.season5Roster().filter((p) => p.level !== 'Pro (IR)');
+  const nights = () => DB.availability.nights;
 
   view.innerHTML = `
-    <div class="page-head"><h2>Attendance &amp; Availability</h2><p class="muted">Season 5 roster only.</p></div>
-
-    ${nights.length === 0 ? '<section class="panel"><p class="muted">No upcoming nights — season complete.</p></section>' : `
-    <div class="att-summary">
-      ${nights.map((d) => {
-        const counts = { in: 0, maybe: 0, out: 0 };
-        seasonPlayers.forEach((p) => { const s = table[d][p.id]; if (s) counts[s]++; });
-        return `<div class="att-night">
-            <div class="att-date">${fmtDate(d)}</div>
-            <div class="att-counts">
-              <span class="pill in">${counts.in} in</span>
-              <span class="pill maybe">${counts.maybe} maybe</span>
-              <span class="pill out">${counts.out} out</span>
-            </div>
-          </div>`;
-      }).join('')}
+    <div class="page-head">
+      <h2>Attendance &amp; Availability</h2>
+      <p class="muted">Season 5 roster — tap a status to update. Changes sync live for everyone.</p>
     </div>
+    <p id="att-live-msg" class="draft-msg"></p>
 
-    <div class="toolbar">
-      <div class="seg" id="att-filter">
-        <button class="seg-btn active" data-team="all">All</button>
-        ${DB.teams.map((t) => `<button class="seg-btn" data-team="${t.id}">${t.name}</button>`).join('')}
-        <button class="seg-btn" data-team="fa">🧢 Free agents</button>
+    <div id="att-empty" class="panel" hidden><p class="muted">No upcoming nights — season complete.</p></div>
+    <div id="att-live" hidden>
+      <div class="att-summary" id="att-summary"></div>
+      <div class="toolbar">
+        <div class="seg" id="att-filter">
+          <button class="seg-btn" data-team="all">All</button>
+          ${DB.teams.map((t) => `<button class="seg-btn" data-team="${t.id}">${t.name}</button>`).join('')}
+          <button class="seg-btn" data-team="fa">🧢 Free agents</button>
+        </div>
       </div>
+      <section class="panel">
+        <table class="tbl att-table">
+          <thead><tr></tr></thead>
+          <tbody id="att-body"></tbody>
+        </table>
+      </section>
     </div>
-
-    <section class="panel">
-      <table class="tbl att-table">
-        <thead><tr><th class="lft">Player</th><th>Team</th>${nights.map((d) => `<th>${fmtDate(d)}</th>`).join('')}<th>Avail%</th></tr></thead>
-        <tbody id="att-body"></tbody>
-      </table>
-    </section>`}
   `;
 
-  if (!nights.length) return;
+  const setMsg = (text, cls = '') => {
+    const el = $('#att-live-msg');
+    if (!el) return;
+    el.className = `draft-msg ${cls}`.trim();
+    el.textContent = text || '';
+  };
 
-  const draw = () => {
-    const players = seasonPlayers.filter((p) =>
+  const paintConn = () => {
+    const st = AttendanceHub.status();
+    if (st.connectionError) {
+      setMsg(`Live sync issue: ${st.connectionError} — changes may stay on this device only.`, 'err');
+    } else if (st.mode === 'firebase' && st.connected) {
+      setMsg('Live — updates save for everyone.', 'ok');
+    } else if (st.mode === 'firebase') {
+      setMsg('Connecting to live attendance…');
+    } else {
+      setMsg('Offline mode — availability is saved on this device only.', 'err');
+    }
+  };
+
+  const paint = () => {
+    if (!$('#att-live-msg')) return;
+    const ns = nights();
+    const playersAll = seasonPlayers();
+    paintConn();
+
+    if (!ns.length) {
+      if ($('#att-empty')) $('#att-empty').hidden = false;
+      if ($('#att-live')) $('#att-live').hidden = true;
+      return;
+    }
+    if ($('#att-empty')) $('#att-empty').hidden = true;
+    if ($('#att-live')) $('#att-live').hidden = false;
+    if (!$('#att-body')) return;
+
+    $('#att-summary').innerHTML = ns.map((d) => {
+      const counts = { in: 0, maybe: 0, out: 0 };
+      playersAll.forEach((p) => {
+        const s = AttendanceHub.statusFor(d, p.id);
+        if (counts[s] != null) counts[s]++;
+      });
+      return `<div class="att-night">
+          <div class="att-date">${fmtDate(d)}</div>
+          <div class="att-counts">
+            <span class="pill in">${counts.in} in</span>
+            <span class="pill maybe">${counts.maybe} maybe</span>
+            <span class="pill out">${counts.out} out</span>
+          </div>
+        </div>`;
+    }).join('');
+
+    const headRow = $('#att-live thead tr');
+    if (headRow) {
+      headRow.innerHTML = `<th class="lft">Player</th><th>Team</th>${ns.map((d) => `<th>${fmtDate(d)}</th>`).join('')}<th>Avail%</th>`;
+    }
+
+    $$('#att-filter .seg-btn').forEach((b) => {
+      b.classList.toggle('active', b.dataset.team === attFilter);
+    });
+
+    const players = playersAll.filter((p) =>
       attFilter === 'all' ? true : attFilter === 'fa' ? p.teamId === 'fa' : p.teamId === attFilter);
+
     $('#att-body').innerHTML = players.map((p) => `
       <tr>
         <td class="lft strong">${playerLink(p.id)} ${levelTag(p.level)}</td>
         <td>${teamPill(p.teamId)}</td>
-        ${nights.map((d) => {
-          const [lbl, cls] = statusMap[table[d][p.id] || 'maybe'];
-          return `<td><span class="pill ${cls}">${lbl}</span></td>`;
+        ${ns.map((d) => {
+          const status = AttendanceHub.statusFor(d, p.id);
+          const [lbl, cls] = statusMap[status];
+          return `<td><button type="button" class="pill ${cls} att-toggle" data-player="${p.id}" data-date="${d}" title="Click to cycle In / Maybe / Out">${lbl}</button></td>`;
         }).join('')}
         <td class="strong">${DB.attendancePct(p.id)}%</td>
       </tr>`).join('');
+
+    $$('#att-body .att-toggle').forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        try {
+          btn.disabled = true;
+          await AttendanceHub.cycle(btn.dataset.player, btn.dataset.date);
+        } catch (e) {
+          setMsg(e.message || String(e), 'err');
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    });
   };
+
   $$('#att-filter .seg-btn').forEach((b) => b.addEventListener('click', () => {
-    $$('#att-filter .seg-btn').forEach((x) => x.classList.remove('active'));
-    b.classList.add('active'); attFilter = b.dataset.team; draw();
+    attFilter = b.dataset.team;
+    paint();
   }));
-  draw();
+
+  if (attUnsub) attUnsub();
+  attUnsub = AttendanceHub.onChange(() => paint());
+  paint();
 }
 
 /* =============================================================================
@@ -1200,12 +1267,14 @@ initTheme();
 initClicks();
 $('#brand-sub').textContent = DB.league.full;
 $('#footer-venue').textContent = DB.league.venue;
-DraftHub.init().then(() => {
+Promise.all([DraftHub.init(), AttendanceHub.init()]).then(() => {
   DraftHub.onChange(() => {
     let tab = 'overview';
     try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
     // Draft tab paints itself; refresh roster-dependent tabs live.
-    if (tab === 'teams' || tab === 'attendance') go(tab);
+    // Attendance paints via AttendanceHub — only remount when teams change.
+    if (tab === 'teams') go(tab);
+    if (tab === 'attendance') go(tab);
   });
   let startTab = 'overview';
   try { startTab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
