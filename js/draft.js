@@ -140,14 +140,21 @@ const DraftHub = (() => {
     const ready = { ...base.ready, ...(raw.ready || {}) };
     let status = raw.status || 'waiting';
     if (status === 'idle') status = 'waiting';
+    // Waiting room always tracks current Season 5 roster minus captains.
+    const pool = status === 'waiting'
+      ? base.pool
+      : (Array.isArray(raw.pool) ? raw.pool : base.pool);
+    const order = status === 'waiting'
+      ? base.order
+      : (Array.isArray(raw.order) ? raw.order : base.order);
     return {
       ...base,
       ...raw,
       status,
       ready,
       turnSeconds: raw.turnSeconds || turnSeconds(),
-      pool: Array.isArray(raw.pool) ? raw.pool : base.pool,
-      order: Array.isArray(raw.order) ? raw.order : base.order,
+      pool,
+      order,
       picks: Array.isArray(raw.picks) ? raw.picks : [],
     };
   }
@@ -247,8 +254,21 @@ const DraftHub = (() => {
       });
       try {
         const snap = await draftRef.once('value');
-        if (!snap.exists()) await draftRef.set(defaultDraft());
-        else draftState = normalizeDraft(snap.val());
+        if (!snap.exists()) {
+          await draftRef.set(defaultDraft());
+        } else {
+          draftState = normalizeDraft(snap.val());
+          // Persist refreshed waiting-room pool/order from current Season 5 roster.
+          if (draftState.status === 'waiting') {
+            const fresh = defaultDraft();
+            const poolChanged = JSON.stringify(snap.val()?.pool || []) !== JSON.stringify(fresh.pool);
+            const orderChanged = JSON.stringify(snap.val()?.order || []) !== JSON.stringify(fresh.order);
+            if (poolChanged || orderChanged) {
+              draftState = { ...draftState, pool: fresh.pool, order: fresh.order, updatedAt: Date.now() };
+              await draftRef.set(draftState);
+            }
+          }
+        }
       } catch (e) {
         connectionError = `Cannot write draft state: ${e.message || e}`;
         mode = 'local';
@@ -337,16 +357,17 @@ const DraftHub = (() => {
     if (!teamId) throw new Error('Enter your captain PIN to ready up (or master PIN to start)');
 
     const ready = { ...(d.ready || emptyReady()), [teamId]: true };
+    const fresh = defaultDraft();
     let next = {
       ...d,
       status: 'waiting',
       ready,
-      pool: d.pool?.length ? d.pool : defaultDraft().pool,
-      order: d.order?.length ? d.order : defaultDraft().order,
+      pool: fresh.pool,
+      order: fresh.order,
     };
 
     if (allCaptainsReady(ready)) {
-      next = beginLive(next);
+      next = beginLive({ ...next, pool: fresh.pool, order: fresh.order });
       await setDraft(next);
       return { started: true, by: 'all-ready', teamId };
     }
