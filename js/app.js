@@ -831,7 +831,7 @@ function renderAttendance() {
 
     $('#att-body').innerHTML = players.map((p) => `
       <tr>
-        <td class="lft strong">${playerLink(p.id)} ${levelTag(p.level)}</td>
+        <td class="lft strong">${playerLink(p.id)}</td>
         <td>${teamPill(p.teamId)}</td>
         ${ns.map((d) => {
           const status = AttendanceHub.statusFor(d, p.id);
