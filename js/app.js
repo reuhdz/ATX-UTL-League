@@ -32,10 +32,6 @@ function playerLink(id, label) {
   const p = DB.player(id);
   return `<button class="plink" data-player="${id}">${label || p.name}</button>`;
 }
-function levelTag(level) {
-  const cls = level === 'Rookie' ? 'rookie' : level.includes('IR') ? 'ir' : 'pro';
-  return `<span class="lvl-tag ${cls}">${level}</span>`;
-}
 function playerPos(p, matches) {
   const mp = matches ?? p.matches ?? 0;
   return mp > 0 ? p.pos : '';
@@ -636,7 +632,7 @@ function drawSpotlight() {
       <div class="spot-id">
         <div class="spot-avatar" style="--tc:${teamColor(p.teamId)}">${p.name[0]}</div>
         <div>
-          <h4>${playerLink(p.playerId)} ${levelTag(p.level)}</h4>
+          <h4>${playerLink(p.playerId)}</h4>
           <p class="muted small">${teamBadge(p.teamId)}${posSuffix(p)}${att != null ? ` · ${att}% avail.` : ''}</p>
         </div>
         <div class="spot-rating">${p.matches ? p.rating : '—'}<small>rating</small></div>

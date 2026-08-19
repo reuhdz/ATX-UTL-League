@@ -311,10 +311,6 @@ th.sorted-desc::after { content: " ▼"; color: var(--accent); opacity: 1; }
 .team-pill.fa { color: var(--text-muted); }
 .team-pill.fa::before { background: var(--text-muted); }
 
-.lvl-tag { font-size: 10px; font-weight: 800; padding: 1px 6px; border-radius: 5px; vertical-align: middle; text-transform: uppercase; letter-spacing: .3px; }
-.lvl-tag.pro { background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); }
-.lvl-tag.rookie { background: color-mix(in srgb, #a78bfa 24%, transparent); color: #c4b5fd; }
-.lvl-tag.ir { background: color-mix(in srgb, #ef4444 22%, transparent); color: #fca5a5; }
 
 /* ---- Info pane (viewport-aware; opened via JS) --------------------------- */
 .info { position: relative; display: inline-flex; vertical-align: middle; }
