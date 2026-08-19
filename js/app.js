@@ -780,12 +780,10 @@ function renderAttendance() {
     const st = AttendanceHub.status();
     if (st.connectionError) {
       setMsg(`Live sync issue: ${st.connectionError} — changes may stay on this device only.`, 'err');
-    } else if (st.mode === 'firebase' && st.connected) {
-      setMsg('Live — updates save for everyone.', 'ok');
-    } else if (st.mode === 'firebase') {
-      setMsg('Connecting to live attendance…');
-    } else {
+    } else if (st.mode !== 'firebase') {
       setMsg('Offline mode — availability is saved on this device only.', 'err');
+    } else {
+      setMsg('');
     }
   };
 
