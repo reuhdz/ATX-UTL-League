@@ -839,16 +839,18 @@ function renderAttendance() {
         ${ns.map((d) => {
           const status = AttendanceHub.statusFor(d, p.id);
           const [lbl, cls] = statusMap[status];
-          return `<td><button type="button" class="pill ${cls} att-toggle" data-player="${p.id}" data-date="${d}" title="Click to cycle In / Maybe / Out">${lbl}</button></td>`;
+          return `<td><button type="button" class="pill ${cls} att-toggle" data-att-player="${p.id}" data-date="${d}" title="Click to cycle In / Maybe / Out">${lbl}</button></td>`;
         }).join('')}
         <td class="strong">${DB.attendancePct(p.id)}%</td>
       </tr>`).join('');
 
     $$('#att-body .att-toggle').forEach((btn) => {
-      btn.addEventListener('click', async () => {
+      btn.addEventListener('click', async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
         try {
           btn.disabled = true;
-          await AttendanceHub.cycle(btn.dataset.player, btn.dataset.date);
+          await AttendanceHub.cycle(btn.dataset.attPlayer, btn.dataset.date);
         } catch (e) {
           setMsg(e.message || String(e), 'err');
         } finally {
@@ -1219,6 +1221,7 @@ function initClicks() {
       go(goTo.dataset.goto);
       return;
     }
+    if (e.target.closest('.att-toggle')) return;
     const pl = e.target.closest('[data-player]');
     if (pl) { openProfile(pl.dataset.player); return; }
     const tm = e.target.closest('[data-team]');
