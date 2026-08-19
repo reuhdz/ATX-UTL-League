@@ -316,7 +316,7 @@ function renderTeamsRoster() {
   const colsFor = (view) => [
     ['rating', 'Rating'], ['name', 'Name'],
     ...(view === 'season5' ? [['teamId', 'Team']] : []),
-    ['level', 'Lvl'], ['pos', 'Pos'],
+    ['pos', 'Pos'],
     ['goals', 'G'], ['assists', 'A'], ['steals', 'S'], ['blocks', 'B'], ['turnovers', 'TO'],
     ['swimOffs', 'SO'], ['shots', 'SH'], ['matches', 'MP'],
   ];
@@ -360,7 +360,6 @@ function renderTeamsRoster() {
         <td>${p.matches ? `<span class="rating-badge">${p.rating}</span>` : '<span class="muted">—</span>'}</td>
         <td class="strong">${playerLink(p.playerId)}</td>
         ${seasonView ? `<td>${teamPill(p.teamId)}</td>` : ''}
-        <td>${levelTag(p.level)}</td>
         <td>${posTag(p)}</td>
         <td>${p.goals}</td><td>${p.assists}</td><td>${p.steals}</td>
         <td>${p.blocks}</td><td>${p.turnovers}</td>
@@ -410,7 +409,7 @@ function renderTeamsRoster() {
             <ul class="roster-mini">
               ${roster.map((p) => `
                 <li>
-                  <span class="rm-name">${playerLink(p.id)}${p.name === t.captain ? ' <span class="cap">C</span>' : ''} ${levelTag(p.level)}</span>
+                  <span class="rm-name">${playerLink(p.id)}${p.name === t.captain ? ' <span class="cap">C</span>' : ''}</span>
                   <span class="rm-pos">${playerPos(p, totals[p.id].matches) || '—'}</span>
                   <span class="rm-goals">${totals[p.id].goals}G</span>
                 </li>`).join('')}

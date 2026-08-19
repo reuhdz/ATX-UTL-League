@@ -64,7 +64,7 @@ const SEASON5_ROSTER = [
   'reuben', 'rich', 'river', 'zach', 'eric', 'justin',
   'bonney', 'max', 'lesley', 'michal', 'sk', 'jacqueline',
   'kellie', 'sage', 'walter', 'glenn', 'liam', 'eddy', 'jack',
-  'andriy', 'scroc',
+  'andriy', 'scroc', 'judson', 'mauricio', 'shaneye', 'brooke',
 ];
 
 /* ---- Players (real active roster). skill 0..1 gently biases box scores.
@@ -88,6 +88,9 @@ const PLAYERS = [
   { id: 'michal',      name: 'Michal',      teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.45 },
   { id: 'jacqueline',  name: 'Jacqueline',  teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.41 },
   { id: 'andriy',      name: 'Andriy',      teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.40 },
+  { id: 'judson',      name: 'Judson',      teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.40 },
+  { id: 'mauricio',    name: 'Mauricio',    teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.40 },
+  { id: 'brooke',      name: 'Brooke',      teamId: 'fa', level: 'Rookie', pos: 'Utility',  skill: 0.39 },
 
   // Overall roster (additional ATX players)
   { id: 'jamese',  name: 'James E',     teamId: 'fa', level: 'Pro',    pos: 'Defender', skill: 0.70 },
