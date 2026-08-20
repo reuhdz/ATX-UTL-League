@@ -64,7 +64,7 @@ const SEASON5_ROSTER = [
   'reuben', 'rich', 'river', 'zach', 'eric', 'justin',
   'bonney', 'max', 'lesley', 'michal', 'sk', 'jacqueline',
   'kellie', 'sage', 'walter', 'glenn', 'liam', 'eddy', 'jack',
-  'andriy', 'scroc', 'judson', 'mauricio', 'shaneye', 'brooke',
+  'andriy', 'scroc', 'judson', 'mauricio', 'shaneye', 'brooke', 'travis',
 ];
 
 /* ---- Players (real active roster). skill 0..1 gently biases box scores.
@@ -76,6 +76,7 @@ const PLAYERS = [
   { id: 'reuben', name: 'Reuben', teamId: 'capybara', level: 'Pro', pos: 'Striker',  skill: 0.78 },
   { id: 'rich',   name: 'Rich',   teamId: 'team1',    level: 'Pro', pos: 'Defender', skill: 0.64 },
   { id: 'zach',   name: 'Zach',   teamId: 'team2',    level: 'Pro', pos: 'Striker',  skill: 0.75 },
+  { id: 'travis', name: 'Travis', teamId: 'team2',    level: 'Pro', pos: 'Utility',  skill: 0.64 },
   { id: 'river',  name: 'River',  teamId: 'team3',    level: 'Pro', pos: 'Striker',  skill: 0.76 },
 
   // Season 5 pool (unassigned) + broader overall roster
@@ -108,7 +109,6 @@ const PLAYERS = [
   { id: 'patrick', name: 'Patrick',     teamId: 'fa', level: 'Pro',    pos: 'Striker',  skill: 0.63 },
   { id: 'scheese', name: 'Sean Cheese', teamId: 'fa', level: 'Pro',    pos: 'Utility',  skill: 0.61 },
   { id: 'scroc',   name: 'Sean Croc',   teamId: 'fa', level: 'Pro',    pos: 'Defender', skill: 0.59 },
-  { id: 'travis',  name: 'Travis',      teamId: 'fa', level: 'Pro',    pos: 'Utility',  skill: 0.64 },
 ];
 
 /* ===========================================================================

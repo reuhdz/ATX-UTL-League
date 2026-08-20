@@ -64,6 +64,10 @@ const DraftHub = (() => {
     return cfg().captainIds || ['river', 'zach', 'reuben', 'rich'];
   }
 
+  function lockedIds() {
+    return [...new Set([...(captainIds()), ...(cfg().preAssignedIds || [])])];
+  }
+
   function draftTeamOrder() {
     return cfg().draftOrder || ['team3', 'team2', 'capybara', 'team1'];
   }
@@ -112,8 +116,8 @@ const DraftHub = (() => {
   }
 
   function defaultDraft() {
-    const captains = new Set(captainIds());
-    const pool = (window.DB?.season5RosterIds || []).filter((id) => !captains.has(id));
+    const locked = new Set(lockedIds());
+    const pool = (window.DB?.season5RosterIds || []).filter((id) => !locked.has(id));
     const teamIds = draftTeamOrder();
     const order = [];
     const rounds = Math.ceil(pool.length / Math.max(teamIds.length, 1));
@@ -161,14 +165,14 @@ const DraftHub = (() => {
 
   function applyAssignments(map) {
     assignments = map || {};
-    const captains = new Set(captainIds());
+    const locked = new Set(lockedIds());
     const players = window.DB?.players || [];
     players.forEach((p) => {
       if (assignments[p.id]?.teamId) {
         p.teamId = assignments[p.id].teamId;
         return;
       }
-      p.teamId = captains.has(p.id) ? (BASE_TEAMS[p.id] || p.teamId) : 'fa';
+      p.teamId = locked.has(p.id) ? (BASE_TEAMS[p.id] || p.teamId) : 'fa';
     });
   }
 
@@ -304,7 +308,7 @@ const DraftHub = (() => {
   }
 
   async function clearDraftAssignments() {
-    const captains = new Set(captainIds());
+    const locked = new Set(lockedIds());
 
     if (mode === 'firebase') {
       try {
@@ -319,7 +323,7 @@ const DraftHub = (() => {
     assignments = {};
     const players = window.DB?.players || [];
     players.forEach((p) => {
-      if (captains.has(p.id)) {
+      if (locked.has(p.id)) {
         p.teamId = BASE_TEAMS[p.id] || p.teamId;
       } else {
         p.teamId = 'fa';

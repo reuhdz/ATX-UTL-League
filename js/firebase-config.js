@@ -23,6 +23,8 @@ window.DRAFT_CONFIG = {
   draftOrder: ['team3', 'team2', 'capybara', 'team1'],
   /* Captains are pre-assigned and excluded from the draft pool */
   captainIds: ['river', 'zach', 'reuben', 'rich'],
+  /* Other locked roster spots (not captains) — keep team, skip draft */
+  preAssignedIds: ['travis'],
   /* Master PIN can pick on any turn */
   turnSeconds: 120, // 2 minutes per pick
   masterPin: 'utlmaster',
