@@ -65,7 +65,7 @@ const SEASON5_ROSTER = [
   'bonney', 'max', 'lesley', 'michal', 'sk', 'jacqueline',
   'kellie', 'sage', 'walter', 'glenn', 'liam', 'eddy', 'jack',
   'andriy', 'scroc', 'judson', 'mauricio', 'shaneye', 'brooke', 'travis',
-  'jamese', 'kora', 'scheese', 'kevin', 'benb',
+  'jamese', 'kora', 'scheese', 'kevin', 'benb', 'patrick',
 ];
 
 /* ---- Players (real active roster). skill 0..1 gently biases box scores.
