@@ -298,8 +298,11 @@ const DB = {
     this.finals().forEach((m) => {
       const h = table[m.home], a = table[m.away];
       h.played++; a.played++;
-      h.gf += m.homeScore; h.ga += m.awayScore;
-      a.gf += m.awayScore; a.ga += m.homeScore;
+      // Series wins decide W/L; summed game points feed GF/GA when present.
+      const hg = m.pointsHome != null ? m.pointsHome : m.homeScore;
+      const ag = m.pointsAway != null ? m.pointsAway : m.awayScore;
+      h.gf += hg; h.ga += ag;
+      a.gf += ag; a.ga += hg;
       if (m.homeScore > m.awayScore) { h.w++; a.l++; h.pts += 3; }
       else if (m.homeScore < m.awayScore) { a.w++; h.l++; a.pts += 3; }
       else { h.d++; a.d++; h.pts++; a.pts++; }

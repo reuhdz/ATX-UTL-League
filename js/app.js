@@ -141,7 +141,11 @@ function renderDashboard() {
   const rated = DB.ratedPlayers().filter((p) => p.matches > 0);
   const finals = DB.finals();
   const upcoming = DB.upcoming();
-  const totalGoals = finals.reduce((s, m) => s + m.homeScore + m.awayScore, 0);
+  const totalGoals = finals.reduce((s, m) => {
+    const hg = m.pointsHome != null ? m.pointsHome : m.homeScore;
+    const ag = m.pointsAway != null ? m.pointsAway : m.awayScore;
+    return s + hg + ag;
+  }, 0);
   const leader = rated[0];
   // Golden Torpedo: Goals×2 + Assists×1 (goals weighted higher)
   const topScorer = [...rated].sort((a, b) =>
@@ -287,11 +291,15 @@ function fixtureRow(m) {
 }
 function resultRow(m) {
   const hw = m.homeScore > m.awayScore, aw = m.awayScore > m.homeScore;
+  const games = Array.isArray(m.games) && m.games.length
+    ? `<span class="fx-games muted small">${m.games.map((g, i) => `G${i + 1} ${g.home}–${g.away}`).join(' · ')}</span>`
+    : '';
   return `<div class="fixture">
       <span class="fx-date">${fmtDate(m.date)} · W${m.round}</span>
       <span class="fx-teams">${teamPill(m.home)}
         <b class="score ${hw ? 'win' : ''}">${m.homeScore}</b><em>–</em><b class="score ${aw ? 'win' : ''}">${m.awayScore}</b>
         ${teamPill(m.away)}</span>
+      ${games}
     </div>`;
 }
 
@@ -668,6 +676,22 @@ function renderMedia() {
     </a>
 
     <section class="panel">
+      <div class="panel-head"><h3>💡 Nominate a highlight</h3><span class="muted small">sent for admin review</span></div>
+      <form id="highlight-form" class="highlight-form">
+        <label>Video link
+          <input id="hl-url" class="input" type="url" required placeholder="https://…" autocomplete="off" />
+        </label>
+        <label>Comment
+          <textarea id="hl-comment" class="input" rows="3" maxlength="500" placeholder="Why is this highlight-worthy?"></textarea>
+        </label>
+        <div class="se-actions">
+          <button type="submit" class="btn">Submit for review</button>
+        </div>
+        <p id="hl-msg" class="draft-msg"></p>
+      </form>
+    </section>
+
+    <section class="panel">
       <div class="panel-head"><h3>🎞️ Game film</h3><span class="muted small">each tile opens that game’s clip folder</span></div>
       <div class="media-controls">
         <div class="seg" id="media-team">
@@ -681,6 +705,33 @@ function renderMedia() {
 
     <p class="muted small center">Clip folders resolve to <code>${MEDIA.filmBase}&lt;game&gt;/</code> — set <code>MEDIA.filmBase</code> in <code>js/content.js</code> to wherever your clips live.</p>
   `;
+
+  const setHlMsg = (text, cls = '') => {
+    const el = $('#hl-msg');
+    if (!el) return;
+    el.className = `draft-msg ${cls}`.trim();
+    el.textContent = text || '';
+  };
+
+  $('#highlight-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    try {
+      if (btn) btn.disabled = true;
+      setHlMsg('Sending…');
+      await HighlightsHub.submit({
+        url: $('#hl-url')?.value,
+        comment: $('#hl-comment')?.value,
+      });
+      if ($('#hl-url')) $('#hl-url').value = '';
+      if ($('#hl-comment')) $('#hl-comment').value = '';
+      setHlMsg('Submitted — thanks! An admin will review it.', 'ok');
+    } catch (err) {
+      setHlMsg(err.message || String(err), 'err');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
 
   const games = [...DB.matches].sort((a, b) => a.round - b.round || a.id.localeCompare(b.id));
 
@@ -1263,7 +1314,7 @@ initTheme();
 initClicks();
 $('#brand-sub').textContent = DB.league.full;
 $('#footer-venue').textContent = DB.league.venue;
-Promise.all([DraftHub.init(), AttendanceHub.init()]).then(() => {
+Promise.all([DraftHub.init(), AttendanceHub.init(), StatsHub.init(), HighlightsHub.init()]).then(() => {
   DraftHub.onChange(() => {
     let tab = 'overview';
     try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
@@ -1271,6 +1322,11 @@ Promise.all([DraftHub.init(), AttendanceHub.init()]).then(() => {
     // Attendance paints via AttendanceHub — only remount when teams change.
     if (tab === 'teams') go(tab);
     if (tab === 'attendance') go(tab);
+  });
+  StatsHub.onChange(() => {
+    let tab = 'overview';
+    try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
+    if (['overview', 'schedule', 'stats', 'teams', 'media'].includes(tab)) go(tab);
   });
   let startTab = 'overview';
   try { startTab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
