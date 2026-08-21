@@ -10,7 +10,9 @@
        homeScore, awayScore,           // series wins (0–2) — used for W/L
        pointsHome, pointsAway,         // sum of game points — used for GF/GA
        homeLineup, awayLineup, box,
-       seriesSavedAt, boxSavedAt, updatedAt
+       seriesSavedAt, seriesSavedBy,   // who entered series scores
+       boxSavedAt, boxSavedBy,         // who entered individual stats
+       updatedAt, updatedBy
      }
    Overlays window.DB.matches in place.
    ============================================================================ */
@@ -74,6 +76,31 @@ const StatsHub = (() => {
     if (typeof AdminAuth !== 'undefined' && AdminAuth.isLoggedIn()) return true;
     const expected = normalizePin(cfg().masterPin || '');
     return !!expected && normalizePin(pin) === expected;
+  }
+
+  function actorFromSession() {
+    const s = (typeof AdminAuth !== 'undefined' && AdminAuth.session) ? AdminAuth.session() : null;
+    if (!s) {
+      return { username: 'unknown', label: 'Unknown', role: null, at: Date.now() };
+    }
+    return {
+      username: s.username || 'unknown',
+      label: s.label || s.username || 'Unknown',
+      role: s.role || null,
+      at: Date.now(),
+    };
+  }
+
+  function normalizeActor(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const username = String(raw.username || '').trim();
+    if (!username) return null;
+    return {
+      username,
+      label: String(raw.label || username).trim() || username,
+      role: raw.role || null,
+      at: raw.at || null,
+    };
   }
 
   function cloneMatch(m) {
@@ -146,8 +173,11 @@ const StatsHub = (() => {
       awayLineup,
       box,
       seriesSavedAt: raw.seriesSavedAt || null,
+      seriesSavedBy: normalizeActor(raw.seriesSavedBy),
       boxSavedAt: raw.boxSavedAt || null,
+      boxSavedBy: normalizeActor(raw.boxSavedBy),
       updatedAt: raw.updatedAt || Date.now(),
+      updatedBy: normalizeActor(raw.updatedBy),
     };
   }
 
@@ -168,6 +198,9 @@ const StatsHub = (() => {
     matches.forEach((m) => {
       const base = baseMatches.find((b) => b.id === m.id) || cloneMatch(m);
       Object.assign(m, cloneMatch(base));
+      m.seriesSavedBy = null;
+      m.boxSavedBy = null;
+      m.updatedBy = null;
       const res = results[m.id];
       if (!res) return;
       m.status = 'final';
@@ -180,6 +213,9 @@ const StatsHub = (() => {
       m.homeLineup = [...res.homeLineup];
       m.awayLineup = [...res.awayLineup];
       m.box = res.box.map((b) => ({ ...b }));
+      m.seriesSavedBy = res.seriesSavedBy;
+      m.boxSavedBy = res.boxSavedBy;
+      m.updatedBy = res.updatedBy;
     });
   }
 
@@ -275,7 +311,7 @@ const StatsHub = (() => {
 
   /** Save series scores only (does not wipe existing box/lineups). */
   async function saveSeries(matchId, games, pin) {
-    if (!checkMasterPin(pin)) throw new Error('Admin login required to save series');
+    if (!checkMasterPin(pin)) throw new Error('Captain or admin login required to save series');
     const match = (window.DB?.matches || []).find((m) => m.id === matchId);
     if (!match) throw new Error('Unknown match');
 
@@ -286,6 +322,7 @@ const StatsHub = (() => {
 
     const prev = results[matchId] || {};
     const derived = seriesFromGames(cleaned);
+    const actor = actorFromSession();
     const next = normalizeResult({
       ...prev,
       games: cleaned,
@@ -293,15 +330,17 @@ const StatsHub = (() => {
       homeLineup: prev.homeLineup || [],
       awayLineup: prev.awayLineup || [],
       box: prev.box || [],
-      seriesSavedAt: Date.now(),
-      updatedAt: Date.now(),
+      seriesSavedAt: actor.at,
+      seriesSavedBy: actor,
+      updatedAt: actor.at,
+      updatedBy: actor,
     }, matchId);
     return writeResult(matchId, next);
   }
 
   /** Save individual box scores / lineups (keeps existing series games). */
   async function saveBox(matchId, payload, pin) {
-    if (!checkMasterPin(pin)) throw new Error('Admin login required to save player stats');
+    if (!checkMasterPin(pin)) throw new Error('Captain or admin login required to save player stats');
     const match = (window.DB?.matches || []).find((m) => m.id === matchId);
     if (!match) throw new Error('Unknown match');
 
@@ -313,6 +352,7 @@ const StatsHub = (() => {
     const homeLineup = Array.isArray(payload.homeLineup) ? payload.homeLineup.filter(Boolean) : [];
     const awayLineup = Array.isArray(payload.awayLineup) ? payload.awayLineup.filter(Boolean) : [];
     const box = Array.isArray(payload.box) ? payload.box.filter((b) => b?.playerId).map(normalizeBoxLine) : [];
+    const actor = actorFromSession();
 
     const next = normalizeResult({
       ...prev,
@@ -324,14 +364,16 @@ const StatsHub = (() => {
       homeLineup,
       awayLineup,
       box,
-      boxSavedAt: Date.now(),
-      updatedAt: Date.now(),
+      boxSavedAt: actor.at,
+      boxSavedBy: actor,
+      updatedAt: actor.at,
+      updatedBy: actor,
     }, matchId);
     return writeResult(matchId, next);
   }
 
   async function clearMatch(matchId, pin) {
-    if (!checkMasterPin(pin)) throw new Error('Admin login required to clear');
+    if (!checkMasterPin(pin)) throw new Error('Captain or admin login required to clear');
     if (mode === 'firebase' && db) {
       await db.ref(`matchResults/${roomId()}/${matchId}`).remove();
       return;
@@ -346,7 +388,7 @@ const StatsHub = (() => {
 
   /** Clear individual box scores / lineups; keep series scores. */
   async function clearBox(matchId, pin) {
-    if (!checkMasterPin(pin)) throw new Error('Admin login required to clear player stats');
+    if (!checkMasterPin(pin)) throw new Error('Captain or admin login required to clear player stats');
     const prev = results[matchId];
     if (!prev) throw new Error('No saved stats for this match');
     if (!prev.games?.length) {
@@ -364,7 +406,9 @@ const StatsHub = (() => {
       awayLineup: [],
       box: [],
       boxSavedAt: null,
+      boxSavedBy: null,
       updatedAt: Date.now(),
+      updatedBy: actorFromSession(),
     }, matchId);
     return writeResult(matchId, next);
   }

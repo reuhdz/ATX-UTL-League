@@ -288,12 +288,17 @@ function resultRow(m) {
   const games = Array.isArray(m.games) && m.games.length
     ? `<span class="fx-games muted small">${m.games.map((g, i) => `G${i + 1} ${g.home}–${g.away}`).join(' · ')}</span>`
     : '';
+  const by = m.updatedBy || m.seriesSavedBy || m.boxSavedBy;
+  const entered = by?.label
+    ? `<span class="fx-entered muted small">Entered by ${by.label}</span>`
+    : '';
   return `<div class="fixture">
       <span class="fx-date">${fmtDate(m.date)} · W${m.round}</span>
       <span class="fx-teams">${teamPill(m.home)}
         <b class="score ${hw ? 'win' : ''}">${m.homeScore}</b><em>–</em><b class="score ${aw ? 'win' : ''}">${m.awayScore}</b>
         ${teamPill(m.away)}</span>
       ${games}
+      ${entered}
     </div>`;
 }
 

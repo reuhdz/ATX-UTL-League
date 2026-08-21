@@ -38,6 +38,19 @@
 
   function setMsg(text, cls = '') { msg = { text: text || '', cls }; }
 
+  function fmtWhen(ts) {
+    if (!ts) return '';
+    try {
+      return new Date(ts).toLocaleString();
+    } catch (e) { return ''; }
+  }
+
+  function enteredByHtml(actor, at) {
+    if (!actor?.label) return '';
+    const when = fmtWhen(actor.at || at);
+    return `Entered by ${actor.label}${when ? ` · ${when}` : ''}`;
+  }
+
   function teamName(id) { return DB.teamName(id); }
 
   function weeks() {
@@ -250,12 +263,16 @@
           <button type="button" class="btn" id="se-save-series" disabled>Submit series scores</button>
           <button type="button" class="btn btn-ghost" id="se-clear" disabled>Clear match</button>
         </div>
-        <p class="muted small">Leave unused games blank (e.g. 2–0 series only needs Game 1 &amp; 2).</p>
+        <p class="muted small">${saved?.seriesSavedBy
+          ? enteredByHtml(saved.seriesSavedBy, saved.seriesSavedAt)
+          : 'Leave unused games blank (e.g. 2–0 series only needs Game 1 &amp; 2).'}</p>
       </section>
 
       <section class="panel">
         <div class="panel-head"><h3>3 · Individual stats</h3>
-          <span class="muted small">${saved?.boxSavedAt ? 'Box scores saved' : 'Not submitted yet'}</span>
+          <span class="muted small">${saved?.boxSavedBy
+            ? enteredByHtml(saved.boxSavedBy, saved.boxSavedAt)
+            : (saved?.boxSavedAt ? 'Box scores saved' : 'Not submitted yet')}</span>
         </div>
         <div class="se-grid">${sideTable('home')}${sideTable('away')}</div>
         <div class="se-actions" style="margin-top:14px">
@@ -265,7 +282,7 @@
       </section>` : ''}`;
 
     const syncSubmitButtons = () => {
-      const ok = AdminAuth.isAdmin();
+      const ok = AdminAuth.isLoggedIn();
       const hasSaved = !!(matchId && StatsHub.getResult(matchId));
       const hasBox = !!(matchId && (StatsHub.getResult(matchId)?.boxSavedAt || StatsHub.getResult(matchId)?.box?.length));
       if ($('#se-save-series')) $('#se-save-series').disabled = !ok;
@@ -432,7 +449,7 @@
   }
 
   applyTheme();
-  if (!AdminAuth.requireAdmin('../admin/')) return;
+  if (!AdminAuth.requireLogin('../admin/')) return;
   Promise.all([DraftHub.init(), AttendanceHub.init(), StatsHub.init()]).then(() => {
     paint();
   }).catch((e) => {
