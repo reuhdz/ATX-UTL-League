@@ -315,7 +315,6 @@ function renderTeamsRoster() {
   const totals = DB.playerTotals();
   const seasonRated = DB.ratedPlayers();
   const careerRated = DB.ratedCareerPlayers();
-  const season5Count = DB.season5Roster().length;
 
   const colsFor = (view) => [
     ['rating', 'Rating'], ['name', 'Name'],
@@ -371,11 +370,8 @@ function renderTeamsRoster() {
       </tr>`).join('');
 
     const title = seasonView ? '🌊 Season 5 roster' : '👤 Overall roster';
-    const meta = seasonView
-      ? `${season5Count} players · Season 5 stats`
-      : `${careerRated.length} players · all-seasons stats · no team affiliation`;
     $('#roster-title').textContent = title;
-    $('#roster-meta').textContent = meta;
+    if ($('#roster-meta')) $('#roster-meta').textContent = '';
 
     $$('#roster-view-toggle .seg-btn').forEach((b) =>
       b.classList.toggle('active', b.dataset.view === rosterView));
@@ -387,7 +383,6 @@ function renderTeamsRoster() {
   view.innerHTML = `
     <div class="page-head">
       <h2>Teams &amp; Roster</h2>
-      <p class="muted">Season 5 stats or all-time career totals — toggle below.</p>
     </div>
 
     <div class="team-grid">
@@ -676,7 +671,7 @@ function renderMedia() {
     </a>
 
     <section class="panel">
-      <div class="panel-head"><h3>💡 Nominate a highlight</h3><span class="muted small">sent for admin review</span></div>
+      <div class="panel-head"><h3>💡 Nominate a highlight</h3></div>
       <form id="highlight-form" class="highlight-form">
         <label>Video link
           <input id="hl-url" class="input" type="url" required placeholder="https://…" autocomplete="off" />
@@ -692,7 +687,7 @@ function renderMedia() {
     </section>
 
     <section class="panel">
-      <div class="panel-head"><h3>🎞️ Game film</h3><span class="muted small">each tile opens that game’s clip folder</span></div>
+      <div class="panel-head"><h3>🎞️ Game film</h3></div>
       <div class="media-controls">
         <div class="seg" id="media-team">
           <button class="seg-btn ${mediaFilter.team === 'all' ? 'active' : ''}" data-team="all">All</button>
@@ -702,8 +697,6 @@ function renderMedia() {
       </div>
       <div id="game-film" class="media-grid"></div>
     </section>
-
-    <p class="muted small center">Clip folders resolve to <code>${MEDIA.filmBase}&lt;game&gt;/</code> — set <code>MEDIA.filmBase</code> in <code>js/content.js</code> to wherever your clips live.</p>
   `;
 
   const setHlMsg = (text, cls = '') => {
@@ -792,7 +785,6 @@ function renderAttendance() {
   view.innerHTML = `
     <div class="page-head">
       <h2>Attendance &amp; Availability</h2>
-      <p class="muted">Season 5 roster — tap a status to update. Changes sync live for everyone.</p>
     </div>
     <p id="att-live-msg" class="draft-msg"></p>
 
