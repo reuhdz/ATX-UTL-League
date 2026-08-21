@@ -37,10 +37,25 @@ const ChartHub = {
     const el = document.getElementById(id);
     if (!el) return;
     this.destroy(id);
+    const base = this._base();
+    const horizontal = opts.indexAxis === 'y';
+    // Horizontal bars need nearest+axis:'y' — mode:'index' highlights the wrong label.
+    const tip = horizontal
+      ? { mode: 'nearest', axis: 'y', intersect: false }
+      : { ...(base.plugins?.tooltip || {}), mode: 'index', intersect: false };
     this.registry[id] = new Chart(el, {
       type: 'bar',
       data: { labels, datasets },
-      options: { ...this._base(), ...opts },
+      options: {
+        ...base,
+        ...opts,
+        interaction: { ...(opts.interaction || {}), ...tip },
+        plugins: {
+          ...base.plugins,
+          ...(opts.plugins || {}),
+          tooltip: { ...(base.plugins?.tooltip || {}), ...(opts.plugins?.tooltip || {}), ...tip },
+        },
+      },
     });
   },
 
