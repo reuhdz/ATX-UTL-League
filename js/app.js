@@ -315,7 +315,7 @@ function renderTeamsRoster() {
     ...(view === 'season5' ? [['teamId', 'Team']] : []),
     ['pos', 'Pos'],
     ['goals', 'G'], ['assists', 'A'], ['steals', 'S'], ['blocks', 'B'], ['turnovers', 'TO'],
-    ['swimOffs', 'SO'], ['shots', 'SH'], ['matches', 'MP'],
+    ['swimOffAttempts', 'SOA'], ['swimOffs', 'SO'], ['shots', 'SH'], ['matches', 'MP'],
   ];
 
   const bindSort = () => {
@@ -360,7 +360,7 @@ function renderTeamsRoster() {
         <td>${posTag(p)}</td>
         <td>${p.goals}</td><td>${p.assists}</td><td>${p.steals}</td>
         <td>${p.blocks}</td><td>${p.turnovers}</td>
-        <td>${p.swimOffs}</td><td>${p.shots}</td><td>${p.matches}</td>
+        <td>${p.swimOffAttempts || 0}</td><td>${p.swimOffs}</td><td>${p.shots}</td><td>${p.matches}</td>
       </tr>`).join('');
 
     const title = seasonView ? '🌊 Season 5 roster' : '👤 Overall roster';
@@ -397,7 +397,7 @@ function renderTeamsRoster() {
             </div>
             <div class="team-mini-stats">
               <span>🥅 ${tt.goals}</span><span>🅰️ ${tt.assists}</span><span>🖐️ ${tt.steals}</span>
-              <span>🧱 ${tt.blocks}</span><span>🏁 ${tt.swimOffs} SO</span><span>🏹 ${tt.shots} SH</span>
+              <span>🧱 ${tt.blocks}</span><span>🏁 ${tt.swimOffAttempts || 0}/${tt.swimOffs} SO</span><span>🏹 ${tt.shots} SH</span>
             </div>
             <ul class="roster-mini">
               ${roster.map((p) => `
@@ -637,8 +637,8 @@ function drawSpotlight() {
       </div>
       <div class="mini-stats">
         ${stat('Goals', p.goals)}${stat('Assists', p.assists)}${stat('Steals', p.steals)}
-        ${stat('Blocks', p.blocks)}${stat('Turnovers', p.turnovers)}${stat('Swim-offs', p.swimOffs)}
-        ${stat('Shots', p.shots)}${stat('Matches', p.matches)}
+        ${stat('Blocks', p.blocks)}${stat('Turnovers', p.turnovers)}${stat('SO att', p.swimOffAttempts || 0)}
+        ${stat('SO wins', p.swimOffs)}${stat('Shots', p.shots)}${stat('Matches', p.matches)}
       </div>
       <div class="spot-grid">
         <div class="chart-wrap sm"><canvas id="c-spotlight"></canvas></div>
@@ -646,14 +646,14 @@ function drawSpotlight() {
           <h4>Game log</h4>
           ${log.length ? `
           <table class="tbl gamelog">
-            <thead><tr><th>W</th><th>Opp</th><th>Res</th><th>G</th><th>A</th><th>S</th><th>B</th><th>TO</th><th>SO</th><th>SH</th></tr></thead>
+            <thead><tr><th>W</th><th>Opp</th><th>Res</th><th>G</th><th>A</th><th>S</th><th>B</th><th>TO</th><th>SOA</th><th>SO</th><th>SH</th></tr></thead>
             <tbody>${log.map((g) => `
               <tr>
                 <td>${g.round}</td>
                 <td>${teamBadge(g.opp)}${g.guest ? ' <span class="guest">guest</span>' : ''}</td>
                 <td><span class="res ${g.result}">${g.result} ${g.gf}-${g.ga}</span></td>
                 <td>${g.goals}</td><td>${g.assists}</td><td>${g.steals}</td><td>${g.blocks}</td><td>${g.turnovers}</td>
-                <td>${g.swimOffs || 0}</td><td>${g.shots || 0}</td>
+                <td>${g.swimOffAttempts || 0}</td><td>${g.swimOffs || 0}</td><td>${g.shots || 0}</td>
               </tr>`).join('')}</tbody>
           </table>` : '<p class="muted">No league matches played yet this season.</p>'}
         </div>
@@ -1019,8 +1019,8 @@ function openProfile(id) {
 
     <div class="mini-stats">
       ${stat('Goals', p.goals)}${stat('Assists', p.assists)}${stat('Steals', p.steals)}
-      ${stat('Blocks', p.blocks)}${stat('Turnovers', p.turnovers)}${stat('Swim-offs', p.swimOffs)}
-      ${stat('Shots', p.shots)}${stat('Matches', p.matches)}
+      ${stat('Blocks', p.blocks)}${stat('Turnovers', p.turnovers)}${stat('SO att', p.swimOffAttempts || 0)}
+      ${stat('SO wins', p.swimOffs)}${stat('Shots', p.shots)}${stat('Matches', p.matches)}
     </div>
 
     <div class="prof-grid">
@@ -1029,14 +1029,14 @@ function openProfile(id) {
         <h4>Game log</h4>
         ${log.length ? `
         <table class="tbl gamelog">
-          <thead><tr><th>W</th><th>Opp</th><th>Res</th><th>G</th><th>A</th><th>S</th><th>B</th><th>TO</th><th>SO</th><th>SH</th></tr></thead>
+          <thead><tr><th>W</th><th>Opp</th><th>Res</th><th>G</th><th>A</th><th>S</th><th>B</th><th>TO</th><th>SOA</th><th>SO</th><th>SH</th></tr></thead>
           <tbody>${log.map((g) => `
             <tr>
               <td>${g.round}</td>
               <td>${teamBadge(g.opp)}${g.guest ? ' <span class="guest">guest</span>' : ''}</td>
               <td><span class="res ${g.result}">${g.result} ${g.gf}-${g.ga}</span></td>
               <td>${g.goals}</td><td>${g.assists}</td><td>${g.steals}</td><td>${g.blocks}</td><td>${g.turnovers}</td>
-              <td>${g.swimOffs || 0}</td><td>${g.shots || 0}</td>
+              <td>${g.swimOffAttempts || 0}</td><td>${g.swimOffs || 0}</td><td>${g.shots || 0}</td>
             </tr>`).join('')}</tbody>
         </table>` : '<p class="muted">No league matches played yet this season.</p>'}
       </div>

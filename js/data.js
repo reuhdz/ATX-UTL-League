@@ -135,10 +135,10 @@ const rint = (min, max) => Math.floor(rng() * (max - min + 1)) + min;
         with the current season so Overall stays all-seasons-ready. ----------- */
 const STAT_ZERO = () => ({
   goals: 0, assists: 0, steals: 0, blocks: 0, turnovers: 0,
-  swimOffs: 0, shots: 0, matches: 0,
+  swimOffAttempts: 0, swimOffs: 0, shots: 0, matches: 0,
 });
 const PRIOR_SEASONS = {
-  // 1: { reuben: { goals: 0, assists: 0, steals: 0, blocks: 0, turnovers: 0, swimOffs: 0, shots: 0, matches: 0 }, ... },
+  // 1: { reuben: { goals: 0, assists: 0, steals: 0, blocks: 0, turnovers: 0, swimOffAttempts: 0, swimOffs: 0, shots: 0, matches: 0 }, ... },
 };
 
 const rosterOf = (tid) => PLAYERS.filter((p) => p.teamId === tid);
@@ -196,7 +196,8 @@ function boxFor(players, goalsScored) {
     steals: rint(0, p.skill > 0.6 ? 4 : 3),
     blocks: p.pos === 'Goalie' || p.pos === 'Defender' ? rint(0, 3) : rint(0, 1),
     turnovers: rint(0, 3),
-    swimOffs: rint(0, p.skill > 0.65 ? 2 : 1), // swim-off wins
+    swimOffAttempts: rint(0, p.skill > 0.65 ? 3 : 2),
+    swimOffs: 0, // filled below as wins ≤ attempts
     shots: 0, // scoring chances (filled below; always ≥ goals)
   }));
   for (let g = 0; g < goalsScored; g++) {
@@ -210,6 +211,7 @@ function boxFor(players, goalsScored) {
   stats.forEach((s) => {
     const p = players.find((x) => x.id === s.playerId);
     s.shots = s.goals + rint(0, p.skill > 0.7 ? 4 : 3);
+    s.swimOffs = Math.min(s.swimOffAttempts, rint(0, s.swimOffAttempts));
   });
   return stats;
 }
@@ -319,13 +321,14 @@ const DB = {
     const totals = {};
     PLAYERS.forEach((p) => (totals[p.id] = {
       playerId: p.id, goals: 0, assists: 0, steals: 0, blocks: 0, turnovers: 0,
-      swimOffs: 0, shots: 0, matches: 0,
+      swimOffAttempts: 0, swimOffs: 0, shots: 0, matches: 0,
     }));
     this.finals().forEach((m) => m.box.forEach((b) => {
       const t = totals[b.playerId];
       if (!t) return;
       t.goals += b.goals || 0; t.assists += b.assists || 0; t.steals += b.steals || 0;
       t.blocks += b.blocks || 0; t.turnovers += b.turnovers || 0;
+      t.swimOffAttempts += b.swimOffAttempts || 0;
       t.swimOffs += b.swimOffs || 0; t.shots += b.shots || 0; t.matches++;
     }));
     return totals;
@@ -345,6 +348,7 @@ const DB = {
         acc.steals += prior.steals || 0;
         acc.blocks += prior.blocks || 0;
         acc.turnovers += prior.turnovers || 0;
+        acc.swimOffAttempts += prior.swimOffAttempts || 0;
         acc.swimOffs += prior.swimOffs || 0;
         acc.shots += prior.shots || 0;
         acc.matches += prior.matches || 0;
@@ -357,6 +361,7 @@ const DB = {
         steals: acc.steals + cur.steals,
         blocks: acc.blocks + cur.blocks,
         turnovers: acc.turnovers + cur.turnovers,
+        swimOffAttempts: acc.swimOffAttempts + cur.swimOffAttempts,
         swimOffs: acc.swimOffs + cur.swimOffs,
         shots: acc.shots + cur.shots,
         matches: acc.matches + cur.matches,
@@ -401,9 +406,9 @@ const DB = {
       const t = totals[p.id];
       acc.goals += t.goals; acc.assists += t.assists; acc.steals += t.steals;
       acc.blocks += t.blocks; acc.turnovers += t.turnovers;
-      acc.swimOffs += t.swimOffs; acc.shots += t.shots;
+      acc.swimOffAttempts += t.swimOffAttempts; acc.swimOffs += t.swimOffs; acc.shots += t.shots;
       return acc;
-    }, { goals: 0, assists: 0, steals: 0, blocks: 0, turnovers: 0, swimOffs: 0, shots: 0 });
+    }, { goals: 0, assists: 0, steals: 0, blocks: 0, turnovers: 0, swimOffAttempts: 0, swimOffs: 0, shots: 0 });
   },
 
   /* Per-match log for one player (used by profiles) */

@@ -13,7 +13,7 @@
   const FIELDS = StatsHub.fields;
   const FIELD_LABELS = {
     goals: 'G', assists: 'A', steals: 'S', blocks: 'B',
-    turnovers: 'TO', swimOffs: 'SO', shots: 'SH',
+    turnovers: 'TO', swimOffAttempts: 'SOA', swimOffs: 'SO', shots: 'SH',
   };
   const FIELD_TITLES = {
     goals: 'Goals — torpedo placed in the opponent’s goal',
@@ -21,6 +21,7 @@
     steals: 'Steals — taking the torpedo or forcing a takeaway',
     blocks: 'Blocks — denying a scoring chance / goal-bound look',
     turnovers: 'Turnovers — lost possession without a shot or goal',
+    swimOffAttempts: 'Swim-off attempts — times this player took the swim-off',
     swimOffs: 'Swim-off wins — first clean possession after restart',
     shots: 'Shots — scoring chances (includes goals)',
   };
@@ -379,8 +380,16 @@
       bindZeroClear(inp, {
         onCommit: (n) => {
           ensureBox(inp.dataset.player);
-          draft.box[inp.dataset.player][inp.dataset.field] = Math.max(0, Math.round(n) || 0);
-          inp.value = String(draft.box[inp.dataset.player][inp.dataset.field]);
+          const line = draft.box[inp.dataset.player];
+          line[inp.dataset.field] = Math.max(0, Math.round(n) || 0);
+          if (line.swimOffs > line.swimOffAttempts) {
+            line.swimOffAttempts = line.swimOffs;
+          }
+          inp.value = String(line[inp.dataset.field]);
+          const att = document.querySelector(`.se-num[data-player="${inp.dataset.player}"][data-field="swimOffAttempts"]`);
+          const win = document.querySelector(`.se-num[data-player="${inp.dataset.player}"][data-field="swimOffs"]`);
+          if (att) att.value = String(line.swimOffAttempts || 0);
+          if (win) win.value = String(line.swimOffs || 0);
         },
       });
     });

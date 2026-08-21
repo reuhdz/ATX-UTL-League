@@ -16,7 +16,7 @@
    ============================================================================ */
 
 const StatsHub = (() => {
-  const STAT_FIELDS = ['goals', 'assists', 'steals', 'blocks', 'turnovers', 'swimOffs', 'shots'];
+  const STAT_FIELDS = ['goals', 'assists', 'steals', 'blocks', 'turnovers', 'swimOffAttempts', 'swimOffs', 'shots'];
   const cfg = () => window.DRAFT_CONFIG || {};
   const fbCfg = () => window.FIREBASE_CONFIG || {};
   const roomId = () => cfg().roomId || 'season5';
