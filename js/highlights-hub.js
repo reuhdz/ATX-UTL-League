@@ -2,7 +2,7 @@
    Highlights hub — user-submitted clip nominations
    -----------------------------------------------------------------------------
    Path: /season5-highlights/{pushId}
-   Shape: { url, comment, createdAt, status: 'pending'|'approved'|'rejected' }
+   Shape: { urls:[...], url, comment, createdAt, status: 'pending'|'approved'|'rejected' }
    ============================================================================ */
 
 const HighlightsHub = (() => {
@@ -36,14 +36,31 @@ const HighlightsHub = (() => {
 
   function normalizeUrl(url) {
     const u = String(url || '').trim();
-    if (!u) throw new Error('Paste a video link');
+    if (!u) throw new Error('Paste at least one video link');
     try {
       const parsed = new URL(u);
       if (!/^https?:$/i.test(parsed.protocol)) throw new Error('bad');
       return parsed.href;
     } catch (e) {
-      throw new Error('Enter a valid http(s) URL');
+      throw new Error(`Invalid link: ${u}`);
     }
+  }
+
+  function normalizeUrls(urls) {
+    const list = (Array.isArray(urls) ? urls : [urls])
+      .map((u) => String(u || '').trim())
+      .filter(Boolean);
+    if (!list.length) throw new Error('Paste at least one video link');
+    const out = [];
+    const seen = new Set();
+    list.forEach((u) => {
+      const href = normalizeUrl(u);
+      if (!seen.has(href)) {
+        seen.add(href);
+        out.push(href);
+      }
+    });
+    return out;
   }
 
   async function init() {
@@ -63,9 +80,11 @@ const HighlightsHub = (() => {
     return { mode, connectionError };
   }
 
-  async function submit({ url, comment }) {
+  async function submit({ url, urls, comment }) {
+    const list = normalizeUrls(urls != null ? urls : url);
     const entry = {
-      url: normalizeUrl(url),
+      urls: list,
+      url: list[0], // convenience for single-link readers
       comment: String(comment || '').trim().slice(0, 500),
       createdAt: Date.now(),
       status: 'pending',
