@@ -707,7 +707,6 @@ function renderMedia() {
         <div class="se-actions">
           <button type="submit" class="btn">Submit for review</button>
         </div>
-        <p class="muted small">Captains review &amp; vote at <a href="season-5-highlights/">/season-5-highlights</a>. Top 3 per game show under Highlights.</p>
         <p id="hl-msg" class="draft-msg"></p>
       </form>
     </section>
