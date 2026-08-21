@@ -291,8 +291,8 @@
             </div>`).join('')}
         </div>
         <div class="se-actions">
-          <button type="button" class="btn" id="se-save-series">Submit series scores</button>
-          <button type="button" class="btn btn-ghost" id="se-clear" ${saved ? '' : 'disabled'}>Clear match</button>
+          <button type="button" class="btn" id="se-save-series" disabled>Submit series scores</button>
+          <button type="button" class="btn btn-ghost" id="se-clear" disabled>Clear match</button>
         </div>
         <p class="muted small">Leave unused games blank (e.g. 2–0 series only needs Game 1 &amp; 2).</p>
       </section>
@@ -303,11 +303,23 @@
         </div>
         <div class="se-grid">${sideTable('home')}${sideTable('away')}</div>
         <div class="se-actions" style="margin-top:14px">
-          <button type="button" class="btn" id="se-save-box">Submit individual stats</button>
+          <button type="button" class="btn" id="se-save-box" disabled>Submit individual stats</button>
         </div>
       </section>` : ''}`;
 
-    $('#se-pin')?.addEventListener('input', (e) => { pinVal = e.target.value; });
+    const syncSubmitButtons = () => {
+      const ok = StatsHub.checkMasterPin(($('#se-pin')?.value || pinVal || '').trim());
+      const hasSaved = !!(matchId && StatsHub.getResult(matchId));
+      if ($('#se-save-series')) $('#se-save-series').disabled = !ok;
+      if ($('#se-save-box')) $('#se-save-box').disabled = !ok;
+      if ($('#se-clear')) $('#se-clear').disabled = !ok || !hasSaved;
+    };
+
+    $('#se-pin')?.addEventListener('input', (e) => {
+      pinVal = e.target.value;
+      syncSubmitButtons();
+    });
+    syncSubmitButtons();
 
     $('#se-week')?.addEventListener('change', (e) => {
       week = Number(e.target.value);
