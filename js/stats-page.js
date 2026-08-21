@@ -192,8 +192,6 @@
   }
 
   function paint() {
-    const st = StatsHub.status();
-
     if (!unlocked) {
       root.innerHTML = `
         <div class="page-head">
@@ -235,9 +233,6 @@
     const match = currentMatch();
     const preview = seriesPreview();
     const saved = match ? StatsHub.getResult(match.id) : null;
-    const conn = st.connectionError
-      ? `Sync issue: ${st.connectionError}`
-      : st.mode === 'firebase' ? (st.connected ? 'Live Firebase' : 'Connecting…') : 'Local only';
 
     root.innerHTML = `
       <div class="page-head">
@@ -247,7 +242,6 @@
         <label class="se-pin"><span>Master PIN</span>
           <input id="se-pin" class="input" type="password" autocomplete="off" value="${String(pinVal).replace(/"/g, '&quot;')}" />
         </label>
-        <span class="muted small">${conn}</span>
         <a class="muted small" href="../">← Dashboard</a>
       </div>
       <p class="draft-msg ${msg.cls}">${msg.text}</p>
