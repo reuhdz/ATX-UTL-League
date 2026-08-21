@@ -342,12 +342,37 @@ const StatsHub = (() => {
     emit();
   }
 
+  /** Clear individual box scores / lineups; keep series scores. */
+  async function clearBox(matchId, pin) {
+    if (!checkMasterPin(pin)) throw new Error('Master PIN required to clear player stats');
+    const prev = results[matchId];
+    if (!prev) throw new Error('No saved stats for this match');
+    if (!prev.games?.length) {
+      // Nothing but box data — clear the whole match
+      return clearMatch(matchId, pin);
+    }
+    const next = normalizeResult({
+      ...prev,
+      games: prev.games || [],
+      homeScore: prev.homeScore,
+      awayScore: prev.awayScore,
+      pointsHome: prev.pointsHome,
+      pointsAway: prev.pointsAway,
+      homeLineup: [],
+      awayLineup: [],
+      box: [],
+      boxSavedAt: null,
+      updatedAt: Date.now(),
+    }, matchId);
+    return writeResult(matchId, next);
+  }
+
   function status() {
     return { results, mode, connected, connectionError, fields: STAT_FIELDS };
   }
 
   return {
-    init, onChange, status, getResult, saveSeries, saveBox, clearMatch,
+    init, onChange, status, getResult, saveSeries, saveBox, clearMatch, clearBox,
     checkMasterPin, emptyLine, seriesFromGames, fields: STAT_FIELDS,
   };
 })();

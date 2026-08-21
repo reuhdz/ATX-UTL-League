@@ -298,15 +298,18 @@
         <div class="se-grid">${sideTable('home')}${sideTable('away')}</div>
         <div class="se-actions" style="margin-top:14px">
           <button type="button" class="btn" id="se-save-box" disabled>Submit individual stats</button>
+          <button type="button" class="btn btn-ghost" id="se-clear-box" disabled>Clear individual stats</button>
         </div>
       </section>` : ''}`;
 
     const syncSubmitButtons = () => {
       const ok = StatsHub.checkMasterPin(($('#se-pin')?.value || pinVal || '').trim());
       const hasSaved = !!(matchId && StatsHub.getResult(matchId));
+      const hasBox = !!(matchId && StatsHub.getResult(matchId)?.boxSavedAt);
       if ($('#se-save-series')) $('#se-save-series').disabled = !ok;
       if ($('#se-save-box')) $('#se-save-box').disabled = !ok;
       if ($('#se-clear')) $('#se-clear').disabled = !ok || !hasSaved;
+      if ($('#se-clear-box')) $('#se-clear-box').disabled = !ok || !hasBox;
     };
 
     $('#se-pin')?.addEventListener('input', (e) => {
