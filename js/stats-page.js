@@ -1,6 +1,6 @@
 /* =============================================================================
    /stats — admin series + individual box-score entry
-   Master PIN gated. Not linked from main nav.
+   Requires AdminAuth admin session (via /admin). Not linked from main nav.
    ============================================================================ */
 
 (() => {
@@ -9,7 +9,6 @@
   const root = $('#stats-app');
   if (!root) return;
 
-  const SESSION_KEY = 'atxutl.stats.unlocked';
   const FIELDS = StatsHub.fields;
   const FIELD_LABELS = {
     goals: 'G', assists: 'A', steals: 'S', blocks: 'B',
@@ -26,15 +25,11 @@
     shots: 'Shots — scoring chances (includes goals)',
   };
 
-  let unlocked = false;
-  let pinVal = '';
   let week = null;
   let matchId = null;
   let seriesGames = [{ home: '', away: '' }, { home: '', away: '' }, { home: '', away: '' }];
   let draft = null; // { homeLineup, awayLineup, box }
   let msg = { text: '', cls: '' };
-
-  try { unlocked = sessionStorage.getItem(SESSION_KEY) === '1'; } catch (e) {}
 
   const fmtDate = (iso) =>
     new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
@@ -192,39 +187,6 @@
   }
 
   function paint() {
-    if (!unlocked) {
-      root.innerHTML = `
-        <div class="page-head">
-          <h2>Match stats</h2>
-          <p class="muted">Admin only — master PIN required.</p>
-        </div>
-        <section class="panel se-lock">
-          <label class="se-pin"><span>Master PIN</span>
-            <input id="se-pin" class="input" type="password" autocomplete="off" />
-          </label>
-          <button type="button" class="btn" id="se-unlock">Unlock</button>
-          <p class="draft-msg ${msg.cls}">${msg.text}</p>
-          <p class="muted small"><a href="../">← Dashboard</a></p>
-        </section>`;
-      $('#se-unlock')?.addEventListener('click', () => {
-        const pin = ($('#se-pin')?.value || '').trim();
-        if (!StatsHub.checkMasterPin(pin)) {
-          setMsg('Incorrect master PIN', 'err');
-          paint();
-          return;
-        }
-        pinVal = pin;
-        unlocked = true;
-        try { sessionStorage.setItem(SESSION_KEY, '1'); } catch (e) {}
-        setMsg('');
-        paint();
-      });
-      $('#se-pin')?.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') $('#se-unlock')?.click();
-      });
-      return;
-    }
-
     if (week == null) week = weeks()[0] || 1;
     const weekMatches = matchesForWeek(week);
     if (!matchId || !weekMatches.some((m) => m.id === matchId)) {
@@ -239,10 +201,10 @@
         <h2>Match stats</h2>
       </div>
       <div class="se-toolbar">
-        <label class="se-pin"><span>Master PIN</span>
-          <input id="se-pin" class="input" type="password" autocomplete="off" value="${String(pinVal).replace(/"/g, '&quot;')}" />
-        </label>
-        <a class="muted small" href="../">← Dashboard</a>
+        <span class="muted small">${AdminAuth.session()?.label || 'Admin'}</span>
+        <a class="muted small" href="../admin/">← Admin</a>
+        <a class="muted small" href="../">Dashboard</a>
+        <button type="button" class="btn btn-ghost" id="se-logout">Log out</button>
       </div>
       <p class="draft-msg ${msg.cls}">${msg.text}</p>
 
@@ -303,18 +265,18 @@
       </section>` : ''}`;
 
     const syncSubmitButtons = () => {
-      const ok = StatsHub.checkMasterPin(($('#se-pin')?.value || pinVal || '').trim());
+      const ok = AdminAuth.isAdmin();
       const hasSaved = !!(matchId && StatsHub.getResult(matchId));
-      const hasBox = !!(matchId && StatsHub.getResult(matchId)?.boxSavedAt);
+      const hasBox = !!(matchId && (StatsHub.getResult(matchId)?.boxSavedAt || StatsHub.getResult(matchId)?.box?.length));
       if ($('#se-save-series')) $('#se-save-series').disabled = !ok;
       if ($('#se-save-box')) $('#se-save-box').disabled = !ok;
       if ($('#se-clear')) $('#se-clear').disabled = !ok || !hasSaved;
       if ($('#se-clear-box')) $('#se-clear-box').disabled = !ok || !hasBox;
     };
 
-    $('#se-pin')?.addEventListener('input', (e) => {
-      pinVal = e.target.value;
-      syncSubmitButtons();
+    $('#se-logout')?.addEventListener('click', () => {
+      AdminAuth.logout();
+      window.location.href = '../admin/';
     });
     syncSubmitButtons();
 
@@ -405,12 +367,11 @@
 
     $('#se-save-series')?.addEventListener('click', async () => {
       try {
-        const pin = ($('#se-pin')?.value || pinVal || '').trim();
         const games = seriesGames.map((g) => ({
           home: Math.min(5, Math.max(0, Number(g.home) || 0)),
           away: Math.min(5, Math.max(0, Number(g.away) || 0)),
         }));
-        await StatsHub.saveSeries(matchId, games, pin);
+        await StatsHub.saveSeries(matchId, games);
         setMsg(`Series saved — ${teamName(match.home)} ${preview.homeScore}–${preview.awayScore} ${teamName(match.away)}`, 'ok');
         paint();
       } catch (e) {
@@ -421,14 +382,13 @@
 
     $('#se-save-box')?.addEventListener('click', async () => {
       try {
-        const pin = ($('#se-pin')?.value || pinVal || '').trim();
         const homeLineup = [...draft.homeLineup];
         const awayLineup = [...draft.awayLineup];
         const box = [...new Set([...homeLineup, ...awayLineup])].map((id) => {
           ensureBox(id);
           return { ...draft.box[id], playerId: id };
         });
-        await StatsHub.saveBox(matchId, { homeLineup, awayLineup, box }, pin);
+        await StatsHub.saveBox(matchId, { homeLineup, awayLineup, box });
         setMsg('Individual stats saved — player & team totals updated on the dashboard', 'ok');
         paint();
       } catch (e) {
@@ -440,10 +400,23 @@
     $('#se-clear')?.addEventListener('click', async () => {
       if (!confirm('Clear all saved series + box scores for this match?')) return;
       try {
-        const pin = ($('#se-pin')?.value || pinVal || '').trim();
-        await StatsHub.clearMatch(matchId, pin);
+        await StatsHub.clearMatch(matchId);
         selectMatch(matchId);
         setMsg('Match cleared', 'ok');
+        paint();
+      } catch (e) {
+        setMsg(e.message || String(e), 'err');
+        paint();
+      }
+    });
+
+    $('#se-clear-box')?.addEventListener('click', async () => {
+      if (!confirm('Clear individual stats for this match? Series scores will be kept.')) return;
+      try {
+        await StatsHub.clearBox(matchId);
+        const m = currentMatch();
+        draft = m ? buildLineupsFromAttendance(m) : null;
+        setMsg('Individual stats cleared', 'ok');
         paint();
       } catch (e) {
         setMsg(e.message || String(e), 'err');
@@ -459,6 +432,7 @@
   }
 
   applyTheme();
+  if (!AdminAuth.requireAdmin('../admin/')) return;
   Promise.all([DraftHub.init(), AttendanceHub.init(), StatsHub.init()]).then(() => {
     paint();
   }).catch((e) => {

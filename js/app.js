@@ -669,6 +669,7 @@ function drawSpotlight() {
    MEDIA
    ============================================================================ */
 let mediaFilter = { team: 'all', q: '' };
+let mediaFilmTab = 'film'; // 'film' | 'highlights'
 
 function renderMedia() {
   const f = MEDIA.featured;
@@ -706,7 +707,13 @@ function renderMedia() {
     </section>
 
     <section class="panel">
-      <div class="panel-head"><h3>🎞️ Game film</h3></div>
+      <div class="panel-head">
+        <h3>🎞️ Game film</h3>
+        <div class="seg" id="media-film-tab">
+          <button type="button" class="seg-btn ${mediaFilmTab === 'film' ? 'active' : ''}" data-tab="film">Film</button>
+          <button type="button" class="seg-btn ${mediaFilmTab === 'highlights' ? 'active' : ''}" data-tab="highlights">Highlights</button>
+        </div>
+      </div>
       <div class="media-controls">
         <div class="seg" id="media-team">
           <button class="seg-btn ${mediaFilter.team === 'all' ? 'active' : ''}" data-team="all">All</button>
@@ -793,6 +800,46 @@ function renderMedia() {
       return hay.split(/\s+/).some((w) => w.startsWith(q)) || hay.includes(q);
     });
 
+    if (mediaFilmTab === 'highlights') {
+      const cards = [];
+      rows.forEach((m) => {
+        const top = (typeof HighlightsHub !== 'undefined' && HighlightsHub.topForMatch)
+          ? HighlightsHub.topForMatch(m.id, 3) : [];
+        if (!top.length) return;
+        const hueA = DB.team(m.home).color, hueB = DB.team(m.away).color;
+        top.forEach((h, i) => {
+          const player = h.playerId ? DB.player(h.playerId) : null;
+          const primary = (h.urls && h.urls[0]) || h.url || '#';
+          cards.push(`
+            <article class="media-card game-card hl-media-card">
+              <div class="media-thumb game-thumb" style="background:linear-gradient(135deg, ${hueA}, ${hueB})">
+                <span class="media-tag">Week ${m.round} · #${i + 1}</span>
+                <span class="game-score">${h.voteCount} vote${h.voteCount === 1 ? '' : 's'}</span>
+                <span class="media-kind">🎬</span>
+              </div>
+              <div class="media-body">
+                <h4>${DB.teamName(m.home)} <em>vs</em> ${DB.teamName(m.away)}</h4>
+                ${player ? `<p class="muted small">Spotlight: ${player.name}</p>` : ''}
+                ${h.comment ? `<p class="hl-comment-sm">${h.comment}</p>` : ''}
+                <div class="hl-link-stack">
+                  ${(h.urls || [primary]).map((u, idx) =>
+                    `<a href="${u}" target="_blank" rel="noopener">Watch${(h.urls || []).length > 1 ? ` ${idx + 1}` : ''} →</a>`
+                  ).join('')}
+                </div>
+                <div class="media-foot">
+                  <span class="game-teams">${teamTag(m.home)} ${teamTag(m.away)}</span>
+                  <span class="muted small">${fmtDate(m.date)}</span>
+                </div>
+              </div>
+            </article>`);
+        });
+      });
+      $('#game-film').innerHTML = cards.length
+        ? cards.join('')
+        : '<p class="muted">No voted highlights yet for these games.</p>';
+      return;
+    }
+
     $('#game-film').innerHTML = rows.length ? rows.map((m) => {
       const slug = `r${m.round}-${m.home}-vs-${m.away}`;
       const href = `${MEDIA.filmBase}${slug}/`;
@@ -818,6 +865,12 @@ function renderMedia() {
     }).join('') : '<p class="muted">No games match your filter.</p>';
   };
 
+  $$('#media-film-tab .seg-btn').forEach((b) => b.addEventListener('click', () => {
+    $$('#media-film-tab .seg-btn').forEach((x) => x.classList.remove('active'));
+    b.classList.add('active');
+    mediaFilmTab = b.dataset.tab;
+    draw();
+  }));
   $$('#media-team .seg-btn').forEach((b) => b.addEventListener('click', () => {
     $$('#media-team .seg-btn').forEach((x) => x.classList.remove('active'));
     b.classList.add('active'); mediaFilter.team = b.dataset.team; draw();
@@ -1375,6 +1428,11 @@ Promise.all([DraftHub.init(), AttendanceHub.init(), StatsHub.init(), HighlightsH
     let tab = 'overview';
     try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
     if (['overview', 'schedule', 'stats', 'teams', 'media'].includes(tab)) go(tab);
+  });
+  HighlightsHub.onChange(() => {
+    let tab = 'overview';
+    try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
+    if (tab === 'media' && mediaFilmTab === 'highlights') go(tab);
   });
   let startTab = 'overview';
   try { startTab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}

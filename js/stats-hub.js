@@ -70,6 +70,8 @@ const StatsHub = (() => {
   }
 
   function checkMasterPin(pin) {
+    // Prefer admin session from /admin; PIN kept as legacy fallback only.
+    if (typeof AdminAuth !== 'undefined' && AdminAuth.isAdmin()) return true;
     const expected = normalizePin(cfg().masterPin || '');
     return !!expected && normalizePin(pin) === expected;
   }
@@ -273,7 +275,7 @@ const StatsHub = (() => {
 
   /** Save series scores only (does not wipe existing box/lineups). */
   async function saveSeries(matchId, games, pin) {
-    if (!checkMasterPin(pin)) throw new Error('Master PIN required to save series');
+    if (!checkMasterPin(pin)) throw new Error('Admin login required to save series');
     const match = (window.DB?.matches || []).find((m) => m.id === matchId);
     if (!match) throw new Error('Unknown match');
 
@@ -299,7 +301,7 @@ const StatsHub = (() => {
 
   /** Save individual box scores / lineups (keeps existing series games). */
   async function saveBox(matchId, payload, pin) {
-    if (!checkMasterPin(pin)) throw new Error('Master PIN required to save player stats');
+    if (!checkMasterPin(pin)) throw new Error('Admin login required to save player stats');
     const match = (window.DB?.matches || []).find((m) => m.id === matchId);
     if (!match) throw new Error('Unknown match');
 
@@ -329,7 +331,7 @@ const StatsHub = (() => {
   }
 
   async function clearMatch(matchId, pin) {
-    if (!checkMasterPin(pin)) throw new Error('Master PIN required to clear');
+    if (!checkMasterPin(pin)) throw new Error('Admin login required to clear');
     if (mode === 'firebase' && db) {
       await db.ref(`matchResults/${roomId()}/${matchId}`).remove();
       return;
@@ -344,7 +346,7 @@ const StatsHub = (() => {
 
   /** Clear individual box scores / lineups; keep series scores. */
   async function clearBox(matchId, pin) {
-    if (!checkMasterPin(pin)) throw new Error('Master PIN required to clear player stats');
+    if (!checkMasterPin(pin)) throw new Error('Admin login required to clear player stats');
     const prev = results[matchId];
     if (!prev) throw new Error('No saved stats for this match');
     if (!prev.games?.length) {
