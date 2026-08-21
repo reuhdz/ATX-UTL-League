@@ -141,11 +141,6 @@ function renderDashboard() {
   const rated = DB.ratedPlayers().filter((p) => p.matches > 0);
   const finals = DB.finals();
   const upcoming = DB.upcoming();
-  const totalGoals = finals.reduce((s, m) => {
-    const hg = m.pointsHome != null ? m.pointsHome : m.homeScore;
-    const ag = m.pointsAway != null ? m.pointsAway : m.awayScore;
-    return s + hg + ag;
-  }, 0);
   const leader = rated[0];
   // Golden Torpedo: Goals×2 + Assists×1 (goals weighted higher)
   const topScorer = [...rated].sort((a, b) =>
@@ -156,7 +151,6 @@ function renderDashboard() {
 
   const cards = [
     { icon: '🎮', label: 'Matches played', value: finals.length, sub: `${upcoming.length} upcoming` },
-    { icon: '🥅', label: 'Total goals', value: totalGoals, sub: finals.length ? `${(totalGoals / finals.length).toFixed(1)} per game` : 'Season not started' },
     {
       icon: '⭐', label: 'Top rated', info: ratingInfoHtml(),
       value: leader ? playerLink(leader.playerId) : '—',
@@ -630,6 +624,7 @@ function drawSpotlight() {
   const p = DB.ratedPlayer(spotlightPlayer);
   const att = DB.attendancePct(p.playerId);
   const stat = (label, val) => `<div class="mini-stat"><span>${val}</span><small>${label}</small></div>`;
+  const log = DB.gameLog(p.playerId);
   $('#spot-body').innerHTML = `
     <div class="spot-card">
       <div class="spot-id">
@@ -645,8 +640,26 @@ function drawSpotlight() {
         ${stat('Blocks', p.blocks)}${stat('Turnovers', p.turnovers)}${stat('Swim-offs', p.swimOffs)}
         ${stat('Shots', p.shots)}${stat('Matches', p.matches)}
       </div>
-      <div class="chart-wrap sm"><canvas id="c-spotlight"></canvas></div>
+      <div class="spot-grid">
+        <div class="chart-wrap sm"><canvas id="c-spotlight"></canvas></div>
+        <div class="prof-log">
+          <h4>Game log</h4>
+          ${log.length ? `
+          <table class="tbl gamelog">
+            <thead><tr><th>W</th><th>Opp</th><th>Res</th><th>G</th><th>A</th><th>S</th><th>B</th><th>TO</th><th>SO</th><th>SH</th></tr></thead>
+            <tbody>${log.map((g) => `
+              <tr>
+                <td>${g.round}</td>
+                <td>${teamBadge(g.opp)}${g.guest ? ' <span class="guest">guest</span>' : ''}</td>
+                <td><span class="res ${g.result}">${g.result} ${g.gf}-${g.ga}</span></td>
+                <td>${g.goals}</td><td>${g.assists}</td><td>${g.steals}</td><td>${g.blocks}</td><td>${g.turnovers}</td>
+                <td>${g.swimOffs || 0}</td><td>${g.shots || 0}</td>
+              </tr>`).join('')}</tbody>
+          </table>` : '<p class="muted">No league matches played yet this season.</p>'}
+        </div>
+      </div>
     </div>`;
+  wrapTables($('#spot-body'));
   ChartHub.radar('c-spotlight', ['Goals', 'Assists', 'Steals', 'Blocks', 'Discipline'],
     [{ label: p.name, data: [p.goals, p.assists, p.steals, p.blocks, Math.max(0, 8 - p.turnovers)],
        borderColor: teamColor(p.teamId), backgroundColor: teamColor(p.teamId) + '33', pointBackgroundColor: teamColor(p.teamId) }]);

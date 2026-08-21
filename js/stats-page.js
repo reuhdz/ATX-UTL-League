@@ -15,6 +15,15 @@
     goals: 'G', assists: 'A', steals: 'S', blocks: 'B',
     turnovers: 'TO', swimOffs: 'SO', shots: 'SH',
   };
+  const FIELD_TITLES = {
+    goals: 'Goals — torpedo placed in the opponent’s goal',
+    assists: 'Assists — last pass/hand-off leading to a teammate’s goal',
+    steals: 'Steals — taking the torpedo or forcing a takeaway',
+    blocks: 'Blocks — denying a scoring chance / goal-bound look',
+    turnovers: 'Turnovers — lost possession without a shot or goal',
+    swimOffs: 'Swim-off wins — first clean possession after restart',
+    shots: 'Shots — scoring chances (includes goals)',
+  };
 
   let unlocked = false;
   let pinVal = '';
@@ -157,7 +166,7 @@
             <thead>
               <tr>
                 <th class="lft">Player</th>
-                ${FIELDS.map((f) => `<th>${FIELD_LABELS[f]}</th>`).join('')}
+                ${FIELDS.map((f) => `<th title="${FIELD_TITLES[f] || FIELD_LABELS[f]}">${FIELD_LABELS[f]}</th>`).join('')}
                 <th></th>
               </tr>
             </thead>
@@ -170,7 +179,7 @@
                 return `<tr>
                   <td class="lft strong">${p?.name || id}${guest ? ' <span class="guest">FA</span>' : ''}</td>
                   ${FIELDS.map((f) => `
-                    <td><input class="se-num" type="number" min="0" step="1"
+                    <td><input class="se-num" type="number" min="0" max="99" step="1"
                       data-player="${id}" data-field="${f}" value="${line[f] || 0}" /></td>`).join('')}
                   <td><button type="button" class="btn btn-ghost se-remove" data-side="${side}" data-player="${id}">✕</button></td>
                 </tr>`;
@@ -232,7 +241,6 @@
     root.innerHTML = `
       <div class="page-head">
         <h2>Match stats</h2>
-        <p class="muted">Submit series scores separately from individual box scores. Series updates standings; box scores update player/team totals.</p>
       </div>
       <div class="se-toolbar">
         <label class="se-pin"><span>Master PIN</span>
@@ -273,11 +281,11 @@
             <div class="se-game">
               <span class="se-game-label">Game ${i + 1}</span>
               <label>${teamName(match.home)}
-                <input class="input se-score" type="number" min="0" max="20" data-game="${i}" data-side="home" value="${g.home}" />
+                <input class="input se-score" type="number" min="0" max="5" data-game="${i}" data-side="home" value="${g.home}" />
               </label>
               <span class="se-vs">–</span>
               <label>${teamName(match.away)}
-                <input class="input se-score" type="number" min="0" max="20" data-game="${i}" data-side="away" value="${g.away}" />
+                <input class="input se-score" type="number" min="0" max="5" data-game="${i}" data-side="away" value="${g.away}" />
               </label>
             </div>`).join('')}
         </div>
@@ -314,10 +322,41 @@
       paint();
     });
 
-    $$('.se-score').forEach((inp) => {
+    const bindZeroClear = (inp, { max = null, onCommit } = {}) => {
+      inp.addEventListener('focus', () => {
+        if (inp.value === '0') {
+          inp.value = '';
+        } else {
+          inp.select();
+        }
+      });
+      inp.addEventListener('blur', () => {
+        let n = Math.round(Number(inp.value));
+        if (!Number.isFinite(n) || inp.value === '') n = 0;
+        if (n < 0) n = 0;
+        if (max != null && n > max) n = max;
+        inp.value = String(n);
+        onCommit?.(n);
+      });
       inp.addEventListener('input', () => {
-        const i = Number(inp.dataset.game);
-        seriesGames[i][inp.dataset.side] = inp.value;
+        if (inp.value === '') return;
+        let n = Number(inp.value);
+        if (!Number.isFinite(n)) return;
+        if (max != null && n > max) {
+          inp.value = String(max);
+          n = max;
+        }
+        onCommit?.(n);
+      });
+    };
+
+    $$('.se-score').forEach((inp) => {
+      bindZeroClear(inp, {
+        max: 5,
+        onCommit: (n) => {
+          const i = Number(inp.dataset.game);
+          seriesGames[i][inp.dataset.side] = String(n);
+        },
       });
     });
 
@@ -337,17 +376,22 @@
     });
 
     $$('.se-num').forEach((inp) => {
-      inp.addEventListener('change', () => {
-        ensureBox(inp.dataset.player);
-        draft.box[inp.dataset.player][inp.dataset.field] = Math.max(0, Math.round(Number(inp.value) || 0));
-        inp.value = draft.box[inp.dataset.player][inp.dataset.field];
+      bindZeroClear(inp, {
+        onCommit: (n) => {
+          ensureBox(inp.dataset.player);
+          draft.box[inp.dataset.player][inp.dataset.field] = Math.max(0, Math.round(n) || 0);
+          inp.value = String(draft.box[inp.dataset.player][inp.dataset.field]);
+        },
       });
     });
 
     $('#se-save-series')?.addEventListener('click', async () => {
       try {
         const pin = ($('#se-pin')?.value || pinVal || '').trim();
-        const games = seriesGames.map((g) => ({ home: g.home, away: g.away }));
+        const games = seriesGames.map((g) => ({
+          home: Math.min(5, Math.max(0, Number(g.home) || 0)),
+          away: Math.min(5, Math.max(0, Number(g.away) || 0)),
+        }));
         await StatsHub.saveSeries(matchId, games, pin);
         setMsg(`Series saved — ${teamName(match.home)} ${preview.homeScore}–${preview.awayScore} ${teamName(match.away)}`, 'ok');
         paint();

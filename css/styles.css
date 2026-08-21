@@ -614,3 +614,7 @@ button.pill.att-toggle:focus-visible { outline: 2px solid var(--accent, #38bdf8)
 .se-table th, .se-table td { padding: 6px 4px; }
 .se-table .lft { text-align: left; padding-left: 8px; }
 .fx-games { display: block; margin-top: 4px; }
+
+.spot-grid { display: grid; grid-template-columns: 1fr 1.2fr; gap: 16px; margin-top: 14px; }
+@media (max-width: 760px) { .spot-grid { grid-template-columns: 1fr; } }
+.spot-card .prof-log h4 { margin: 0 0 8px; font-size: 14px; }
