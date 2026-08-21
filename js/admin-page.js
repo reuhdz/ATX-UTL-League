@@ -53,8 +53,7 @@
       </div>
       <section class="panel admin-links">
         <ul class="admin-link-list">
-          ${s.role === 'admin' ? `
-          <li><a class="btn" href="../stats/">Match stats entry</a></li>` : ''}
+          <li><a class="btn" href="../stats/">Match stats entry</a></li>
           <li><a class="btn" href="../season-5-highlights/">Season 5 highlights review</a></li>
           <li><a class="btn btn-ghost" href="../">League dashboard</a></li>
         </ul>

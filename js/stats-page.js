@@ -1,6 +1,6 @@
 /* =============================================================================
-   /stats — admin series + individual box-score entry
-   Requires AdminAuth admin session (via /admin). Not linked from main nav.
+   /stats — series + individual box-score entry
+   Requires captain or admin session (via /admin). Not linked from main nav.
    ============================================================================ */
 
 (() => {

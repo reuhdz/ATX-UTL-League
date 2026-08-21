@@ -70,8 +70,8 @@ const StatsHub = (() => {
   }
 
   function checkMasterPin(pin) {
-    // Prefer admin session from /admin; PIN kept as legacy fallback only.
-    if (typeof AdminAuth !== 'undefined' && AdminAuth.isAdmin()) return true;
+    // Prefer captain/admin session from /admin; PIN kept as legacy fallback only.
+    if (typeof AdminAuth !== 'undefined' && AdminAuth.isLoggedIn()) return true;
     const expected = normalizePin(cfg().masterPin || '');
     return !!expected && normalizePin(pin) === expected;
   }
