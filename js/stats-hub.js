@@ -121,7 +121,7 @@ const StatsHub = (() => {
     const games = Array.isArray(raw.games)
       ? raw.games
         .filter((g) => g && (g.home != null || g.away != null))
-        .map((g) => ({ home: num(g.home), away: num(g.away) }))
+        .map((g) => ({ home: Math.min(5, num(g.home)), away: Math.min(5, num(g.away)) }))
       : [];
     const derived = seriesFromGames(games);
     const homeScore = games.length ? derived.homeScore : num(raw.homeScore);
