@@ -188,7 +188,7 @@
       root.innerHTML = `
         <div class="page-head">
           <h2>Match stats</h2>
-          <p class="muted">Admin only — master PIN required. Best of 3, first to 5.</p>
+          <p class="muted">Admin only — master PIN required.</p>
         </div>
         <section class="panel se-lock">
           <label class="se-pin"><span>Master PIN</span>
@@ -265,7 +265,7 @@
       ${match ? `
       <section class="panel">
         <div class="panel-head">
-          <h3>2 · Series scores (Bo3 · first to 5)</h3>
+          <h3>2 · Series scores</h3>
           <span class="muted small">Series ${preview.homeScore}–${preview.awayScore} · points ${preview.pointsHome}–${preview.pointsAway}</span>
         </div>
         <div class="se-games">
