@@ -589,6 +589,11 @@ button.pill.att-toggle:focus-visible { outline: 2px solid var(--accent, #38bdf8)
 .highlight-form { display: flex; flex-direction: column; gap: 12px; max-width: 560px; }
 .highlight-form label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; }
 .highlight-form textarea { resize: vertical; min-height: 80px; }
+.hl-links { display: flex; flex-direction: column; gap: 8px; }
+.hl-url-list { display: flex; flex-direction: column; gap: 8px; }
+.hl-url-row { display: flex; gap: 8px; align-items: center; }
+.hl-url-row .hl-url { flex: 1; min-width: 0; }
+.hl-url-row .hl-remove { flex: 0 0 auto; }
 .se-games { display: flex; flex-direction: column; gap: 12px; margin: 12px 0; }
 .se-game { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; padding: 10px 12px;
   background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); }

@@ -673,11 +673,17 @@ function renderMedia() {
     <section class="panel">
       <div class="panel-head"><h3>💡 Nominate a highlight</h3></div>
       <form id="highlight-form" class="highlight-form">
-        <label>Video link
-          <input id="hl-url" class="input" type="url" required placeholder="https://…" autocomplete="off" />
-        </label>
+        <div class="hl-links">
+          <div class="panel-head tight"><span>Video links</span></div>
+          <div id="hl-url-list" class="hl-url-list">
+            <div class="hl-url-row">
+              <input class="input hl-url" type="url" required placeholder="https://…" autocomplete="off" />
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost" id="hl-add-url">+ Add another link</button>
+        </div>
         <label>Comment
-          <textarea id="hl-comment" class="input" rows="3" maxlength="500" placeholder="Why is this highlight-worthy?"></textarea>
+          <textarea id="hl-comment" class="input" rows="3" maxlength="500" placeholder="Why are these highlight-worthy?"></textarea>
         </label>
         <div class="se-actions">
           <button type="submit" class="btn">Submit for review</button>
