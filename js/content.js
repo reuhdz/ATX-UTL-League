@@ -230,14 +230,6 @@ const MEDIA = {
       'runs and goal-line stands. (Links out to UTL footage.)',
   },
   items: [
-    { kind: 'photo', title: 'Capybara vs Splash Damage — Week 4 opener', team: 'capybara', date: '2026-09-13', tag: 'Game photo', hue: 200 },
-    { kind: 'video', title: 'Lesley’s buzzer-beater from the throw-off', team: 'capybara', date: '2026-09-13', tag: 'Highlight', hue: 195 },
-    { kind: 'photo', title: 'Lone Starfish defensive wall holds the line', team: 'team2', date: '2026-09-06', tag: 'Game photo', hue: 38 },
-    { kind: 'video', title: 'Manny hat-trick reel', team: 'team2', date: '2026-09-06', tag: 'Highlight', hue: 40 },
-    { kind: 'photo', title: 'Flying Hellfish pre-dive huddle', team: 'team1', date: '2026-08-30', tag: 'Behind the scenes', hue: 140 },
-    { kind: 'video', title: 'Glenn’s goal-line steal of the season', team: 'team1', date: '2026-08-30', tag: 'Highlight', hue: 150 },
-    { kind: 'photo', title: 'Splash Damage rookies’ first league night', team: 'team3', date: '2026-08-23', tag: 'Game photo', hue: 0 },
-    { kind: 'video', title: 'River breaks the lockout — fast break', team: 'team3', date: '2026-08-23', tag: 'Highlight', hue: 5 },
     { kind: 'photo', title: 'Deepend Fitness — 14 ft arena', date: '2026-08-23', tag: 'Venue', hue: 210 },
   ],
 };

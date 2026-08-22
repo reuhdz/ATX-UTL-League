@@ -126,17 +126,6 @@ function gameLogTableHtml(log, { filmCol = true } = {}) {
         </tr>`).join('')}</tbody>
     </table>`;
 }
-function playerPos(p, matches) {
-  const mp = matches ?? p.matches ?? 0;
-  return mp > 0 ? p.pos : '';
-}
-function posTag(p, matches) {
-  const pos = playerPos(p, matches);
-  return pos ? `<span class="pos-tag">${pos}</span>` : '<span class="muted">—</span>';
-}
-function posSuffix(p) {
-  return p.matches ? ` · ${p.pos}` : '';
-}
 function infoIcon(html) {
   return `<span class="info"><button type="button" class="info-i" aria-label="More info" aria-expanded="false">ⓘ</button><span class="info-pop" role="tooltip">${html}</span></span>`;
 }
@@ -412,7 +401,6 @@ function renderTeamsRoster() {
   const colsFor = (view) => [
     ['rating', 'Rating'], ['name', 'Name'],
     ...(view === 'season5' ? [['teamId', 'Team']] : []),
-    ['pos', 'Pos'],
     ['goals', 'G'], ['assists', 'A'], ['steals', 'S'], ['blocks', 'B'], ['turnovers', 'TO'],
     ['swimOffAttempts', 'SOA'], ['swimOffs', 'SO'], ['shots', 'SH'], ['matches', 'MP'],
   ];
@@ -456,7 +444,6 @@ function renderTeamsRoster() {
         <td>${p.matches ? `<span class="rating-badge">${p.rating}</span>` : '<span class="muted">—</span>'}</td>
         <td class="strong">${playerLink(p.playerId)}</td>
         ${seasonView ? `<td>${teamPill(p.teamId)}</td>` : ''}
-        <td>${posTag(p)}</td>
         <td>${p.goals}</td><td>${p.assists}</td><td>${p.steals}</td>
         <td>${p.blocks}</td><td>${p.turnovers}</td>
         <td>${p.swimOffAttempts || 0}</td><td>${p.swimOffs}</td><td>${p.shots}</td><td>${p.matches}</td>
@@ -502,7 +489,6 @@ function renderTeamsRoster() {
               ${roster.map((p) => `
                 <li>
                   <span class="rm-name">${playerLink(p.id)}${p.name === t.captain ? ' <span class="cap">C</span>' : ''}</span>
-                  <span class="rm-pos">${playerPos(p, totals[p.id].matches) || '—'}</span>
                   <span class="rm-goals">${totals[p.id].goals}G</span>
                 </li>`).join('')}
             </ul>
@@ -729,7 +715,7 @@ function drawSpotlight() {
         <div class="spot-avatar" style="--tc:${teamColor(p.teamId)}">${p.name[0]}</div>
         <div>
           <h4>${playerLink(p.playerId)}</h4>
-          <p class="muted small">${teamBadge(p.teamId)}${posSuffix(p)}${att != null ? ` · ${att}% avail.` : ''}</p>
+          <p class="muted small">${teamBadge(p.teamId)}${att != null ? ` · ${att}% avail.` : ''}</p>
         </div>
         <div class="spot-rating">${p.matches ? p.rating : '—'}<small>rating</small></div>
       </div>
@@ -1147,7 +1133,7 @@ function openProfile(id) {
         <div class="prof-avatar" style="--tc:${teamColor(p.teamId)}">${p.name[0]}</div>
         <div>
           <h2>${p.name}${DB.isSeason5(p.playerId) ? ' <span class="s5-tag">S5</span>' : ''}</h2>
-          <p class="muted">${DB.isSeason5(p.playerId) ? teamBadge(p.teamId) : 'ATX roster'}${posSuffix(p)}${att != null ? ` · ${att}% availability` : ''}</p>
+          <p class="muted">${DB.isSeason5(p.playerId) ? teamBadge(p.teamId) : 'ATX roster'}${att != null ? ` · ${att}% availability` : ''}</p>
         </div>
       </div>
       <div class="prof-rating">${p.matches ? p.rating : '—'}<small>rating</small></div>
