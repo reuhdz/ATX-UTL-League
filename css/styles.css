@@ -378,6 +378,17 @@ button.mini-stat-btn:hover, button.mini-stat-btn.active {
   border-radius: 8px; background: var(--surface); font-size: 13px;
 }
 .prof-clip-list a, .se-clip-list a { word-break: break-all; color: var(--accent); }
+.film-folder-link { font-weight: 700; text-decoration: none; }
+.film-folder-link:hover { text-decoration: underline; }
+.spot-media-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 0 0 14px;
+}
+@media (max-width: 720px) { .spot-media-grid { grid-template-columns: 1fr; } }
+.spot-media-block {
+  padding: 12px; border: 1px solid var(--border); border-radius: var(--radius-sm); background: var(--surface-2);
+}
+.spot-media-block h4 { margin: 0 0 6px; font-size: 13px; text-transform: uppercase; letter-spacing: .3px; color: var(--text-muted); }
+.match-film-list a { word-break: normal; }
 .se-clip-list li { grid-template-columns: auto 1fr auto; align-items: start; column-gap: 8px; }
 .se-clip-list li a { grid-column: 1 / -1; }
 .se-clip-url, .se-clip-note { flex: 1; min-width: 180px; }

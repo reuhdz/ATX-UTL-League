@@ -424,8 +424,18 @@ const DB = {
       const ga = forTeam === m.home ? m.awayScore : m.homeScore;
       const guest = p.teamId === 'fa' || forTeam !== p.teamId;
       log.push({
-        round: m.round, date: m.date, opp, gf, ga, guest,
-        result: gf > ga ? 'W' : gf < ga ? 'L' : 'D', ...line,
+        matchId: m.id,
+        round: m.round,
+        date: m.date,
+        home: m.home,
+        away: m.away,
+        forTeam,
+        opp,
+        gf,
+        ga,
+        guest,
+        result: gf > ga ? 'W' : gf < ga ? 'L' : 'D',
+        ...line,
       });
     });
     return log;
