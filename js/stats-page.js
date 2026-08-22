@@ -30,8 +30,9 @@
   let week = null;
   let matchId = null;
   let seriesGames = [{ home: '', away: '' }, { home: '', away: '' }, { home: '', away: '' }];
-  let draft = null; // { homeLineup, awayLineup, box }
+  let draft = null; // { homeLineup, awayLineup, box, events }
   let msg = { text: '', cls: '' };
+  let clipForm = { playerId: '', type: 'goals', url: '', note: '' };
 
   const fmtDate = (iso) =>
     new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
@@ -89,12 +90,12 @@
     const awayLineup = playersInForDate(match.date, match.away);
     const box = {};
     [...homeLineup, ...awayLineup].forEach((id) => { box[id] = StatsHub.emptyLine(id); });
-    return { homeLineup, awayLineup, box };
+    return { homeLineup, awayLineup, box, events: [] };
   }
 
   function loadDraftForMatch(match) {
     const saved = StatsHub.getResult(match.id);
-    if (saved?.homeLineup?.length || saved?.awayLineup?.length || saved?.box?.length) {
+    if (saved?.homeLineup?.length || saved?.awayLineup?.length || saved?.box?.length || saved?.events?.length) {
       const box = {};
       (saved.box || []).forEach((b) => { box[b.playerId] = { ...b }; });
       [...(saved.homeLineup || []), ...(saved.awayLineup || [])].forEach((id) => {
@@ -104,6 +105,7 @@
         homeLineup: [...(saved.homeLineup || [])],
         awayLineup: [...(saved.awayLineup || [])],
         box,
+        events: (saved.events || []).map((e) => ({ ...e })),
       };
     }
     return buildLineupsFromAttendance(match);
@@ -143,6 +145,65 @@
   function removePlayer(side, playerId) {
     const key = side === 'home' ? 'homeLineup' : 'awayLineup';
     draft[key] = draft[key].filter((id) => id !== playerId);
+  }
+
+  function clipTypeLabel(type) {
+    return FIELD_TITLES[type]?.split('—')[0]?.trim() || FIELD_LABELS[type] || type;
+  }
+
+  function clipsPanelHtml() {
+    if (!draft) return '';
+    const rosterIds = [...new Set([...(draft.homeLineup || []), ...(draft.awayLineup || [])])];
+    const playerOpts = rosterIds.map((id) => {
+      const p = DB.player(id);
+      return `<option value="${id}" ${clipForm.playerId === id ? 'selected' : ''}>${p?.name || id}</option>`;
+    }).join('');
+    const typeOpts = FIELDS.map((f) =>
+      `<option value="${f}" ${clipForm.type === f ? 'selected' : ''}>${FIELD_LABELS[f]} · ${clipTypeLabel(f)}</option>`
+    ).join('');
+    const events = draft.events || [];
+
+    return `
+      <section class="panel">
+        <div class="panel-head">
+          <h3>4 · Stat clips</h3>
+          <span class="muted small">${events.length} linked</span>
+        </div>
+        <p class="muted small">Attach a clip URL to a player + stat for this match. Saved with individual stats. Profile tiles open these links.</p>
+        <div class="se-pickers se-clip-form">
+          <label>Player
+            <select id="se-clip-player">
+              <option value="">—</option>
+              ${playerOpts}
+            </select>
+          </label>
+          <label>Stat
+            <select id="se-clip-type">${typeOpts}</select>
+          </label>
+          <label class="se-clip-url">Clip link
+            <input id="se-clip-url" class="input" type="url" placeholder="https://…" value="${clipForm.url || ''}" />
+          </label>
+          <label class="se-clip-note">Note
+            <input id="se-clip-note" class="input" maxlength="200" placeholder="optional (e.g. G2 1:42)" value="${clipForm.note || ''}" />
+          </label>
+        </div>
+        <div class="se-actions" style="margin-top:10px">
+          <button type="button" class="btn btn-ghost" id="se-clip-add">Add clip</button>
+        </div>
+        ${events.length ? `
+        <ul class="se-clip-list">
+          ${events.map((e) => {
+            const p = DB.player(e.playerId);
+            return `<li>
+              <span class="ix-key">${FIELD_LABELS[e.type] || e.type}</span>
+              <strong>${p?.name || e.playerId}</strong>
+              <a href="${e.url}" target="_blank" rel="noopener">${e.url}</a>
+              ${e.note ? `<span class="muted small">${e.note}</span>` : ''}
+              <button type="button" class="btn btn-ghost se-clip-remove" data-clip-id="${e.id}">✕</button>
+            </li>`;
+          }).join('')}
+        </ul>` : '<p class="muted small">No clips for this match yet.</p>'}
+      </section>`;
   }
 
   function seriesPreview() {
@@ -284,7 +345,9 @@
           <button type="button" class="btn" id="se-save-box" disabled>Submit individual stats</button>
           <button type="button" class="btn btn-ghost" id="se-clear-box" disabled>Clear individual stats</button>
         </div>
-      </section>` : ''}`;
+      </section>
+
+      ${clipsPanelHtml()}` : ''}`;
 
     const syncSubmitButtons = () => {
       const ok = AdminAuth.isLoggedIn();
@@ -301,6 +364,51 @@
       window.location.href = '../admin/';
     });
     $('#se-criteria')?.addEventListener('click', () => openCriteriaModal());
+
+    const syncClipFormFromDom = () => {
+      clipForm = {
+        playerId: $('#se-clip-player')?.value || '',
+        type: $('#se-clip-type')?.value || 'goals',
+        url: $('#se-clip-url')?.value || '',
+        note: $('#se-clip-note')?.value || '',
+      };
+    };
+    ['se-clip-player', 'se-clip-type', 'se-clip-url', 'se-clip-note'].forEach((id) => {
+      $(`#${id}`)?.addEventListener('change', syncClipFormFromDom);
+      $(`#${id}`)?.addEventListener('input', syncClipFormFromDom);
+    });
+    $('#se-clip-add')?.addEventListener('click', () => {
+      syncClipFormFromDom();
+      try {
+        if (!clipForm.playerId) throw new Error('Select a player');
+        if (!FIELDS.includes(clipForm.type)) throw new Error('Select a stat');
+        const url = StatsHub.normalizeUrl(clipForm.url);
+        if (!draft.events) draft.events = [];
+        draft.events.push({
+          id: `ev_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+          playerId: clipForm.playerId,
+          type: clipForm.type,
+          url,
+          note: String(clipForm.note || '').trim().slice(0, 200),
+          createdAt: Date.now(),
+        });
+        clipForm = { ...clipForm, url: '', note: '' };
+        setMsg('Clip added — submit individual stats to save', 'ok');
+        paint();
+      } catch (e) {
+        setMsg(e.message || String(e), 'err');
+        paint();
+      }
+    });
+    $$('.se-clip-remove').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const id = btn.dataset.clipId;
+        draft.events = (draft.events || []).filter((e) => e.id !== id);
+        setMsg('Clip removed — submit individual stats to save', 'ok');
+        paint();
+      });
+    });
+
     syncSubmitButtons();
 
     $('#se-week')?.addEventListener('change', (e) => {
@@ -411,8 +519,13 @@
           ensureBox(id);
           return { ...draft.box[id], playerId: id };
         });
-        await StatsHub.saveBox(matchId, { homeLineup, awayLineup, box });
-        setMsg('Individual stats saved — player & team totals updated on the dashboard', 'ok');
+        await StatsHub.saveBox(matchId, {
+          homeLineup,
+          awayLineup,
+          box,
+          events: draft.events || [],
+        });
+        setMsg('Individual stats + clips saved — player totals and profile clips updated', 'ok');
         paint();
       } catch (e) {
         setMsg(e.message || String(e), 'err');

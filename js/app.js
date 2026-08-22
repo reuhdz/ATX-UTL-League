@@ -1058,7 +1058,30 @@ function openProfile(id) {
   const log = DB.gameLog(id);
   const att = DB.attendancePct(id);
   const host = $('#profile-modal');
-  const stat = (label, val) => `<div class="mini-stat"><span>${val}</span><small>${label}</small></div>`;
+  const clipCounts = (typeof StatsHub !== 'undefined' && StatsHub.clipCountsForPlayer)
+    ? StatsHub.clipCountsForPlayer(id) : {};
+  const STAT_TILES = [
+    { key: 'goals', label: 'Goals', val: p.goals },
+    { key: 'assists', label: 'Assists', val: p.assists },
+    { key: 'steals', label: 'Steals', val: p.steals },
+    { key: 'blocks', label: 'Blocks', val: p.blocks },
+    { key: 'turnovers', label: 'Turnovers', val: p.turnovers },
+    { key: 'swimOffAttempts', label: 'SO att', val: p.swimOffAttempts || 0 },
+    { key: 'swimOffs', label: 'SO wins', val: p.swimOffs },
+    { key: 'shots', label: 'Shots', val: p.shots },
+    { key: null, label: 'Matches', val: p.matches },
+  ];
+  const stat = (tile) => {
+    const clips = tile.key ? (clipCounts[tile.key] || 0) : 0;
+    const clickable = !!tile.key;
+    const clipHint = clips ? `<em class="clip-count">${clips} clip${clips === 1 ? '' : 's'}</em>` : '';
+    if (!clickable) {
+      return `<div class="mini-stat"><span>${tile.val}</span><small>${tile.label}</small></div>`;
+    }
+    return `<button type="button" class="mini-stat mini-stat-btn" data-stat-type="${tile.key}" title="View ${tile.label} clips">
+      <span>${tile.val}</span><small>${tile.label}${clipHint}</small>
+    </button>`;
+  };
 
   $('#profile-card').innerHTML = `
     <div class="modal-head">
@@ -1074,10 +1097,9 @@ function openProfile(id) {
     </div>
 
     <div class="mini-stats">
-      ${stat('Goals', p.goals)}${stat('Assists', p.assists)}${stat('Steals', p.steals)}
-      ${stat('Blocks', p.blocks)}${stat('Turnovers', p.turnovers)}${stat('SO att', p.swimOffAttempts || 0)}
-      ${stat('SO wins', p.swimOffs)}${stat('Shots', p.shots)}${stat('Matches', p.matches)}
+      ${STAT_TILES.map(stat).join('')}
     </div>
+    <div id="prof-clips" class="prof-clips" hidden></div>
 
     <div class="prof-grid">
       <div class="chart-wrap sm"><canvas id="c-profile"></canvas></div>
@@ -1103,6 +1125,37 @@ function openProfile(id) {
   host.hidden = false;
   document.body.style.overflow = 'hidden';
   $('#profile-close').addEventListener('click', closeProfile);
+
+  const showClips = (type) => {
+    const panel = $('#prof-clips');
+    if (!panel || typeof StatsHub === 'undefined') return;
+    const label = STAT_TILES.find((t) => t.key === type)?.label || type;
+    const clips = StatsHub.clipsForPlayer(id, type);
+    $$('.mini-stat-btn').forEach((b) => b.classList.toggle('active', b.dataset.statType === type));
+    panel.hidden = false;
+    panel.innerHTML = `
+      <div class="panel-head tight">
+        <h4>${p.name} · ${label} clips</h4>
+        <button type="button" class="btn btn-ghost" id="prof-clips-close">Hide</button>
+      </div>
+      ${clips.length ? `<ul class="prof-clip-list">${clips.map((c) => {
+        const matchLabel = c.round != null
+          ? `Week ${c.round} · ${DB.teamName(c.home)} vs ${DB.teamName(c.away)}`
+          : 'Match clip';
+        return `<li>
+          <span class="muted small">${matchLabel}${c.note ? ` · ${c.note}` : ''}</span>
+          <a href="${c.url}" target="_blank" rel="noopener">${c.url}</a>
+        </li>`;
+      }).join('')}</ul>` : `<p class="muted small">No clips tagged for ${label} yet. Attach them on Match stats → Stat clips.</p>`}`;
+    $('#prof-clips-close')?.addEventListener('click', () => {
+      panel.hidden = true;
+      $$('.mini-stat-btn').forEach((b) => b.classList.remove('active'));
+    });
+  };
+
+  $$('.mini-stat-btn').forEach((btn) => {
+    btn.addEventListener('click', () => showClips(btn.dataset.statType));
+  });
 
   if (p.matches) {
     ChartHub.radar('c-profile', ['Goals', 'Assists', 'Steals', 'Blocks', 'Discipline'],

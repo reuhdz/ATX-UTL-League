@@ -10,8 +10,9 @@
        homeScore, awayScore,           // series wins (0–2) — used for W/L
        pointsHome, pointsAway,         // sum of game points — used for GF/GA
        homeLineup, awayLineup, box,
-       seriesSavedAt, seriesSavedBy,   // who entered series scores
-       boxSavedAt, boxSavedBy,         // who entered individual stats
+       events: [{ id, playerId, type, url, note, createdAt }], // Option A/B clips
+       seriesSavedAt, seriesSavedBy,
+       boxSavedAt, boxSavedBy,
        updatedAt, updatedBy
      }
    Overlays window.DB.matches in place.
@@ -145,6 +146,40 @@ const StatsHub = (() => {
     return line;
   }
 
+  function normalizeUrl(url) {
+    const u = String(url || '').trim();
+    if (!u) throw new Error('Paste a clip link');
+    try {
+      const parsed = new URL(u);
+      if (!/^https?:$/i.test(parsed.protocol)) throw new Error('bad');
+      return parsed.href;
+    } catch (e) {
+      throw new Error(`Invalid link: ${u}`);
+    }
+  }
+
+  function normalizeEvent(raw, fallbackId) {
+    if (!raw || typeof raw !== 'object') return null;
+    const playerId = String(raw.playerId || '').trim();
+    const type = String(raw.type || '').trim();
+    if (!playerId || !STAT_FIELDS.includes(type)) return null;
+    let url = '';
+    try { url = normalizeUrl(raw.url); } catch (e) { return null; }
+    return {
+      id: String(raw.id || fallbackId || `ev_${Date.now()}`),
+      playerId,
+      type,
+      url,
+      note: String(raw.note || '').trim().slice(0, 200),
+      createdAt: raw.createdAt || Date.now(),
+    };
+  }
+
+  function normalizeEvents(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.map((e, i) => normalizeEvent(e, `ev_${i}`)).filter(Boolean);
+  }
+
   function normalizeResult(raw, matchId) {
     if (!raw || typeof raw !== 'object') return null;
     const games = Array.isArray(raw.games)
@@ -160,6 +195,7 @@ const StatsHub = (() => {
     const homeLineup = Array.isArray(raw.homeLineup) ? raw.homeLineup.filter(Boolean) : [];
     const awayLineup = Array.isArray(raw.awayLineup) ? raw.awayLineup.filter(Boolean) : [];
     const box = Array.isArray(raw.box) ? raw.box.filter((b) => b?.playerId).map(normalizeBoxLine) : [];
+    const events = normalizeEvents(raw.events);
     return {
       matchId,
       status: 'final',
@@ -172,6 +208,7 @@ const StatsHub = (() => {
       homeLineup,
       awayLineup,
       box,
+      events,
       seriesSavedAt: raw.seriesSavedAt || null,
       seriesSavedBy: normalizeActor(raw.seriesSavedBy),
       boxSavedAt: raw.boxSavedAt || null,
@@ -201,6 +238,7 @@ const StatsHub = (() => {
       m.seriesSavedBy = null;
       m.boxSavedBy = null;
       m.updatedBy = null;
+      m.events = [];
       const res = results[m.id];
       if (!res) return;
       m.status = 'final';
@@ -213,6 +251,7 @@ const StatsHub = (() => {
       m.homeLineup = [...res.homeLineup];
       m.awayLineup = [...res.awayLineup];
       m.box = res.box.map((b) => ({ ...b }));
+      m.events = (res.events || []).map((e) => ({ ...e }));
       m.seriesSavedBy = res.seriesSavedBy;
       m.boxSavedBy = res.boxSavedBy;
       m.updatedBy = res.updatedBy;
@@ -352,6 +391,7 @@ const StatsHub = (() => {
     const homeLineup = Array.isArray(payload.homeLineup) ? payload.homeLineup.filter(Boolean) : [];
     const awayLineup = Array.isArray(payload.awayLineup) ? payload.awayLineup.filter(Boolean) : [];
     const box = Array.isArray(payload.box) ? payload.box.filter((b) => b?.playerId).map(normalizeBoxLine) : [];
+    const events = payload.events != null ? normalizeEvents(payload.events) : normalizeEvents(prev.events);
     const actor = actorFromSession();
 
     const next = normalizeResult({
@@ -364,6 +404,7 @@ const StatsHub = (() => {
       homeLineup,
       awayLineup,
       box,
+      events,
       boxSavedAt: actor.at,
       boxSavedBy: actor,
       updatedAt: actor.at,
@@ -405,12 +446,44 @@ const StatsHub = (() => {
       homeLineup: [],
       awayLineup: [],
       box: [],
+      events: [],
       boxSavedAt: null,
       boxSavedBy: null,
       updatedAt: Date.now(),
       updatedBy: actorFromSession(),
     }, matchId);
     return writeResult(matchId, next);
+  }
+
+  /** All clips for a player across saved matches (optional type filter). */
+  function clipsForPlayer(playerId, type = null) {
+    const out = [];
+    Object.keys(results).forEach((matchId) => {
+      const res = results[matchId];
+      const match = (window.DB?.matches || []).find((m) => m.id === matchId);
+      (res.events || []).forEach((e) => {
+        if (e.playerId !== playerId) return;
+        if (type && e.type !== type) return;
+        out.push({
+          ...e,
+          matchId,
+          round: match?.round ?? null,
+          date: match?.date || null,
+          home: match?.home || null,
+          away: match?.away || null,
+        });
+      });
+    });
+    return out.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  }
+
+  function clipCountsForPlayer(playerId) {
+    const counts = {};
+    STAT_FIELDS.forEach((f) => { counts[f] = 0; });
+    clipsForPlayer(playerId).forEach((e) => {
+      if (counts[e.type] != null) counts[e.type] += 1;
+    });
+    return counts;
   }
 
   function status() {
@@ -420,6 +493,7 @@ const StatsHub = (() => {
   return {
     init, onChange, status, getResult, saveSeries, saveBox, clearMatch, clearBox,
     checkMasterPin, emptyLine, seriesFromGames, fields: STAT_FIELDS,
+    normalizeUrl, clipsForPlayer, clipCountsForPlayer,
   };
 })();
 
