@@ -74,7 +74,7 @@ const FAQ = [
     a:
       'Each player’s core box-score (goals, assists, steals, blocks, turnovers) is weighted, ' +
       'divided by matches played (+2 prior), then normalized across the league onto a 1–10 scale. ' +
-      'Swim-off wins and shots are tracked separately and do not feed the rating. ' +
+      'Swim-off attempts/wins and shots are tracked separately and do not feed the rating. ' +
       'Exact weights are on the Teams & Roster tab.',
   },
   {
@@ -278,10 +278,15 @@ const PLAYER_STAT_INDEX = [
       'with no prior pass). Lower is better; weighted negatively in Rating.',
   },
   {
+    key: 'SOA', name: 'Swim-off attempts',
+    desc:
+      'Times this player took the swim-off after a restart. Tracked for possession; not used in Rating.',
+  },
+  {
     key: 'SO', name: 'Swim-off wins',
     desc:
       'Wins the swim-off — first clean underwater possession for your team after the restart buzzer. ' +
-      'Hockey faceoff analog. Tracked for possession; not used in Rating.',
+      'Hockey faceoff analog. Always ≤ attempts. Tracked for possession; not used in Rating.',
   },
   {
     key: 'SH', name: 'Shots / scoring chances',

@@ -572,3 +572,65 @@ button.pill.att-toggle:focus-visible { outline: 2px solid var(--accent, #38bdf8)
 .draft-team-card ul { list-style: none; margin: 0; padding: 0; font-size: 13px; }
 .draft-team-card li { padding: 4px 0; border-bottom: 1px solid var(--border); }
 .draft-team-card li:last-child { border-bottom: 0; }
+
+
+/* ---- Stats admin + highlight submit -------------------------------------- */
+.stats-admin-page .view { max-width: 1100px; }
+.se-lock { display: flex; flex-direction: column; gap: 12px; max-width: 360px; }
+.se-toolbar { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; margin-bottom: 10px; }
+.se-pin { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; }
+.se-pin .input { min-width: 180px; }
+.se-pickers { display: flex; flex-wrap: wrap; gap: 16px; }
+.se-pickers label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; }
+.se-pickers select, .highlight-form .input, .highlight-form textarea {
+  padding: 10px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--text); font: inherit; min-width: 220px;
+}
+.highlight-form { display: flex; flex-direction: column; gap: 12px; max-width: 560px; }
+.highlight-form label { display: flex; flex-direction: column; gap: 6px; font-size: 13px; font-weight: 600; }
+.highlight-form textarea { resize: vertical; min-height: 80px; }
+.hl-links { display: flex; flex-direction: column; gap: 8px; }
+.hl-url-list { display: flex; flex-direction: column; gap: 8px; }
+.hl-url-row { display: flex; gap: 8px; align-items: center; }
+.hl-url-row .hl-url { flex: 1; min-width: 0; }
+.hl-url-row .hl-remove { flex: 0 0 auto; }
+.se-games { display: flex; flex-direction: column; gap: 12px; margin: 12px 0; }
+.se-game { display: flex; flex-wrap: wrap; align-items: end; gap: 12px; padding: 10px 12px;
+  background: var(--surface-2); border: 1px solid var(--border); border-radius: var(--radius-sm); }
+.se-game-label { font-weight: 800; min-width: 64px; }
+.se-game label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; }
+.se-score { width: 72px; }
+.se-vs { font-weight: 800; color: var(--text-muted); padding-bottom: 8px; }
+.se-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+.se-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 8px; }
+@media (max-width: 900px) { .se-grid { grid-template-columns: 1fr; } }
+.se-side .panel-head { flex-wrap: wrap; gap: 10px; }
+.se-hint { margin: 0 0 10px; }
+.se-add { display: flex; flex-direction: column; gap: 4px; }
+.se-add select { min-width: 160px; padding: 6px 8px; border-radius: var(--radius-sm);
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; }
+.se-table .se-num { width: 52px; padding: 6px 4px; text-align: center; border-radius: 6px;
+  border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; }
+.se-table th, .se-table td { padding: 6px 4px; }
+.se-table .lft { text-align: left; padding-left: 8px; }
+.fx-games { display: block; margin-top: 4px; }
+.fx-entered { display: block; margin-top: 2px; }
+
+.spot-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 14px; }
+.spot-grid .chart-wrap { max-width: 420px; margin: 0 auto; }
+.spot-card .prof-log h4 { margin: 0 0 8px; font-size: 14px; }
+
+/* ---- Admin + highlights review ------------------------------------------- */
+.admin-shell .view { max-width: 920px; margin: 0 auto; padding: 20px 16px 48px; }
+.admin-link-list { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.admin-link-list .btn { display: inline-flex; justify-content: center; text-decoration: none; }
+.hl-card { margin-bottom: 14px; }
+.hl-url-review { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.hl-url-review a { word-break: break-all; color: var(--accent); }
+.hl-comment { margin: 0 0 12px; color: var(--text-muted); font-size: 14px; }
+.hl-meta { margin: 10px 0 12px; }
+.hl-comment-sm { margin: 4px 0 8px; font-size: 13px; color: var(--text-muted); }
+.hl-link-stack { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 10px; }
+.hl-link-stack a { font-weight: 700; color: var(--accent); text-decoration: none; }
+.hl-link-stack a:hover { text-decoration: underline; }
+.hl-media-card { cursor: default; }

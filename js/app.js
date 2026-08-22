@@ -141,7 +141,6 @@ function renderDashboard() {
   const rated = DB.ratedPlayers().filter((p) => p.matches > 0);
   const finals = DB.finals();
   const upcoming = DB.upcoming();
-  const totalGoals = finals.reduce((s, m) => s + m.homeScore + m.awayScore, 0);
   const leader = rated[0];
   // Golden Torpedo: Goals×2 + Assists×1 (goals weighted higher)
   const topScorer = [...rated].sort((a, b) =>
@@ -152,7 +151,6 @@ function renderDashboard() {
 
   const cards = [
     { icon: '🎮', label: 'Matches played', value: finals.length, sub: `${upcoming.length} upcoming` },
-    { icon: '🥅', label: 'Total goals', value: totalGoals, sub: finals.length ? `${(totalGoals / finals.length).toFixed(1)} per game` : 'Season not started' },
     {
       icon: '⭐', label: 'Top rated', info: ratingInfoHtml(),
       value: leader ? playerLink(leader.playerId) : '—',
@@ -287,11 +285,20 @@ function fixtureRow(m) {
 }
 function resultRow(m) {
   const hw = m.homeScore > m.awayScore, aw = m.awayScore > m.homeScore;
+  const games = Array.isArray(m.games) && m.games.length
+    ? `<span class="fx-games muted small">${m.games.map((g, i) => `G${i + 1} ${g.home}–${g.away}`).join(' · ')}</span>`
+    : '';
+  const by = m.updatedBy || m.seriesSavedBy || m.boxSavedBy;
+  const entered = by?.label
+    ? `<span class="fx-entered muted small">Entered by ${by.label}</span>`
+    : '';
   return `<div class="fixture">
       <span class="fx-date">${fmtDate(m.date)} · W${m.round}</span>
       <span class="fx-teams">${teamPill(m.home)}
         <b class="score ${hw ? 'win' : ''}">${m.homeScore}</b><em>–</em><b class="score ${aw ? 'win' : ''}">${m.awayScore}</b>
         ${teamPill(m.away)}</span>
+      ${games}
+      ${entered}
     </div>`;
 }
 
@@ -307,14 +314,13 @@ function renderTeamsRoster() {
   const totals = DB.playerTotals();
   const seasonRated = DB.ratedPlayers();
   const careerRated = DB.ratedCareerPlayers();
-  const season5Count = DB.season5Roster().length;
 
   const colsFor = (view) => [
     ['rating', 'Rating'], ['name', 'Name'],
     ...(view === 'season5' ? [['teamId', 'Team']] : []),
     ['pos', 'Pos'],
     ['goals', 'G'], ['assists', 'A'], ['steals', 'S'], ['blocks', 'B'], ['turnovers', 'TO'],
-    ['swimOffs', 'SO'], ['shots', 'SH'], ['matches', 'MP'],
+    ['swimOffAttempts', 'SOA'], ['swimOffs', 'SO'], ['shots', 'SH'], ['matches', 'MP'],
   ];
 
   const bindSort = () => {
@@ -359,15 +365,12 @@ function renderTeamsRoster() {
         <td>${posTag(p)}</td>
         <td>${p.goals}</td><td>${p.assists}</td><td>${p.steals}</td>
         <td>${p.blocks}</td><td>${p.turnovers}</td>
-        <td>${p.swimOffs}</td><td>${p.shots}</td><td>${p.matches}</td>
+        <td>${p.swimOffAttempts || 0}</td><td>${p.swimOffs}</td><td>${p.shots}</td><td>${p.matches}</td>
       </tr>`).join('');
 
     const title = seasonView ? '🌊 Season 5 roster' : '👤 Overall roster';
-    const meta = seasonView
-      ? `${season5Count} players · Season 5 stats`
-      : `${careerRated.length} players · all-seasons stats · no team affiliation`;
     $('#roster-title').textContent = title;
-    $('#roster-meta').textContent = meta;
+    if ($('#roster-meta')) $('#roster-meta').textContent = '';
 
     $$('#roster-view-toggle .seg-btn').forEach((b) =>
       b.classList.toggle('active', b.dataset.view === rosterView));
@@ -379,7 +382,6 @@ function renderTeamsRoster() {
   view.innerHTML = `
     <div class="page-head">
       <h2>Teams &amp; Roster</h2>
-      <p class="muted">Season 5 stats or all-time career totals — toggle below.</p>
     </div>
 
     <div class="team-grid">
@@ -400,7 +402,7 @@ function renderTeamsRoster() {
             </div>
             <div class="team-mini-stats">
               <span>🥅 ${tt.goals}</span><span>🅰️ ${tt.assists}</span><span>🖐️ ${tt.steals}</span>
-              <span>🧱 ${tt.blocks}</span><span>🏁 ${tt.swimOffs} SO</span><span>🏹 ${tt.shots} SH</span>
+              <span>🧱 ${tt.blocks}</span><span>🏁 ${tt.swimOffAttempts || 0}/${tt.swimOffs} SO</span><span>🏹 ${tt.shots} SH</span>
             </div>
             <ul class="roster-mini">
               ${roster.map((p) => `
@@ -627,6 +629,7 @@ function drawSpotlight() {
   const p = DB.ratedPlayer(spotlightPlayer);
   const att = DB.attendancePct(p.playerId);
   const stat = (label, val) => `<div class="mini-stat"><span>${val}</span><small>${label}</small></div>`;
+  const log = DB.gameLog(p.playerId);
   $('#spot-body').innerHTML = `
     <div class="spot-card">
       <div class="spot-id">
@@ -639,11 +642,29 @@ function drawSpotlight() {
       </div>
       <div class="mini-stats">
         ${stat('Goals', p.goals)}${stat('Assists', p.assists)}${stat('Steals', p.steals)}
-        ${stat('Blocks', p.blocks)}${stat('Turnovers', p.turnovers)}${stat('Swim-offs', p.swimOffs)}
-        ${stat('Shots', p.shots)}${stat('Matches', p.matches)}
+        ${stat('Blocks', p.blocks)}${stat('Turnovers', p.turnovers)}${stat('SO att', p.swimOffAttempts || 0)}
+        ${stat('SO wins', p.swimOffs)}${stat('Shots', p.shots)}${stat('Matches', p.matches)}
       </div>
-      <div class="chart-wrap sm"><canvas id="c-spotlight"></canvas></div>
+      <div class="spot-grid">
+        <div class="chart-wrap sm"><canvas id="c-spotlight"></canvas></div>
+        <div class="prof-log">
+          <h4>Game log</h4>
+          ${log.length ? `
+          <table class="tbl gamelog">
+            <thead><tr><th>W</th><th>Opp</th><th>Res</th><th>G</th><th>A</th><th>S</th><th>B</th><th>TO</th><th>SOA</th><th>SO</th><th>SH</th></tr></thead>
+            <tbody>${log.map((g) => `
+              <tr>
+                <td>${g.round}</td>
+                <td>${teamBadge(g.opp)}${g.guest ? ' <span class="guest">guest</span>' : ''}</td>
+                <td><span class="res ${g.result}">${g.result} ${g.gf}-${g.ga}</span></td>
+                <td>${g.goals}</td><td>${g.assists}</td><td>${g.steals}</td><td>${g.blocks}</td><td>${g.turnovers}</td>
+                <td>${g.swimOffAttempts || 0}</td><td>${g.swimOffs || 0}</td><td>${g.shots || 0}</td>
+              </tr>`).join('')}</tbody>
+          </table>` : '<p class="muted">No league matches played yet this season.</p>'}
+        </div>
+      </div>
     </div>`;
+  wrapTables($('#spot-body'));
   ChartHub.radar('c-spotlight', ['Goals', 'Assists', 'Steals', 'Blocks', 'Discipline'],
     [{ label: p.name, data: [p.goals, p.assists, p.steals, p.blocks, Math.max(0, 8 - p.turnovers)],
        borderColor: teamColor(p.teamId), backgroundColor: teamColor(p.teamId) + '33', pointBackgroundColor: teamColor(p.teamId) }]);
@@ -653,6 +674,7 @@ function drawSpotlight() {
    MEDIA
    ============================================================================ */
 let mediaFilter = { team: 'all', q: '' };
+let mediaFilmTab = 'film'; // 'film' | 'highlights'
 
 function renderMedia() {
   const f = MEDIA.featured;
@@ -668,7 +690,53 @@ function renderMedia() {
     </a>
 
     <section class="panel">
-      <div class="panel-head"><h3>🎞️ Game film</h3><span class="muted small">each tile opens that game’s clip folder</span></div>
+      <div class="panel-head"><h3>💡 Nominate a highlight</h3></div>
+      <form id="highlight-form" class="highlight-form">
+        <div class="se-pickers" id="hl-meta-pickers">
+          <label>Week
+            <select id="hl-week" required>
+              ${[...new Set(DB.matches.map((m) => m.round))].sort((a, b) => a - b).map((r) =>
+                `<option value="${r}">Week ${r}</option>`).join('')}
+            </select>
+          </label>
+          <label>Match
+            <select id="hl-match" required></select>
+          </label>
+          <label>Player spotlight
+            <select id="hl-player">
+              <option value="">— optional —</option>
+              ${DB.season5Roster().map((p) => `<option value="${p.id}">${p.name}</option>`).join('')}
+            </select>
+          </label>
+        </div>
+        <div class="hl-links">
+          <div class="panel-head tight"><span>Video links</span></div>
+          <div id="hl-url-list" class="hl-url-list">
+            <div class="hl-url-row">
+              <input class="input hl-url" type="url" required placeholder="https://…" autocomplete="off" />
+            </div>
+          </div>
+          <button type="button" class="btn btn-ghost" id="hl-add-url">+ Add another link</button>
+        </div>
+        <label>Comment
+          <textarea id="hl-comment" class="input" rows="3" maxlength="500" placeholder="Why are these highlight-worthy?"></textarea>
+        </label>
+        <div class="se-actions">
+          <button type="submit" class="btn">Submit for review</button>
+          <a class="btn btn-ghost" href="season-5-highlights/">Vote on highlights →</a>
+        </div>
+        <p id="hl-msg" class="draft-msg"></p>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h3>🎞️ Game film</h3>
+        <div class="seg" id="media-film-tab">
+          <button type="button" class="seg-btn ${mediaFilmTab === 'film' ? 'active' : ''}" data-tab="film">Film</button>
+          <button type="button" class="seg-btn ${mediaFilmTab === 'highlights' ? 'active' : ''}" data-tab="highlights">Highlights</button>
+        </div>
+      </div>
       <div class="media-controls">
         <div class="seg" id="media-team">
           <button class="seg-btn ${mediaFilter.team === 'all' ? 'active' : ''}" data-team="all">All</button>
@@ -678,9 +746,93 @@ function renderMedia() {
       </div>
       <div id="game-film" class="media-grid"></div>
     </section>
-
-    <p class="muted small center">Clip folders resolve to <code>${MEDIA.filmBase}&lt;game&gt;/</code> — set <code>MEDIA.filmBase</code> in <code>js/content.js</code> to wherever your clips live.</p>
   `;
+
+  const setHlMsg = (text, cls = '') => {
+    const el = $('#hl-msg');
+    if (!el) return;
+    el.className = `draft-msg ${cls}`.trim();
+    el.textContent = text || '';
+  };
+
+  const fmtHlDate = (iso) =>
+    new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric',
+    });
+
+  const fillHlMatches = () => {
+    const weekSel = $('#hl-week');
+    const matchSel = $('#hl-match');
+    if (!weekSel || !matchSel) return;
+    const round = Number(weekSel.value);
+    const opts = DB.matches
+      .filter((m) => m.round === round)
+      .map((m) => `<option value="${m.id}">${DB.teamName(m.home)} vs ${DB.teamName(m.away)} · ${fmtHlDate(m.date)}</option>`);
+    matchSel.innerHTML = opts.join('') || '<option value="">No matches</option>';
+  };
+  fillHlMatches();
+  $('#hl-week')?.addEventListener('change', fillHlMatches);
+
+  const syncHlRemoveButtons = () => {
+    const rows = $$('#hl-url-list .hl-url-row');
+    rows.forEach((row) => {
+      const btn = row.querySelector('.hl-remove');
+      if (rows.length <= 1) {
+        btn?.remove();
+        return;
+      }
+      if (!btn) {
+        const b = document.createElement('button');
+        b.type = 'button';
+        b.className = 'btn btn-ghost hl-remove';
+        b.textContent = '✕';
+        b.addEventListener('click', () => {
+          row.remove();
+          syncHlRemoveButtons();
+        });
+        row.appendChild(b);
+      }
+    });
+  };
+
+  $('#hl-add-url')?.addEventListener('click', () => {
+    const list = $('#hl-url-list');
+    if (!list) return;
+    const row = document.createElement('div');
+    row.className = 'hl-url-row';
+    row.innerHTML = `<input class="input hl-url" type="url" required placeholder="https://…" autocomplete="off" />`;
+    list.appendChild(row);
+    syncHlRemoveButtons();
+    row.querySelector('input')?.focus();
+  });
+
+  $('#highlight-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const btn = e.target.querySelector('button[type="submit"]');
+    try {
+      if (btn) btn.disabled = true;
+      setHlMsg('Sending…');
+      const urls = $$('#hl-url-list .hl-url').map((inp) => inp.value.trim()).filter(Boolean);
+      await HighlightsHub.submit({
+        urls,
+        comment: $('#hl-comment')?.value,
+        round: Number($('#hl-week')?.value),
+        matchId: $('#hl-match')?.value,
+        playerId: $('#hl-player')?.value || null,
+      });
+      const list = $('#hl-url-list');
+      if (list) {
+        list.innerHTML = `<div class="hl-url-row"><input class="input hl-url" type="url" required placeholder="https://…" autocomplete="off" /></div>`;
+      }
+      if ($('#hl-comment')) $('#hl-comment').value = '';
+      if ($('#hl-player')) $('#hl-player').value = '';
+      setHlMsg(`Submitted ${urls.length} link${urls.length === 1 ? '' : 's'} — thanks! Vote at Season 5 highlights.`, 'ok');
+    } catch (err) {
+      setHlMsg(err.message || String(err), 'err');
+    } finally {
+      if (btn) btn.disabled = false;
+    }
+  });
 
   const games = [...DB.matches].sort((a, b) => a.round - b.round || a.id.localeCompare(b.id));
 
@@ -692,6 +844,46 @@ function renderMedia() {
       const hay = `${DB.teamName(m.home)} vs ${DB.teamName(m.away)} w${m.round} r${m.round} ${m.date}`.toLowerCase();
       return hay.split(/\s+/).some((w) => w.startsWith(q)) || hay.includes(q);
     });
+
+    if (mediaFilmTab === 'highlights') {
+      const cards = [];
+      rows.forEach((m) => {
+        const top = (typeof HighlightsHub !== 'undefined' && HighlightsHub.topForMatch)
+          ? HighlightsHub.topForMatch(m.id, 3, m.round) : [];
+        if (!top.length) return;
+        const hueA = DB.team(m.home).color, hueB = DB.team(m.away).color;
+        top.forEach((h, i) => {
+          const player = h.playerId ? DB.player(h.playerId) : null;
+          const primary = (h.urls && h.urls[0]) || h.url || '#';
+          cards.push(`
+            <article class="media-card game-card hl-media-card">
+              <div class="media-thumb game-thumb" style="background:linear-gradient(135deg, ${hueA}, ${hueB})">
+                <span class="media-tag">Week ${m.round} · #${i + 1}</span>
+                <span class="game-score">${h.voteCount} vote${h.voteCount === 1 ? '' : 's'}</span>
+                <span class="media-kind">🎬</span>
+              </div>
+              <div class="media-body">
+                <h4>${DB.teamName(m.home)} <em>vs</em> ${DB.teamName(m.away)}</h4>
+                ${player ? `<p class="muted small">Spotlight: ${player.name}</p>` : ''}
+                ${h.comment ? `<p class="hl-comment-sm">${h.comment}</p>` : ''}
+                <div class="hl-link-stack">
+                  ${(h.urls || [primary]).map((u, idx) =>
+                    `<a href="${u}" target="_blank" rel="noopener">Watch${(h.urls || []).length > 1 ? ` ${idx + 1}` : ''} →</a>`
+                  ).join('')}
+                </div>
+                <div class="media-foot">
+                  <span class="game-teams">${teamTag(m.home)} ${teamTag(m.away)}</span>
+                  <span class="muted small">${fmtDate(m.date)}</span>
+                </div>
+              </div>
+            </article>`);
+        });
+      });
+      $('#game-film').innerHTML = cards.length
+        ? cards.join('')
+        : '<p class="muted">No voted highlights yet for these games.</p>';
+      return;
+    }
 
     $('#game-film').innerHTML = rows.length ? rows.map((m) => {
       const slug = `r${m.round}-${m.home}-vs-${m.away}`;
@@ -718,6 +910,12 @@ function renderMedia() {
     }).join('') : '<p class="muted">No games match your filter.</p>';
   };
 
+  $$('#media-film-tab .seg-btn').forEach((b) => b.addEventListener('click', () => {
+    $$('#media-film-tab .seg-btn').forEach((x) => x.classList.remove('active'));
+    b.classList.add('active');
+    mediaFilmTab = b.dataset.tab;
+    draw();
+  }));
   $$('#media-team .seg-btn').forEach((b) => b.addEventListener('click', () => {
     $$('#media-team .seg-btn').forEach((x) => x.classList.remove('active'));
     b.classList.add('active'); mediaFilter.team = b.dataset.team; draw();
@@ -741,7 +939,6 @@ function renderAttendance() {
   view.innerHTML = `
     <div class="page-head">
       <h2>Attendance &amp; Availability</h2>
-      <p class="muted">Season 5 roster — tap a status to update. Changes sync live for everyone.</p>
     </div>
     <p id="att-live-msg" class="draft-msg"></p>
 
@@ -920,8 +1117,8 @@ function openProfile(id) {
 
     <div class="mini-stats">
       ${stat('Goals', p.goals)}${stat('Assists', p.assists)}${stat('Steals', p.steals)}
-      ${stat('Blocks', p.blocks)}${stat('Turnovers', p.turnovers)}${stat('Swim-offs', p.swimOffs)}
-      ${stat('Shots', p.shots)}${stat('Matches', p.matches)}
+      ${stat('Blocks', p.blocks)}${stat('Turnovers', p.turnovers)}${stat('SO att', p.swimOffAttempts || 0)}
+      ${stat('SO wins', p.swimOffs)}${stat('Shots', p.shots)}${stat('Matches', p.matches)}
     </div>
 
     <div class="prof-grid">
@@ -930,14 +1127,14 @@ function openProfile(id) {
         <h4>Game log</h4>
         ${log.length ? `
         <table class="tbl gamelog">
-          <thead><tr><th>W</th><th>Opp</th><th>Res</th><th>G</th><th>A</th><th>S</th><th>B</th><th>TO</th><th>SO</th><th>SH</th></tr></thead>
+          <thead><tr><th>W</th><th>Opp</th><th>Res</th><th>G</th><th>A</th><th>S</th><th>B</th><th>TO</th><th>SOA</th><th>SO</th><th>SH</th></tr></thead>
           <tbody>${log.map((g) => `
             <tr>
               <td>${g.round}</td>
               <td>${teamBadge(g.opp)}${g.guest ? ' <span class="guest">guest</span>' : ''}</td>
               <td><span class="res ${g.result}">${g.result} ${g.gf}-${g.ga}</span></td>
               <td>${g.goals}</td><td>${g.assists}</td><td>${g.steals}</td><td>${g.blocks}</td><td>${g.turnovers}</td>
-              <td>${g.swimOffs || 0}</td><td>${g.shots || 0}</td>
+              <td>${g.swimOffAttempts || 0}</td><td>${g.swimOffs || 0}</td><td>${g.shots || 0}</td>
             </tr>`).join('')}</tbody>
         </table>` : '<p class="muted">No league matches played yet this season.</p>'}
       </div>
@@ -1263,7 +1460,7 @@ initTheme();
 initClicks();
 $('#brand-sub').textContent = DB.league.full;
 $('#footer-venue').textContent = DB.league.venue;
-Promise.all([DraftHub.init(), AttendanceHub.init()]).then(() => {
+Promise.all([DraftHub.init(), AttendanceHub.init(), StatsHub.init(), HighlightsHub.init()]).then(() => {
   DraftHub.onChange(() => {
     let tab = 'overview';
     try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
@@ -1271,6 +1468,16 @@ Promise.all([DraftHub.init(), AttendanceHub.init()]).then(() => {
     // Attendance paints via AttendanceHub — only remount when teams change.
     if (tab === 'teams') go(tab);
     if (tab === 'attendance') go(tab);
+  });
+  StatsHub.onChange(() => {
+    let tab = 'overview';
+    try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
+    if (['overview', 'schedule', 'stats', 'teams', 'media'].includes(tab)) go(tab);
+  });
+  HighlightsHub.onChange(() => {
+    let tab = 'overview';
+    try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
+    if (tab === 'media' && mediaFilmTab === 'highlights') go(tab);
   });
   let startTab = 'overview';
   try { startTab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
