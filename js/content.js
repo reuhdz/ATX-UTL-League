@@ -268,7 +268,9 @@ const PLAYER_STAT_INDEX = [
   {
     key: 'B', name: 'Blocks',
     desc:
-      'Stopping a scoring chance or goal-bound pass (deny entry to goal / cut off a shot). ' +
+      'Stopping a scoring chance or goal-bound look only inside the goal / 3rd lane — the scoring zone ' +
+      'between the near wall and the rest of the pool: wall | lane | goal | lane | … rest of pool | wall. ' +
+      'Do not credit blocks in mid-pool or elsewhere outside that 3rd-lane goal area. ' +
       'Not every wrap or swim contact — only a clear denial of a look at goal. Distinct from a Steal ' +
       '(steal = take the torpedo; block = kill the chance without necessarily ending with possession).',
   },
@@ -309,7 +311,7 @@ const TEAM_PROFILE_INDEX = [
   { key: 'Defense',    desc: 'Goals Against, inverted — fewer conceded ranks higher.' },
   { key: 'Playmaking', desc: 'Total assists — passing that creates goals.' },
   { key: 'Steals',     desc: 'Takeaways from the carrier or clear interceptions of an attempted pass (not loose recoveries).' },
-  { key: 'Blocks',     desc: 'Scoring chances denied (not the same as steals).' },
+  { key: 'Blocks',     desc: 'Scoring chances denied in the goal / 3rd-lane zone only (not mid-pool; not the same as steals).' },
   { key: 'Discipline', desc: 'Turnovers, inverted — fewer giveaways ranks higher.' },
 ];
 
