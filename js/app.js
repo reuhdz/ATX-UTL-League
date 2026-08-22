@@ -32,6 +32,69 @@ function playerLink(id, label) {
   const p = DB.player(id);
   return `<button class="plink" data-player="${id}">${label || p.name}</button>`;
 }
+
+/** Media game-film folder slug/href (same as Media → Film cards). */
+function matchFilmSlug(m) {
+  if (!m || m.round == null || !m.home || !m.away) return '';
+  return `r${m.round}-${m.home}-vs-${m.away}`;
+}
+function matchFilmHref(m) {
+  const slug = matchFilmSlug(m);
+  return slug ? `${(MEDIA && MEDIA.filmBase) || 'clips/'}${slug}/` : '#';
+}
+
+function playerGoalClipsHtml(playerId, { emptyMsg = true } = {}) {
+  const clips = (typeof StatsHub !== 'undefined' && StatsHub.clipsForPlayer)
+    ? StatsHub.clipsForPlayer(playerId, 'goals') : [];
+  if (!clips.length) {
+    return emptyMsg
+      ? '<p class="muted small">No goal clips tagged yet. Attach them on Match stats → Stat clips.</p>'
+      : '';
+  }
+  return `<ul class="prof-clip-list">${clips.map((c) => {
+    const matchLabel = c.round != null
+      ? `Week ${c.round} · ${DB.teamName(c.home)} vs ${DB.teamName(c.away)}`
+      : 'Goal clip';
+    const film = (c.home && c.away && c.round != null)
+      ? `<a class="film-folder-link" href="${matchFilmHref(c)}" target="_blank" rel="noopener">Match film 📁</a>`
+      : '';
+    return `<li>
+      <span class="muted small">${matchLabel}${c.note ? ` · ${c.note}` : ''}</span>
+      <a href="${c.url}" target="_blank" rel="noopener">${c.url}</a>
+      ${film}
+    </li>`;
+  }).join('')}</ul>`;
+}
+
+function playerMatchFilmsHtml(playerId) {
+  const log = DB.gameLog(playerId);
+  if (!log.length) return '<p class="muted small">No matches played yet this season.</p>';
+  return `<ul class="prof-clip-list match-film-list">${log.map((g) => {
+    const href = matchFilmHref(g);
+    const slug = matchFilmSlug(g);
+    return `<li>
+      <span class="muted small">Week ${g.round} · vs ${DB.teamName(g.opp)} · ${g.result} ${g.gf}–${g.ga}</span>
+      <a class="film-folder-link" href="${href}" target="_blank" rel="noopener" title="Open ${slug}">Open match film folder →</a>
+    </li>`;
+  }).join('')}</ul>`;
+}
+
+function gameLogTableHtml(log, { filmCol = true } = {}) {
+  if (!log.length) return '<p class="muted">No league matches played yet this season.</p>';
+  return `
+    <table class="tbl gamelog">
+      <thead><tr><th>W</th><th>Opp</th><th>Res</th><th>G</th><th>A</th><th>S</th><th>B</th><th>TO</th><th>SOA</th><th>SO</th><th>SH</th>${filmCol ? '<th>Film</th>' : ''}</tr></thead>
+      <tbody>${log.map((g) => `
+        <tr>
+          <td>${g.round}</td>
+          <td>${teamBadge(g.opp)}${g.guest ? ' <span class="guest">guest</span>' : ''}</td>
+          <td><span class="res ${g.result}">${g.result} ${g.gf}-${g.ga}</span></td>
+          <td>${g.goals}</td><td>${g.assists}</td><td>${g.steals}</td><td>${g.blocks}</td><td>${g.turnovers}</td>
+          <td>${g.swimOffAttempts || 0}</td><td>${g.swimOffs || 0}</td><td>${g.shots || 0}</td>
+          ${filmCol ? `<td><a class="film-folder-link" href="${matchFilmHref(g)}" target="_blank" rel="noopener" title="${matchFilmSlug(g)}">📁</a></td>` : ''}
+        </tr>`).join('')}</tbody>
+    </table>`;
+}
 function playerPos(p, matches) {
   const mp = matches ?? p.matches ?? 0;
   return mp > 0 ? p.pos : '';
@@ -628,7 +691,11 @@ function drawSpotlight() {
   if (!spotlightPlayer) { $('#spot-body').innerHTML = '<p class="muted">No players.</p>'; return; }
   const p = DB.ratedPlayer(spotlightPlayer);
   const att = DB.attendancePct(p.playerId);
-  const stat = (label, val) => `<div class="mini-stat"><span>${val}</span><small>${label}</small></div>`;
+  const clipCounts = (typeof StatsHub !== 'undefined' && StatsHub.clipCountsForPlayer)
+    ? StatsHub.clipCountsForPlayer(p.playerId) : {};
+  const goalClips = clipCounts.goals || 0;
+  const stat = (label, val, extra = '') =>
+    `<div class="mini-stat"><span>${val}</span><small>${label}${extra}</small></div>`;
   const log = DB.gameLog(p.playerId);
   $('#spot-body').innerHTML = `
     <div class="spot-card">
@@ -641,26 +708,26 @@ function drawSpotlight() {
         <div class="spot-rating">${p.matches ? p.rating : '—'}<small>rating</small></div>
       </div>
       <div class="mini-stats">
-        ${stat('Goals', p.goals)}${stat('Assists', p.assists)}${stat('Steals', p.steals)}
+        ${stat('Goals', p.goals, goalClips ? `<em class="clip-count">${goalClips} clip${goalClips === 1 ? '' : 's'}</em>` : '')}
+        ${stat('Assists', p.assists)}${stat('Steals', p.steals)}
         ${stat('Blocks', p.blocks)}${stat('Turnovers', p.turnovers)}${stat('SO att', p.swimOffAttempts || 0)}
         ${stat('SO wins', p.swimOffs)}${stat('Shots', p.shots)}${stat('Matches', p.matches)}
+      </div>
+      <div class="spot-media-grid">
+        <section class="spot-media-block">
+          <h4>Goal clips</h4>
+          ${playerGoalClipsHtml(p.playerId)}
+        </section>
+        <section class="spot-media-block">
+          <h4>Match film folders</h4>
+          ${playerMatchFilmsHtml(p.playerId)}
+        </section>
       </div>
       <div class="spot-grid">
         <div class="chart-wrap sm"><canvas id="c-spotlight"></canvas></div>
         <div class="prof-log">
           <h4>Game log</h4>
-          ${log.length ? `
-          <table class="tbl gamelog">
-            <thead><tr><th>W</th><th>Opp</th><th>Res</th><th>G</th><th>A</th><th>S</th><th>B</th><th>TO</th><th>SOA</th><th>SO</th><th>SH</th></tr></thead>
-            <tbody>${log.map((g) => `
-              <tr>
-                <td>${g.round}</td>
-                <td>${teamBadge(g.opp)}${g.guest ? ' <span class="guest">guest</span>' : ''}</td>
-                <td><span class="res ${g.result}">${g.result} ${g.gf}-${g.ga}</span></td>
-                <td>${g.goals}</td><td>${g.assists}</td><td>${g.steals}</td><td>${g.blocks}</td><td>${g.turnovers}</td>
-                <td>${g.swimOffAttempts || 0}</td><td>${g.swimOffs || 0}</td><td>${g.shots || 0}</td>
-              </tr>`).join('')}</tbody>
-          </table>` : '<p class="muted">No league matches played yet this season.</p>'}
+          ${gameLogTableHtml(log)}
         </div>
       </div>
     </div>`;
@@ -1101,22 +1168,22 @@ function openProfile(id) {
     </div>
     <div id="prof-clips" class="prof-clips" hidden></div>
 
+    <div class="spot-media-grid">
+      <section class="spot-media-block">
+        <h4>Goal clips</h4>
+        ${playerGoalClipsHtml(id)}
+      </section>
+      <section class="spot-media-block">
+        <h4>Match film folders</h4>
+        ${playerMatchFilmsHtml(id)}
+      </section>
+    </div>
+
     <div class="prof-grid">
       <div class="chart-wrap sm"><canvas id="c-profile"></canvas></div>
       <div class="prof-log">
         <h4>Game log</h4>
-        ${log.length ? `
-        <table class="tbl gamelog">
-          <thead><tr><th>W</th><th>Opp</th><th>Res</th><th>G</th><th>A</th><th>S</th><th>B</th><th>TO</th><th>SOA</th><th>SO</th><th>SH</th></tr></thead>
-          <tbody>${log.map((g) => `
-            <tr>
-              <td>${g.round}</td>
-              <td>${teamBadge(g.opp)}${g.guest ? ' <span class="guest">guest</span>' : ''}</td>
-              <td><span class="res ${g.result}">${g.result} ${g.gf}-${g.ga}</span></td>
-              <td>${g.goals}</td><td>${g.assists}</td><td>${g.steals}</td><td>${g.blocks}</td><td>${g.turnovers}</td>
-              <td>${g.swimOffAttempts || 0}</td><td>${g.swimOffs || 0}</td><td>${g.shots || 0}</td>
-            </tr>`).join('')}</tbody>
-        </table>` : '<p class="muted">No league matches played yet this season.</p>'}
+        ${gameLogTableHtml(log)}
       </div>
     </div>
   `;
@@ -1142,9 +1209,13 @@ function openProfile(id) {
         const matchLabel = c.round != null
           ? `Week ${c.round} · ${DB.teamName(c.home)} vs ${DB.teamName(c.away)}`
           : 'Match clip';
+        const film = (c.home && c.away && c.round != null)
+          ? `<a class="film-folder-link" href="${matchFilmHref(c)}" target="_blank" rel="noopener">Match film 📁</a>`
+          : '';
         return `<li>
           <span class="muted small">${matchLabel}${c.note ? ` · ${c.note}` : ''}</span>
           <a href="${c.url}" target="_blank" rel="noopener">${c.url}</a>
+          ${film}
         </li>`;
       }).join('')}</ul>` : `<p class="muted small">No clips tagged for ${label} yet. Attach them on Match stats → Stat clips.</p>`}`;
     $('#prof-clips-close')?.addEventListener('click', () => {
