@@ -767,60 +767,24 @@ function renderMedia() {
   fillHlMatches();
   $('#hl-week')?.addEventListener('change', fillHlMatches);
 
-  const syncHlRemoveButtons = () => {
-    const rows = $$('#hl-url-list .hl-url-row');
-    rows.forEach((row) => {
-      const btn = row.querySelector('.hl-remove');
-      if (rows.length <= 1) {
-        btn?.remove();
-        return;
-      }
-      if (!btn) {
-        const b = document.createElement('button');
-        b.type = 'button';
-        b.className = 'btn btn-ghost hl-remove';
-        b.textContent = '✕';
-        b.addEventListener('click', () => {
-          row.remove();
-          syncHlRemoveButtons();
-        });
-        row.appendChild(b);
-      }
-    });
-  };
-
-  $('#hl-add-url')?.addEventListener('click', () => {
-    const list = $('#hl-url-list');
-    if (!list) return;
-    const row = document.createElement('div');
-    row.className = 'hl-url-row';
-    row.innerHTML = `<input class="input hl-url" type="url" required placeholder="https://…" autocomplete="off" />`;
-    list.appendChild(row);
-    syncHlRemoveButtons();
-    row.querySelector('input')?.focus();
-  });
-
   $('#highlight-form')?.addEventListener('submit', async (e) => {
     e.preventDefault();
     const btn = e.target.querySelector('button[type="submit"]');
     try {
       if (btn) btn.disabled = true;
       setHlMsg('Sending…');
-      const urls = $$('#hl-url-list .hl-url').map((inp) => inp.value.trim()).filter(Boolean);
+      const url = ($('#hl-url')?.value || '').trim();
       await HighlightsHub.submit({
-        urls,
+        url,
         comment: $('#hl-comment')?.value,
         round: Number($('#hl-week')?.value),
         matchId: $('#hl-match')?.value,
         playerId: $('#hl-player')?.value || null,
       });
-      const list = $('#hl-url-list');
-      if (list) {
-        list.innerHTML = `<div class="hl-url-row"><input class="input hl-url" type="url" required placeholder="https://…" autocomplete="off" /></div>`;
-      }
+      if ($('#hl-url')) $('#hl-url').value = '';
       if ($('#hl-comment')) $('#hl-comment').value = '';
       if ($('#hl-player')) $('#hl-player').value = '';
-      setHlMsg(`Submitted ${urls.length} link${urls.length === 1 ? '' : 's'} — thanks! Vote at Season 5 highlights.`, 'ok');
+      setHlMsg('Submitted — thanks! Vote at Season 5 highlights.', 'ok');
     } catch (err) {
       setHlMsg(err.message || String(err), 'err');
     } finally {
