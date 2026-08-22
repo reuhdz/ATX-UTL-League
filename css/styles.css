@@ -615,8 +615,13 @@ a.btn:hover, a.btn:focus { text-decoration: none; color: inherit; }
   border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; }
 .se-table th, .se-table td { padding: 6px 4px; }
 .se-table .lft { text-align: left; padding-left: 8px; }
-.fx-games { display: block; margin-top: 4px; }
-.fx-entered { display: block; margin-top: 2px; }
+.se-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-left: auto; }
+.stat-criteria-dl { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: baseline; margin: 12px 0 0; }
+.stat-criteria-dl dt { margin: 0; font-weight: 700; }
+.stat-criteria-dl dd { margin: 0; color: var(--text-muted); font-size: 14px; line-height: 1.45; }
+.se-criteria-card { width: min(720px, 100%); }
+.se-criteria-card .modal-head { justify-content: space-between; }
+.se-criteria-card .modal-head h2 { margin: 0; font-size: 18px; }
 
 .spot-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 14px; }
 .spot-grid .chart-wrap { max-width: 420px; margin: 0 auto; }

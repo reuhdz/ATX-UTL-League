@@ -8,7 +8,7 @@
 <title>ATX UTL — Match stats</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%8A%3C/text%3E%3C/svg%3E" />
 <meta http-equiv="Cache-Control" content="no-cache" />
-<link rel="stylesheet" href="../css/styles.css?v=20260822b" />
+<link rel="stylesheet" href="../css/styles.css?v=20260822e" />
 </head>
 <body class="stats-admin-page">
 <header class="app-header">
@@ -23,14 +23,26 @@
 
 <main id="stats-app" class="view"></main>
 
+<div id="stat-criteria-modal" class="modal-overlay" hidden>
+  <div class="modal-card se-criteria-card" role="dialog" aria-modal="true" aria-labelledby="stat-criteria-title">
+    <div class="modal-head">
+      <h2 id="stat-criteria-title">Box score criteria</h2>
+      <button type="button" class="btn btn-ghost" id="stat-criteria-close">Close</button>
+    </div>
+    <p class="muted small">How to credit each column on the player box score.</p>
+    <div id="stat-criteria-body"></div>
+  </div>
+</div>
+
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
-<script src="../js/data.js?v=20260822b"></script>
-<script src="../js/firebase-config.js?v=20260822b"></script>
-<script src="../js/admin-auth.js?v=20260822b"></script>
-<script src="../js/draft.js?v=20260822b"></script>
-<script src="../js/attendance.js?v=20260822b"></script>
-<script src="../js/stats-hub.js?v=20260822b"></script>
-<script src="../js/stats-page.js?v=20260822b"></script>
+<script src="../js/data.js?v=20260822e"></script>
+<script src="../js/content.js?v=20260822e"></script>
+<script src="../js/firebase-config.js?v=20260822e"></script>
+<script src="../js/admin-auth.js?v=20260822e"></script>
+<script src="../js/draft.js?v=20260822e"></script>
+<script src="../js/attendance.js?v=20260822e"></script>
+<script src="../js/stats-hub.js?v=20260822e"></script>
+<script src="../js/stats-page.js?v=20260822e"></script>
 </body>
 </html>

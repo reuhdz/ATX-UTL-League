@@ -17,13 +17,15 @@
   const FIELD_TITLES = {
     goals: 'Goals — torpedo placed in the opponent’s goal',
     assists: 'Assists — last pass/hand-off leading to a teammate’s goal',
-    steals: 'Steals — taking the torpedo or forcing a takeaway',
+    steals: 'Steals — takeaway from carrier or clear interception of an attempted pass (not a loose recovery)',
     blocks: 'Blocks — denying a scoring chance / goal-bound look',
     turnovers: 'Turnovers — lost possession without a shot or goal',
     swimOffAttempts: 'Swim-off attempts — times this player took the swim-off',
     swimOffs: 'Swim-off wins — first clean possession after restart',
     shots: 'Shots — scoring chances (includes goals)',
   };
+
+  const BOX_CRITERIA_KEYS = ['G', 'A', 'S', 'B', 'TO', 'SOA', 'SO', 'SH'];
 
   let week = null;
   let matchId = null;
@@ -270,9 +272,12 @@
 
       <section class="panel">
         <div class="panel-head"><h3>3 · Individual stats</h3>
-          <span class="muted small">${saved?.boxSavedBy
-            ? enteredByHtml(saved.boxSavedBy, saved.boxSavedAt)
-            : (saved?.boxSavedAt ? 'Box scores saved' : 'Not submitted yet')}</span>
+          <div class="se-head-actions">
+            <button type="button" class="btn btn-ghost" id="se-criteria">Stat criteria</button>
+            <span class="muted small">${saved?.boxSavedBy
+              ? enteredByHtml(saved.boxSavedBy, saved.boxSavedAt)
+              : (saved?.boxSavedAt ? 'Box scores saved' : 'Not submitted yet')}</span>
+          </div>
         </div>
         <div class="se-grid">${sideTable('home')}${sideTable('away')}</div>
         <div class="se-actions" style="margin-top:14px">
@@ -295,6 +300,7 @@
       AdminAuth.logout();
       window.location.href = '../admin/';
     });
+    $('#se-criteria')?.addEventListener('click', () => openCriteriaModal());
     syncSubmitButtons();
 
     $('#se-week')?.addEventListener('change', (e) => {

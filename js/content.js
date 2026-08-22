@@ -259,9 +259,11 @@ const PLAYER_STAT_INDEX = [
   {
     key: 'S', name: 'Steals',
     desc:
-      'Taking the torpedo from the carrier, or forcing an immediate change of possession while they ' +
-      'still held it (takeaway). Do not credit a steal if the carrier already released / turned it over ' +
-      'before contact — that is their Turnover.',
+      'Taking the torpedo from the carrier, forcing an immediate change of possession while they ' +
+      'still held it (takeaway), or a clear interception of an attempted pass to a teammate. ' +
+      'Do not credit a steal for picking up a botched / loose pass with no clear recipient — ' +
+      'that is a recovery, not an interception. Also do not credit a steal if the carrier already ' +
+      'released / turned it over before contact — that is their Turnover.',
   },
   {
     key: 'B', name: 'Blocks',
@@ -306,7 +308,7 @@ const TEAM_PROFILE_INDEX = [
   { key: 'Attack',     desc: 'Goals For — how much the team scores.' },
   { key: 'Defense',    desc: 'Goals Against, inverted — fewer conceded ranks higher.' },
   { key: 'Playmaking', desc: 'Total assists — passing that creates goals.' },
-  { key: 'Steals',     desc: 'Total takeaways (torpedo stripped from the carrier).' },
+  { key: 'Steals',     desc: 'Takeaways from the carrier or clear interceptions of an attempted pass (not loose recoveries).' },
   { key: 'Blocks',     desc: 'Scoring chances denied (not the same as steals).' },
   { key: 'Discipline', desc: 'Turnovers, inverted — fewer giveaways ranks higher.' },
 ];
