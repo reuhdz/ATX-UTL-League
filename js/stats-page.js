@@ -18,7 +18,7 @@
     goals: 'Goals — torpedo placed in the opponent’s goal',
     assists: 'Assists — last pass/hand-off leading to a teammate’s goal',
     steals: 'Steals — takeaway from carrier or clear interception of an attempted pass (not a loose recovery)',
-    blocks: 'Blocks — deny a look at goal only in the 3rd-lane / goal zone (not mid-pool)',
+    blocks: 'Blocks — deny a look at goal only inside the scoring zone (near wall to 3rd lane line)',
     turnovers: 'Turnovers — lost possession without a shot or goal',
     swimOffAttempts: 'Swim-off attempts — times this player took the swim-off',
     swimOffs: 'Swim-off wins — first clean possession after restart',
