@@ -43,40 +43,71 @@ function matchFilmHref(m) {
   return slug ? `${(MEDIA && MEDIA.filmBase) || 'clips/'}${slug}/` : '#';
 }
 
-function playerGoalClipsHtml(playerId, { emptyMsg = true } = {}) {
-  const clips = (typeof StatsHub !== 'undefined' && StatsHub.clipsForPlayer)
-    ? StatsHub.clipsForPlayer(playerId, 'goals') : [];
-  if (!clips.length) {
-    return emptyMsg
-      ? '<p class="muted small">No goal clips tagged yet. Attach them on Match stats → Stat clips.</p>'
-      : '';
-  }
-  return `<ul class="prof-clip-list">${clips.map((c) => {
-    const matchLabel = c.round != null
-      ? `Week ${c.round} · ${DB.teamName(c.home)} vs ${DB.teamName(c.away)}`
-      : 'Goal clip';
-    const film = (c.home && c.away && c.round != null)
-      ? `<a class="film-folder-link" href="${matchFilmHref(c)}" target="_blank" rel="noopener">Match film 📁</a>`
-      : '';
-    return `<li>
-      <span class="muted small">${matchLabel}${c.note ? ` · ${c.note}` : ''}</span>
-      <a href="${c.url}" target="_blank" rel="noopener">${c.url}</a>
-      ${film}
-    </li>`;
-  }).join('')}</ul>`;
+const PLAYER_STAT_TILES = (p) => [
+  { key: 'goals', label: 'Goals', val: p.goals },
+  { key: 'assists', label: 'Assists', val: p.assists },
+  { key: 'steals', label: 'Steals', val: p.steals },
+  { key: 'blocks', label: 'Blocks', val: p.blocks },
+  { key: 'turnovers', label: 'Turnovers', val: p.turnovers },
+  { key: 'swimOffAttempts', label: 'SO att', val: p.swimOffAttempts || 0 },
+  { key: 'swimOffs', label: 'SO wins', val: p.swimOffs },
+  { key: 'shots', label: 'Shots', val: p.shots },
+  { key: null, label: 'Matches', val: p.matches },
+];
+
+function playerStatTilesHtml(p) {
+  const clipCounts = (typeof StatsHub !== 'undefined' && StatsHub.clipCountsForPlayer)
+    ? StatsHub.clipCountsForPlayer(p.playerId) : {};
+  return PLAYER_STAT_TILES(p).map((tile) => {
+    if (!tile.key) {
+      return `<div class="mini-stat"><span>${tile.val}</span><small>${tile.label}</small></div>`;
+    }
+    const clips = clipCounts[tile.key] || 0;
+    const clipHint = clips ? `<em class="clip-count">${clips} clip${clips === 1 ? '' : 's'}</em>` : '';
+    return `<button type="button" class="mini-stat mini-stat-btn" data-stat-type="${tile.key}" title="View ${tile.label} clips">
+      <span>${tile.val}</span><small>${tile.label}${clipHint}</small>
+    </button>`;
+  }).join('');
 }
 
-function playerMatchFilmsHtml(playerId) {
-  const log = DB.gameLog(playerId);
-  if (!log.length) return '<p class="muted small">No matches played yet this season.</p>';
-  return `<ul class="prof-clip-list match-film-list">${log.map((g) => {
-    const href = matchFilmHref(g);
-    const slug = matchFilmSlug(g);
-    return `<li>
-      <span class="muted small">Week ${g.round} · vs ${DB.teamName(g.opp)} · ${g.result} ${g.gf}–${g.ga}</span>
-      <a class="film-folder-link" href="${href}" target="_blank" rel="noopener" title="Open ${slug}">Open match film folder →</a>
-    </li>`;
-  }).join('')}</ul>`;
+/** Show tagged clips for a stat type only after a mini-stat tile is clicked. */
+function bindStatClipTiles(root, playerId, playerName) {
+  const panel = root.querySelector('.stat-clips-panel');
+  if (!panel) return;
+  const tiles = PLAYER_STAT_TILES({ playerId, matches: 0 });
+
+  const hide = () => {
+    panel.hidden = true;
+    panel.innerHTML = '';
+    root.querySelectorAll('.mini-stat-btn').forEach((b) => b.classList.remove('active'));
+  };
+
+  const show = (type) => {
+    if (typeof StatsHub === 'undefined') return;
+    const label = tiles.find((t) => t.key === type)?.label || type;
+    const clips = StatsHub.clipsForPlayer(playerId, type);
+    root.querySelectorAll('.mini-stat-btn').forEach((b) => b.classList.toggle('active', b.dataset.statType === type));
+    panel.hidden = false;
+    panel.innerHTML = `
+      <div class="panel-head tight">
+        <h4>${playerName} · ${label} clips</h4>
+        <button type="button" class="btn btn-ghost stat-clips-hide">Hide</button>
+      </div>
+      ${clips.length ? `<ul class="prof-clip-list">${clips.map((c) => {
+        const matchLabel = c.round != null
+          ? `Week ${c.round} · ${DB.teamName(c.home)} vs ${DB.teamName(c.away)}`
+          : 'Clip';
+        return `<li>
+          <span class="muted small">${matchLabel}${c.note ? ` · ${c.note}` : ''}</span>
+          <a href="${c.url}" target="_blank" rel="noopener">${c.url}</a>
+        </li>`;
+      }).join('')}</ul>` : `<p class="muted small">No clips tagged for ${label} yet. Attach them on Match stats → Stat clips.</p>`}`;
+    panel.querySelector('.stat-clips-hide')?.addEventListener('click', hide);
+  };
+
+  root.querySelectorAll('.mini-stat-btn').forEach((btn) => {
+    btn.addEventListener('click', () => show(btn.dataset.statType));
+  });
 }
 
 function gameLogTableHtml(log, { filmCol = true } = {}) {
@@ -691,11 +722,6 @@ function drawSpotlight() {
   if (!spotlightPlayer) { $('#spot-body').innerHTML = '<p class="muted">No players.</p>'; return; }
   const p = DB.ratedPlayer(spotlightPlayer);
   const att = DB.attendancePct(p.playerId);
-  const clipCounts = (typeof StatsHub !== 'undefined' && StatsHub.clipCountsForPlayer)
-    ? StatsHub.clipCountsForPlayer(p.playerId) : {};
-  const goalClips = clipCounts.goals || 0;
-  const stat = (label, val, extra = '') =>
-    `<div class="mini-stat"><span>${val}</span><small>${label}${extra}</small></div>`;
   const log = DB.gameLog(p.playerId);
   $('#spot-body').innerHTML = `
     <div class="spot-card">
@@ -708,21 +734,9 @@ function drawSpotlight() {
         <div class="spot-rating">${p.matches ? p.rating : '—'}<small>rating</small></div>
       </div>
       <div class="mini-stats">
-        ${stat('Goals', p.goals, goalClips ? `<em class="clip-count">${goalClips} clip${goalClips === 1 ? '' : 's'}</em>` : '')}
-        ${stat('Assists', p.assists)}${stat('Steals', p.steals)}
-        ${stat('Blocks', p.blocks)}${stat('Turnovers', p.turnovers)}${stat('SO att', p.swimOffAttempts || 0)}
-        ${stat('SO wins', p.swimOffs)}${stat('Shots', p.shots)}${stat('Matches', p.matches)}
+        ${playerStatTilesHtml(p)}
       </div>
-      <div class="spot-media-grid">
-        <section class="spot-media-block">
-          <h4>Goal clips</h4>
-          ${playerGoalClipsHtml(p.playerId)}
-        </section>
-        <section class="spot-media-block">
-          <h4>Match film folders</h4>
-          ${playerMatchFilmsHtml(p.playerId)}
-        </section>
-      </div>
+      <div class="stat-clips-panel prof-clips" hidden></div>
       <div class="spot-grid">
         <div class="chart-wrap sm"><canvas id="c-spotlight"></canvas></div>
         <div class="prof-log">
@@ -732,6 +746,7 @@ function drawSpotlight() {
       </div>
     </div>`;
   wrapTables($('#spot-body'));
+  bindStatClipTiles($('#spot-body'), p.playerId, p.name);
   ChartHub.radar('c-spotlight', ['Goals', 'Assists', 'Steals', 'Blocks', 'Discipline'],
     [{ label: p.name, data: [p.goals, p.assists, p.steals, p.blocks, Math.max(0, 8 - p.turnovers)],
        borderColor: teamColor(p.teamId), backgroundColor: teamColor(p.teamId) + '33', pointBackgroundColor: teamColor(p.teamId) }]);
@@ -1125,30 +1140,6 @@ function openProfile(id) {
   const log = DB.gameLog(id);
   const att = DB.attendancePct(id);
   const host = $('#profile-modal');
-  const clipCounts = (typeof StatsHub !== 'undefined' && StatsHub.clipCountsForPlayer)
-    ? StatsHub.clipCountsForPlayer(id) : {};
-  const STAT_TILES = [
-    { key: 'goals', label: 'Goals', val: p.goals },
-    { key: 'assists', label: 'Assists', val: p.assists },
-    { key: 'steals', label: 'Steals', val: p.steals },
-    { key: 'blocks', label: 'Blocks', val: p.blocks },
-    { key: 'turnovers', label: 'Turnovers', val: p.turnovers },
-    { key: 'swimOffAttempts', label: 'SO att', val: p.swimOffAttempts || 0 },
-    { key: 'swimOffs', label: 'SO wins', val: p.swimOffs },
-    { key: 'shots', label: 'Shots', val: p.shots },
-    { key: null, label: 'Matches', val: p.matches },
-  ];
-  const stat = (tile) => {
-    const clips = tile.key ? (clipCounts[tile.key] || 0) : 0;
-    const clickable = !!tile.key;
-    const clipHint = clips ? `<em class="clip-count">${clips} clip${clips === 1 ? '' : 's'}</em>` : '';
-    if (!clickable) {
-      return `<div class="mini-stat"><span>${tile.val}</span><small>${tile.label}</small></div>`;
-    }
-    return `<button type="button" class="mini-stat mini-stat-btn" data-stat-type="${tile.key}" title="View ${tile.label} clips">
-      <span>${tile.val}</span><small>${tile.label}${clipHint}</small>
-    </button>`;
-  };
 
   $('#profile-card').innerHTML = `
     <div class="modal-head">
@@ -1164,20 +1155,9 @@ function openProfile(id) {
     </div>
 
     <div class="mini-stats">
-      ${STAT_TILES.map(stat).join('')}
+      ${playerStatTilesHtml(p)}
     </div>
-    <div id="prof-clips" class="prof-clips" hidden></div>
-
-    <div class="spot-media-grid">
-      <section class="spot-media-block">
-        <h4>Goal clips</h4>
-        ${playerGoalClipsHtml(id)}
-      </section>
-      <section class="spot-media-block">
-        <h4>Match film folders</h4>
-        ${playerMatchFilmsHtml(id)}
-      </section>
-    </div>
+    <div class="stat-clips-panel prof-clips" hidden></div>
 
     <div class="prof-grid">
       <div class="chart-wrap sm"><canvas id="c-profile"></canvas></div>
@@ -1192,41 +1172,7 @@ function openProfile(id) {
   host.hidden = false;
   document.body.style.overflow = 'hidden';
   $('#profile-close').addEventListener('click', closeProfile);
-
-  const showClips = (type) => {
-    const panel = $('#prof-clips');
-    if (!panel || typeof StatsHub === 'undefined') return;
-    const label = STAT_TILES.find((t) => t.key === type)?.label || type;
-    const clips = StatsHub.clipsForPlayer(id, type);
-    $$('.mini-stat-btn').forEach((b) => b.classList.toggle('active', b.dataset.statType === type));
-    panel.hidden = false;
-    panel.innerHTML = `
-      <div class="panel-head tight">
-        <h4>${p.name} · ${label} clips</h4>
-        <button type="button" class="btn btn-ghost" id="prof-clips-close">Hide</button>
-      </div>
-      ${clips.length ? `<ul class="prof-clip-list">${clips.map((c) => {
-        const matchLabel = c.round != null
-          ? `Week ${c.round} · ${DB.teamName(c.home)} vs ${DB.teamName(c.away)}`
-          : 'Match clip';
-        const film = (c.home && c.away && c.round != null)
-          ? `<a class="film-folder-link" href="${matchFilmHref(c)}" target="_blank" rel="noopener">Match film 📁</a>`
-          : '';
-        return `<li>
-          <span class="muted small">${matchLabel}${c.note ? ` · ${c.note}` : ''}</span>
-          <a href="${c.url}" target="_blank" rel="noopener">${c.url}</a>
-          ${film}
-        </li>`;
-      }).join('')}</ul>` : `<p class="muted small">No clips tagged for ${label} yet. Attach them on Match stats → Stat clips.</p>`}`;
-    $('#prof-clips-close')?.addEventListener('click', () => {
-      panel.hidden = true;
-      $$('.mini-stat-btn').forEach((b) => b.classList.remove('active'));
-    });
-  };
-
-  $$('.mini-stat-btn').forEach((btn) => {
-    btn.addEventListener('click', () => showClips(btn.dataset.statType));
-  });
+  bindStatClipTiles($('#profile-card'), id, p.name);
 
   if (p.matches) {
     ChartHub.radar('c-profile', ['Goals', 'Assists', 'Steals', 'Blocks', 'Discipline'],
