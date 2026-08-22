@@ -454,7 +454,48 @@
     document.documentElement.dataset.theme = theme;
   }
 
+  function boxCriteriaList() {
+    const index = window.PLAYER_STAT_INDEX || [];
+    const want = new Set(BOX_CRITERIA_KEYS);
+    return index.filter((s) => want.has(s.key));
+  }
+
+  function fillCriteriaModal() {
+    const body = $('#stat-criteria-body');
+    if (!body) return;
+    const items = boxCriteriaList();
+    body.innerHTML = items.length
+      ? `<dl class="stat-criteria-dl">${items.map((s) =>
+        `<dt><span class="ix-key">${s.key}</span> ${s.name}</dt><dd>${s.desc}</dd>`
+      ).join('')}</dl>`
+      : '<p class="muted">Stat definitions unavailable.</p>';
+  }
+
+  function openCriteriaModal() {
+    fillCriteriaModal();
+    const modal = $('#stat-criteria-modal');
+    if (!modal) return;
+    modal.hidden = false;
+  }
+
+  function closeCriteriaModal() {
+    const modal = $('#stat-criteria-modal');
+    if (modal) modal.hidden = true;
+  }
+
+  function bindCriteriaModal() {
+    fillCriteriaModal();
+    $('#stat-criteria-close')?.addEventListener('click', closeCriteriaModal);
+    $('#stat-criteria-modal')?.addEventListener('click', (e) => {
+      if (e.target.id === 'stat-criteria-modal') closeCriteriaModal();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeCriteriaModal();
+    });
+  }
+
   applyTheme();
+  bindCriteriaModal();
   if (!AdminAuth.requireLogin('../admin/')) return;
   Promise.all([DraftHub.init(), AttendanceHub.init(), StatsHub.init()]).then(() => {
     paint();
