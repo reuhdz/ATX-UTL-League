@@ -723,7 +723,7 @@ function renderMedia() {
         </label>
         <div class="se-actions">
           <button type="submit" class="btn">Submit for review</button>
-          <a class="btn btn-ghost" href="season-5-highlights/">Vote on highlights →</a>
+          <a class="btn btn-ghost" href="season-5-highlights/">Vote on highlights</a>
         </div>
         <p id="hl-msg" class="draft-msg"></p>
       </form>
