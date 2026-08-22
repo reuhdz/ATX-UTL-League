@@ -1,20 +1,22 @@
 /* =============================================================================
-   Highlights hub — nominations + captain/admin votes
+   Highlights hub — public nominations + session votes
    -----------------------------------------------------------------------------
    Path: /season5-highlights/{id}
    Shape:
      {
        urls, url, comment, createdAt, status,
-       round, matchId, playerId,   // set when voting / reviewing
+       round, matchId, playerId,   // set at nomination
        votes: { [voterKey]: true },
        updatedAt
      }
-   Each voter may vote for only one highlight at a time.
-   Top 3 by vote count per matchId feed the Media → Highlights tab.
+   Visitors get a stable session voter key (localStorage).
+   Each voter may cast at most one vote per highlight (can vote on many clips).
+   Top 3 by vote count per week+match feed Media → Highlights.
    ============================================================================ */
 
 const HighlightsHub = (() => {
   const PATH = 'season5-highlights';
+  const VOTER_KEY = 'atxutl.hlVoter';
   const fbCfg = () => window.FIREBASE_CONFIG || {};
 
   let db = null;
@@ -55,6 +57,20 @@ const HighlightsHub = (() => {
 
   function writeLocal(map) {
     try { localStorage.setItem(localKey(), JSON.stringify(map)); } catch (e) { /* ignore */ }
+  }
+
+  /** Stable anonymous voter id for this browser session/device. */
+  function sessionVoterKey() {
+    try {
+      let id = localStorage.getItem(VOTER_KEY);
+      if (!id) {
+        id = `v_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+        localStorage.setItem(VOTER_KEY, id);
+      }
+      return id;
+    } catch (e) {
+      return `v_tmp_${Date.now().toString(36)}`;
+    }
   }
 
   function normalizeUrl(url) {
@@ -188,17 +204,20 @@ const HighlightsHub = (() => {
     return entry;
   }
 
-  async function submit({ url, urls, comment }) {
+  async function submit({ url, urls, comment, round, matchId, playerId }) {
     const listUrls = normalizeUrls(urls != null ? urls : url);
+    if (!matchId) throw new Error('Select a match');
+    if (round == null || Number.isNaN(Number(round))) throw new Error('Select a week');
+
     const entry = {
       urls: listUrls,
       url: listUrls[0],
       comment: String(comment || '').trim().slice(0, 500),
       createdAt: Date.now(),
       status: 'pending',
-      round: null,
-      matchId: null,
-      playerId: null,
+      round: Number(round),
+      matchId,
+      playerId: playerId || null,
       votes: {},
       updatedAt: Date.now(),
     };
@@ -209,96 +228,80 @@ const HighlightsHub = (() => {
       return { id: ref.key, ...entry, voteCount: 0 };
     }
 
-    const id = `local_${Date.now()}`;
+    const id = `local_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     return persist(id, normalizeEntry(id, entry));
   }
 
-  function voterHighlightId(voterKey) {
-    const key = String(voterKey || '');
-    if (!key) return null;
-    const hit = list().find((e) => e.votes && e.votes[key]);
-    return hit?.id || null;
+  function hasVoted(highlightId, voterKey = sessionVoterKey()) {
+    const e = entries[highlightId];
+    return !!(e && e.votes && e.votes[voterKey]);
   }
 
-  /**
-   * Cast or move this voter's single vote onto highlightId.
-   * Also stamps week/match/player metadata used in Media highlights.
-   */
-  async function vote(highlightId, { voterKey, round, matchId, playerId }) {
-    if (!voterKey) throw new Error('Login required to vote');
+  /** Cast one vote on this highlight (idempotent if already voted). */
+  async function vote(highlightId, voterKey = sessionVoterKey()) {
+    if (!voterKey) throw new Error('Session required to vote');
     const target = entries[highlightId];
     if (!target) throw new Error('Highlight not found');
-    if (!matchId) throw new Error('Select a match');
-    if (round == null || Number.isNaN(Number(round))) throw new Error('Select a week');
-
-    const prevId = voterHighlightId(voterKey);
-    const nextEntries = { ...entries };
-
-    if (prevId && prevId !== highlightId && nextEntries[prevId]) {
-      const prev = { ...nextEntries[prevId], votes: { ...nextEntries[prevId].votes } };
-      delete prev.votes[voterKey];
-      prev.voteCount = Object.keys(prev.votes).length;
-      prev.updatedAt = Date.now();
-      nextEntries[prevId] = prev;
-    }
+    if (target.votes && target.votes[voterKey]) return target;
 
     const cur = {
       ...target,
       votes: { ...target.votes, [voterKey]: true },
-      round: Number(round),
-      matchId,
-      playerId: playerId || null,
-      status: 'pending',
       updatedAt: Date.now(),
     };
     cur.voteCount = Object.keys(cur.votes).length;
-    nextEntries[highlightId] = cur;
 
     if (mode === 'firebase' && db) {
-      const updates = {};
-      if (prevId && prevId !== highlightId) {
-        updates[`${PATH}/${prevId}/votes/${voterKey}`] = null;
-        updates[`${PATH}/${prevId}/updatedAt`] = Date.now();
-      }
-      updates[`${PATH}/${highlightId}/votes/${voterKey}`] = true;
-      updates[`${PATH}/${highlightId}/round`] = Number(round);
-      updates[`${PATH}/${highlightId}/matchId`] = matchId;
-      updates[`${PATH}/${highlightId}/playerId`] = playerId || null;
-      updates[`${PATH}/${highlightId}/updatedAt`] = Date.now();
-      await db.ref().update(updates);
+      await db.ref().update({
+        [`${PATH}/${highlightId}/votes/${voterKey}`]: true,
+        [`${PATH}/${highlightId}/updatedAt`]: Date.now(),
+      });
       return cur;
     }
 
-    entries = nextEntries;
+    entries = { ...entries, [highlightId]: cur };
     writeLocal(entries);
     emit();
     return cur;
   }
 
-  async function clearVote(voterKey) {
-    const prevId = voterHighlightId(voterKey);
-    if (!prevId) return null;
+  /** Remove this session's vote from one highlight. */
+  async function clearVote(highlightId, voterKey = sessionVoterKey()) {
+    if (!voterKey || !highlightId) return null;
+    const target = entries[highlightId];
+    if (!target || !target.votes || !target.votes[voterKey]) return null;
+
     if (mode === 'firebase' && db) {
       await db.ref().update({
-        [`${PATH}/${prevId}/votes/${voterKey}`]: null,
-        [`${PATH}/${prevId}/updatedAt`]: Date.now(),
+        [`${PATH}/${highlightId}/votes/${voterKey}`]: null,
+        [`${PATH}/${highlightId}/updatedAt`]: Date.now(),
       });
-      return prevId;
+      return highlightId;
     }
-    const prev = { ...entries[prevId], votes: { ...entries[prevId].votes } };
-    delete prev.votes[voterKey];
-    prev.voteCount = Object.keys(prev.votes).length;
-    prev.updatedAt = Date.now();
-    entries = { ...entries, [prevId]: prev };
+
+    const next = { ...target, votes: { ...target.votes } };
+    delete next.votes[voterKey];
+    next.voteCount = Object.keys(next.votes).length;
+    next.updatedAt = Date.now();
+    entries = { ...entries, [highlightId]: next };
     writeLocal(entries);
     emit();
-    return prevId;
+    return highlightId;
   }
 
-  /** Top N voted highlights for a match (need ≥1 vote and matchId). */
-  function topForMatch(matchId, n = 3) {
+  /**
+   * Top N voted highlights for a week + match.
+   * Prefer matchId; also require round when provided / available.
+   */
+  function topForMatch(matchId, n = 3, round = null) {
+    const match = (window.DB?.matches || []).find((m) => m.id === matchId);
+    const week = round != null ? Number(round) : (match?.round ?? null);
     return list()
-      .filter((e) => e.matchId === matchId && e.voteCount > 0)
+      .filter((e) => {
+        if (e.matchId !== matchId || e.voteCount <= 0) return false;
+        if (week == null) return true;
+        return e.round == null || Number(e.round) === week;
+      })
       .sort((a, b) => b.voteCount - a.voteCount || b.updatedAt - a.updatedAt)
       .slice(0, n);
   }
@@ -308,8 +311,8 @@ const HighlightsHub = (() => {
   }
 
   return {
-    init, onChange, list, get, submit, vote, clearVote, voterHighlightId,
-    topForMatch, status,
+    init, onChange, list, get, submit, vote, clearVote, hasVoted,
+    sessionVoterKey, topForMatch, status,
   };
 })();
 

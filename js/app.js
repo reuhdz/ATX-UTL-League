@@ -692,6 +692,23 @@ function renderMedia() {
     <section class="panel">
       <div class="panel-head"><h3>💡 Nominate a highlight</h3></div>
       <form id="highlight-form" class="highlight-form">
+        <div class="se-pickers" id="hl-meta-pickers">
+          <label>Week
+            <select id="hl-week" required>
+              ${[...new Set(DB.matches.map((m) => m.round))].sort((a, b) => a - b).map((r) =>
+                `<option value="${r}">Week ${r}</option>`).join('')}
+            </select>
+          </label>
+          <label>Match
+            <select id="hl-match" required></select>
+          </label>
+          <label>Player spotlight
+            <select id="hl-player">
+              <option value="">— optional —</option>
+              ${DB.season5Roster().map((p) => `<option value="${p.id}">${p.name}</option>`).join('')}
+            </select>
+          </label>
+        </div>
         <div class="hl-links">
           <div class="panel-head tight"><span>Video links</span></div>
           <div id="hl-url-list" class="hl-url-list">
@@ -706,6 +723,7 @@ function renderMedia() {
         </label>
         <div class="se-actions">
           <button type="submit" class="btn">Submit for review</button>
+          <a class="btn btn-ghost" href="season-5-highlights/">Vote on highlights →</a>
         </div>
         <p id="hl-msg" class="draft-msg"></p>
       </form>
@@ -736,6 +754,24 @@ function renderMedia() {
     el.className = `draft-msg ${cls}`.trim();
     el.textContent = text || '';
   };
+
+  const fmtHlDate = (iso) =>
+    new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
+      weekday: 'short', month: 'short', day: 'numeric',
+    });
+
+  const fillHlMatches = () => {
+    const weekSel = $('#hl-week');
+    const matchSel = $('#hl-match');
+    if (!weekSel || !matchSel) return;
+    const round = Number(weekSel.value);
+    const opts = DB.matches
+      .filter((m) => m.round === round)
+      .map((m) => `<option value="${m.id}">${DB.teamName(m.home)} vs ${DB.teamName(m.away)} · ${fmtHlDate(m.date)}</option>`);
+    matchSel.innerHTML = opts.join('') || '<option value="">No matches</option>';
+  };
+  fillHlMatches();
+  $('#hl-week')?.addEventListener('change', fillHlMatches);
 
   const syncHlRemoveButtons = () => {
     const rows = $$('#hl-url-list .hl-url-row');
@@ -780,13 +816,17 @@ function renderMedia() {
       await HighlightsHub.submit({
         urls,
         comment: $('#hl-comment')?.value,
+        round: Number($('#hl-week')?.value),
+        matchId: $('#hl-match')?.value,
+        playerId: $('#hl-player')?.value || null,
       });
       const list = $('#hl-url-list');
       if (list) {
         list.innerHTML = `<div class="hl-url-row"><input class="input hl-url" type="url" required placeholder="https://…" autocomplete="off" /></div>`;
       }
       if ($('#hl-comment')) $('#hl-comment').value = '';
-      setHlMsg(`Submitted ${urls.length} link${urls.length === 1 ? '' : 's'} — thanks!`, 'ok');
+      if ($('#hl-player')) $('#hl-player').value = '';
+      setHlMsg(`Submitted ${urls.length} link${urls.length === 1 ? '' : 's'} — thanks! Vote at Season 5 highlights.`, 'ok');
     } catch (err) {
       setHlMsg(err.message || String(err), 'err');
     } finally {
@@ -809,7 +849,7 @@ function renderMedia() {
       const cards = [];
       rows.forEach((m) => {
         const top = (typeof HighlightsHub !== 'undefined' && HighlightsHub.topForMatch)
-          ? HighlightsHub.topForMatch(m.id, 3) : [];
+          ? HighlightsHub.topForMatch(m.id, 3, m.round) : [];
         if (!top.length) return;
         const hueA = DB.team(m.home).color, hueB = DB.team(m.away).color;
         top.forEach((h, i) => {

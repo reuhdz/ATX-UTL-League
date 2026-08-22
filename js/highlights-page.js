@@ -1,15 +1,13 @@
-/* /season-5-highlights — captain/admin review + single vote */
+/* /season-5-highlights — public vote page (one vote per video per session) */
 (() => {
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
   const root = $('#hl-review-app');
   if (!root) return;
 
-  if (!AdminAuth.requireLogin('../admin/')) return;
-
   let msg = { text: '', cls: '' };
-  /** @type {Record<string, { round: string, matchId: string, playerId: string }>} */
-  const draftMeta = {};
+  let filterRound = 'all';
+  let filterMatch = 'all';
 
   const fmtDate = (iso) =>
     new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
@@ -23,124 +21,105 @@
   }
 
   function matchesForWeek(r) {
+    if (r === 'all') return DB.matches || [];
     return (DB.matches || []).filter((m) => m.round === Number(r));
   }
 
-  function ensureDraft(id, entry) {
-    if (!draftMeta[id]) {
-      draftMeta[id] = {
-        round: entry.round != null ? String(entry.round) : String(weeks()[0] || 1),
-        matchId: entry.matchId || '',
-        playerId: entry.playerId || '',
-      };
-      if (!draftMeta[id].matchId) {
-        const first = matchesForWeek(draftMeta[id].round)[0];
-        draftMeta[id].matchId = first?.id || '';
-      }
-    }
-    return draftMeta[id];
+  function matchLabel(matchId) {
+    const m = (DB.matches || []).find((x) => x.id === matchId);
+    if (!m) return matchId || 'Unknown match';
+    return `Week ${m.round} · ${DB.teamName(m.home)} vs ${DB.teamName(m.away)}`;
   }
 
   function paint() {
-    const session = AdminAuth.session();
-    const items = HighlightsHub.list();
-    const myVote = HighlightsHub.voterHighlightId(session.voterKey);
+    const voter = HighlightsHub.sessionVoterKey();
+    let items = HighlightsHub.list();
+    if (filterRound !== 'all') {
+      items = items.filter((e) => Number(e.round) === Number(filterRound));
+    }
+    if (filterMatch !== 'all') {
+      items = items.filter((e) => e.matchId === filterMatch);
+    }
+
+    const weekOpts = [
+      `<option value="all" ${filterRound === 'all' ? 'selected' : ''}>All weeks</option>`,
+      ...weeks().map((r) =>
+        `<option value="${r}" ${String(filterRound) === String(r) ? 'selected' : ''}>Week ${r}</option>`),
+    ].join('');
+    const matchOpts = [
+      `<option value="all" ${filterMatch === 'all' ? 'selected' : ''}>All matches</option>`,
+      ...matchesForWeek(filterRound).map((m) =>
+        `<option value="${m.id}" ${filterMatch === m.id ? 'selected' : ''}>${DB.teamName(m.home)} vs ${DB.teamName(m.away)} · ${fmtDate(m.date)}</option>`),
+    ].join('');
 
     root.innerHTML = `
       <div class="page-head">
         <h2>Season 5 highlights</h2>
       </div>
       <div class="se-toolbar">
-        <span class="muted small">${session.label}</span>
-        <a class="muted small" href="../admin/">← Admin</a>
-        <button type="button" class="btn btn-ghost" id="hl-logout">Log out</button>
+        <a class="muted small" href="../">← Dashboard</a>
+        <a class="muted small" href="../" id="hl-nominate-link">Nominate a clip</a>
       </div>
       <p class="draft-msg ${msg.cls}">${msg.text}</p>
-      <p class="muted small">Each captain/admin gets <b>one</b> vote. Top 3 voted clips per match appear under Media → Highlights.</p>
+      <p class="muted small">Vote for as many clips as you like — one vote per clip from this browser. Top 3 per week &amp; match appear under Media → Highlights.</p>
+
+      <section class="panel">
+        <div class="se-pickers">
+          <label>Week
+            <select id="hl-filter-week">${weekOpts}</select>
+          </label>
+          <label>Match
+            <select id="hl-filter-match">${matchOpts}</select>
+          </label>
+        </div>
+      </section>
 
       ${items.length ? items.map((e) => {
-        const meta = ensureDraft(e.id, e);
-        const weekOpts = weeks().map((r) =>
-          `<option value="${r}" ${String(meta.round) === String(r) ? 'selected' : ''}>Week ${r}</option>`).join('');
-        const matchOpts = matchesForWeek(meta.round).map((m) =>
-          `<option value="${m.id}" ${meta.matchId === m.id ? 'selected' : ''}>${DB.teamName(m.home)} vs ${DB.teamName(m.away)} · ${fmtDate(m.date)}</option>`).join('');
-        const playerOpts = [
-          `<option value="">— optional —</option>`,
-          ...DB.season5Roster().map((p) =>
-            `<option value="${p.id}" ${meta.playerId === p.id ? 'selected' : ''}>${p.name}</option>`),
-        ].join('');
-        const mine = myVote === e.id;
+        const mine = HighlightsHub.hasVoted(e.id, voter);
+        const player = e.playerId ? DB.player(e.playerId) : null;
         return `
           <article class="panel hl-card" data-id="${e.id}">
             <div class="panel-head">
-              <h3>${e.voteCount} vote${e.voteCount === 1 ? '' : 's'}${mine ? ' · your vote' : ''}</h3>
+              <h3>${e.voteCount} vote${e.voteCount === 1 ? '' : 's'}${mine ? ' · you voted' : ''}</h3>
               <span class="muted small">${new Date(e.createdAt).toLocaleString()}</span>
             </div>
+            <p class="muted small">${matchLabel(e.matchId)}${e.round != null ? '' : ''}</p>
+            ${player ? `<p class="muted small">Spotlight: ${player.name}</p>` : ''}
             <ul class="hl-url-review">
               ${(e.urls || []).map((u) => `<li><a href="${u}" target="_blank" rel="noopener">${u}</a></li>`).join('') || '<li class="muted">No links</li>'}
             </ul>
             ${e.comment ? `<p class="hl-comment">${e.comment}</p>` : ''}
-            <div class="se-pickers hl-meta">
-              <label>Week
-                <select class="hl-round" data-id="${e.id}">${weekOpts}</select>
-              </label>
-              <label>Match
-                <select class="hl-match" data-id="${e.id}">${matchOpts}</select>
-              </label>
-              <label>Player spotlight
-                <select class="hl-player" data-id="${e.id}">${playerOpts}</select>
-              </label>
-            </div>
             <div class="se-actions">
-              <button type="button" class="btn ${mine ? '' : ''}" data-vote="${e.id}">${mine ? 'Update my vote' : 'Vote'}</button>
-              ${mine ? `<button type="button" class="btn btn-ghost" data-unvote="${e.id}">Remove my vote</button>` : ''}
+              ${mine
+                ? `<button type="button" class="btn btn-ghost" data-unvote="${e.id}">Remove my vote</button>`
+                : `<button type="button" class="btn" data-vote="${e.id}">Vote</button>`}
             </div>
           </article>`;
-      }).join('') : '<section class="panel"><p class="muted">No highlight nominations yet.</p></section>'}`;
+      }).join('') : '<section class="panel"><p class="muted">No highlight nominations yet for this filter.</p></section>'}`;
 
-    $('#hl-logout')?.addEventListener('click', () => {
-      AdminAuth.logout();
-      window.location.href = '../admin/';
+    $('#hl-nominate-link')?.addEventListener('click', (e) => {
+      try { localStorage.setItem('atxutl.tab', 'media'); } catch (err) { /* ignore */ }
     });
 
-    $$('.hl-round').forEach((sel) => {
-      sel.addEventListener('change', () => {
-        const id = sel.dataset.id;
-        ensureDraft(id, HighlightsHub.get(id) || {});
-        draftMeta[id].round = sel.value;
-        draftMeta[id].matchId = matchesForWeek(sel.value)[0]?.id || '';
-        paint();
-      });
+    $('#hl-filter-week')?.addEventListener('change', (e) => {
+      filterRound = e.target.value;
+      filterMatch = 'all';
+      paint();
     });
-    $$('.hl-match').forEach((sel) => {
-      sel.addEventListener('change', () => {
-        ensureDraft(sel.dataset.id, {});
-        draftMeta[sel.dataset.id].matchId = sel.value;
-      });
-    });
-    $$('.hl-player').forEach((sel) => {
-      sel.addEventListener('change', () => {
-        ensureDraft(sel.dataset.id, {});
-        draftMeta[sel.dataset.id].playerId = sel.value;
-      });
+    $('#hl-filter-match')?.addEventListener('change', (e) => {
+      filterMatch = e.target.value;
+      paint();
     });
 
     $$('[data-vote]').forEach((btn) => {
       btn.addEventListener('click', async () => {
-        const id = btn.dataset.vote;
-        const meta = ensureDraft(id, HighlightsHub.get(id) || {});
         try {
           btn.disabled = true;
-          await HighlightsHub.vote(id, {
-            voterKey: session.voterKey,
-            round: meta.round,
-            matchId: meta.matchId,
-            playerId: meta.playerId || null,
-          });
-          setMsg('Vote saved — only this highlight counts for you', 'ok');
+          await HighlightsHub.vote(btn.dataset.vote);
+          setMsg('Vote recorded', 'ok');
           paint();
-        } catch (e) {
-          setMsg(e.message || String(e), 'err');
+        } catch (err) {
+          setMsg(err.message || String(err), 'err');
           paint();
         }
       });
@@ -149,11 +128,11 @@
     $$('[data-unvote]').forEach((btn) => {
       btn.addEventListener('click', async () => {
         try {
-          await HighlightsHub.clearVote(session.voterKey);
+          await HighlightsHub.clearVote(btn.dataset.unvote);
           setMsg('Vote removed', 'ok');
           paint();
-        } catch (e) {
-          setMsg(e.message || String(e), 'err');
+        } catch (err) {
+          setMsg(err.message || String(err), 'err');
           paint();
         }
       });

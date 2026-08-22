@@ -54,7 +54,7 @@
       <section class="panel admin-links">
         <ul class="admin-link-list">
           <li><a class="btn" href="../stats/">Match stats entry</a></li>
-          <li><a class="btn" href="../season-5-highlights/">Season 5 highlights review</a></li>
+          <li><a class="btn btn-ghost" href="../season-5-highlights/">Season 5 highlights (public)</a></li>
           <li><a class="btn btn-ghost" href="../">League dashboard</a></li>
         </ul>
         <button type="button" class="btn btn-ghost" id="ad-logout">Log out</button>
