@@ -663,6 +663,9 @@ a.btn:hover, a.btn:focus { text-decoration: none; color: inherit; }
 .se-table tbody tr:nth-child(even) .se-sticky-name {
   background: var(--surface);
 }
+.se-table tbody tr:hover .se-sticky-name {
+  background: var(--surface-2);
+}
 .se-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-left: auto; }
 .stat-criteria-dl { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: baseline; margin: 12px 0 0; }
 .stat-criteria-dl dt { margin: 0; font-weight: 700; }
