@@ -39,6 +39,9 @@ function matchFilmSlug(m) {
   return `r${m.round}-${m.home}-vs-${m.away}`;
 }
 function matchFilmHref(m) {
+  if (!m) return '#';
+  const byId = MEDIA?.filmByMatchId || {};
+  if (m.id && byId[m.id]) return byId[m.id];
   const slug = matchFilmSlug(m);
   return slug ? `${(MEDIA && MEDIA.filmBase) || 'clips/'}${slug}/` : '#';
 }
@@ -912,14 +915,14 @@ function renderMedia() {
     }
 
     $('#game-film').innerHTML = rows.length ? rows.map((m) => {
-      const slug = `r${m.round}-${m.home}-vs-${m.away}`;
-      const href = `${MEDIA.filmBase}${slug}/`;
+      const slug = matchFilmSlug(m);
+      const href = matchFilmHref(m);
       const hueA = DB.team(m.home).color, hueB = DB.team(m.away).color;
       const scoreline = m.status === 'final'
         ? `<span class="game-score">${m.homeScore} – ${m.awayScore}</span>`
         : `<span class="game-score up">Upcoming</span>`;
       return `
-        <a class="media-card game-card" href="${href}" target="_blank" rel="noopener" title="Open clip folder: ${slug}">
+        <a class="media-card game-card" href="${href}" target="_blank" rel="noopener" title="Open game film: ${slug || m.id}">
           <div class="media-thumb game-thumb" style="background:linear-gradient(135deg, ${hueA}, ${hueB})">
             <span class="media-tag">Week ${m.round}</span>
             ${scoreline}

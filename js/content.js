@@ -212,11 +212,16 @@ const RESEARCH = {
 
 /* ---- Media gallery -------------------------------------------------------- */
 const MEDIA = {
-  // Each game tile links to a folder of uploaded clips. Point this at wherever
-  // your clips live (a relative folder next to the site, a Google Drive folder,
-  // an S3 bucket, etc.). The per-game folder slug is appended, e.g.
-  //   clips/r5-capybara-vs-splash-damage/
+  // Default folder base when a match has no explicit film URL.
+  // Per-game folder slug: clips/r5-capybara-vs-team3/
   filmBase: 'clips/',
+
+  // Explicit film links by match id (Box / Drive / etc.)
+  // Week 1: Splash Damage vs Lone Starfish · Capybara vs Flying Hellfish
+  filmByMatchId: {
+    r1g0: 'https://app.box.com/s/logpav4g7tl96vzip0c5ape9aumd7n9v', // Splash vs Lone
+    r1g1: 'https://app.box.com/s/8b7pw6fa7dukwu8q68n5wo4stn56xt8a', // Capy vs Hellfish
+  },
 
   featured: {
     kind: 'video',
