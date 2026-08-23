@@ -1531,8 +1531,7 @@ Promise.all([
     if (tab === 'teams') go(tab);
     if (tab === 'attendance') go(tab);
   });
-  // Remount only when match results change — ignore editLocks heartbeats /
-  // connection flips (those used to call go() → scrollTo(0) in a tight loop).
+  // Remount when match results change (ignore connection-only emits).
   let lastStatsResultsSig = null;
   StatsHub.onChange((state) => {
     const sig = JSON.stringify(state?.results ?? {});

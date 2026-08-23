@@ -33,8 +33,6 @@
   let draft = null; // { homeLineup, awayLineup, box, events }
   let msg = { text: '', cls: '' };
   let clipForm = { playerId: '', type: 'goals', url: '', note: '' };
-  let heartbeatTimer = null;
-  let lockBusy = false;
 
   const fmtDate = (iso) =>
     new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
@@ -135,113 +133,9 @@
     draft = loadDraftForMatch(m);
   }
 
-  function canEditMatch() {
-    return !!(matchId && StatsHub.holdsEditLock(matchId));
-  }
-
-  function lockBannerHtml() {
-    if (!matchId) return '';
-    const lock = StatsHub.editLock(matchId);
-    const held = StatsHub.holdsEditLock(matchId);
-    const other = StatsHub.isEditLockedByOther(matchId);
-    const st = StatsHub.status?.() || {};
-    const fb = st.mode === 'firebase';
-
-    if (lockBusy) {
-      return `<div class="se-lock-banner" role="status"><span>Updating lock…</span></div>`;
-    }
-
-    if (held) {
-      return `<div class="se-lock-banner mine" role="status">
-        <div class="se-lock-copy">
-          <strong>Locked by you</strong>
-          <span class="muted small">${lock?.label || AdminAuth.session()?.label || ''} · others are read-only until you unlock (~30 min idle)</span>
-        </div>
-        <button type="button" class="btn btn-ghost" id="se-unlock">Unlock</button>
-      </div>`;
-    }
-
-    if (other) {
-      return `<div class="se-lock-banner theirs" role="status">
-        <div class="se-lock-copy">
-          <strong>🔒 Locked by ${lock.label}</strong>
-          <span class="muted small">Read-only — wait for them to unlock, or take over if they left</span>
-        </div>
-        <button type="button" class="btn" id="se-take-lock">Take over</button>
-      </div>`;
-    }
-
-    return `<div class="se-lock-banner unlocked" role="status">
-      <div class="se-lock-copy">
-        <strong>Unlocked</strong>
-        <span class="muted small">${fb ? 'Firebase live lock' : 'Local lock only'} — lock this game before entering stats</span>
-      </div>
-      <button type="button" class="btn" id="se-lock">Lock to edit</button>
-    </div>`;
-  }
-
-  /** Interval-only heartbeat. Never call from StatsHub.onChange — that loops
-   *  (write lock → emit → heartbeat → write → …) and freezes the public site. */
-  function clearHeartbeat() {
-    if (heartbeatTimer) {
-      clearInterval(heartbeatTimer);
-      heartbeatTimer = null;
-    }
-  }
-
-  function startHeartbeatInterval() {
-    clearHeartbeat();
-    if (!matchId || !StatsHub.holdsEditLock(matchId)) return;
-    heartbeatTimer = setInterval(() => {
-      StatsHub.heartbeatEditLock(matchId).catch(() => {});
-    }, 15_000);
-  }
-
-  async function claimLock({ force = false } = {}) {
-    if (!matchId) return;
-    lockBusy = true;
-    paint();
-    try {
-      await StatsHub.acquireEditLock(matchId, { force });
-      setMsg(force ? 'Took over — you can edit now' : 'Game locked — you can edit now', 'ok');
-      startHeartbeatInterval();
-    } catch (e) {
-      setMsg(e.message || String(e), 'err');
-      clearHeartbeat();
-    } finally {
-      lockBusy = false;
-      paint();
-    }
-  }
-
-  async function unlockMatch() {
-    if (!matchId) return;
-    lockBusy = true;
-    paint();
-    try {
-      await StatsHub.releaseEditLock(matchId);
-      setMsg('Unlocked — others can claim this game', 'ok');
-    } catch (e) {
-      setMsg(e.message || String(e), 'err');
-    } finally {
-      lockBusy = false;
-      clearHeartbeat();
-      paint();
-    }
-  }
-
-  async function switchMatch(id) {
-    const prev = matchId;
-    if (prev && prev !== id && StatsHub.holdsEditLock(prev)) {
-      try { await StatsHub.releaseEditLock(prev); } catch (e) { /* ignore */ }
-    }
+  function switchMatch(id) {
     selectMatch(id);
-    clearHeartbeat();
     setMsg('');
-    if (id) {
-      try { await StatsHub.refreshEditLock(id); } catch (e) { /* ignore */ }
-    }
-    if (StatsHub.holdsEditLock(id)) startHeartbeatInterval();
     paint();
   }
 
@@ -395,7 +289,6 @@
         <button type="button" class="btn btn-ghost" id="se-logout">Log out</button>
       </div>
       <p class="draft-msg ${msg.cls}">${msg.text}</p>
-      ${lockBannerHtml()}
 
       <section class="panel">
         <div class="panel-head"><h3>1 · Pick week &amp; game</h3></div>
@@ -481,24 +374,16 @@
 
     const syncSubmitButtons = () => {
       const ok = AdminAuth.isLoggedIn();
-      const editable = ok && canEditMatch();
       const hasSaved = !!(matchId && StatsHub.getResult(matchId));
       const hasBox = !!(matchId && (StatsHub.getResult(matchId)?.boxSavedAt || StatsHub.getResult(matchId)?.box?.length));
       const hasFilm = !!(matchId && typeof FilmHub !== 'undefined' && FilmHub.urlFor(matchId));
-      if ($('#se-save-series')) $('#se-save-series').disabled = !editable;
-      if ($('#se-save-box')) $('#se-save-box').disabled = !editable;
-      if ($('#se-clear')) $('#se-clear').disabled = !editable || !hasSaved;
-      if ($('#se-clear-box')) $('#se-clear-box').disabled = !editable || !hasBox;
-      if ($('#se-save-film')) $('#se-save-film').disabled = !editable;
-      if ($('#se-clear-film')) $('#se-clear-film').disabled = !editable || !hasFilm;
-      if ($('#se-clip-add')) $('#se-clip-add').disabled = !editable;
-
-      // Lock all match-entry controls when someone else holds the lock
-      root.querySelectorAll(
-        '.se-score, .se-num, #se-film-url, #se-clip-player, #se-clip-type, #se-clip-url, #se-clip-note, [data-add-side], .se-remove, .se-clip-remove'
-      ).forEach((el) => {
-        el.disabled = !editable;
-      });
+      if ($('#se-save-series')) $('#se-save-series').disabled = !ok;
+      if ($('#se-save-box')) $('#se-save-box').disabled = !ok;
+      if ($('#se-clear')) $('#se-clear').disabled = !ok || !hasSaved;
+      if ($('#se-clear-box')) $('#se-clear-box').disabled = !ok || !hasBox;
+      if ($('#se-save-film')) $('#se-save-film').disabled = !ok;
+      if ($('#se-clear-film')) $('#se-clear-film').disabled = !ok || !hasFilm;
+      if ($('#se-clip-add')) $('#se-clip-add').disabled = !ok;
     };
 
     $('#se-logout')?.addEventListener('click', () => {
@@ -510,7 +395,6 @@
     $('#se-save-film')?.addEventListener('click', async () => {
       try {
         if (!matchId) throw new Error('Select a match');
-        await StatsHub.assertEditLock(matchId);
         const url = ($('#se-film-url')?.value || '').trim();
         await FilmHub.setUrl(matchId, url);
         setMsg('Film link saved — live on Media now', 'ok');
@@ -522,7 +406,6 @@
     $('#se-clear-film')?.addEventListener('click', async () => {
       try {
         if (!matchId) throw new Error('Select a match');
-        await StatsHub.assertEditLock(matchId);
         if (!confirm('Remove the film link for this match?')) return;
         await FilmHub.clearUrl(matchId);
         setMsg('Film link cleared', 'ok');
@@ -577,7 +460,6 @@
     });
 
     syncSubmitButtons();
-    bindLockButtons();
 
     $('#se-week')?.addEventListener('change', async (e) => {
       week = Number(e.target.value);
@@ -775,51 +657,12 @@
   bindCriteriaModal();
   if (!AdminAuth.requireLogin('../admin/')) return;
 
-  const releaseOnLeave = () => {
-    if (matchId && StatsHub.holdsEditLock(matchId)) {
-      // best-effort; may not finish on unload
-      StatsHub.releaseEditLock(matchId);
-    }
-  };
-  window.addEventListener('pagehide', releaseOnLeave);
-  window.addEventListener('beforeunload', releaseOnLeave);
-
-  function bindLockButtons() {
-    $('#se-lock')?.addEventListener('click', () => claimLock({ force: false }));
-    $('#se-unlock')?.addEventListener('click', () => unlockMatch());
-    $('#se-take-lock')?.addEventListener('click', () => {
-      const lock = StatsHub.editLock(matchId);
-      if (!confirm(`Take over from ${lock?.label || 'the other editor'}? They will lose the edit lock.`)) return;
-      claimLock({ force: true });
-    });
-  }
-
-  Promise.all([DraftHub.init(), AttendanceHub.init(), StatsHub.init(), FilmHub.init()]).then(async () => {
-    StatsHub.onChange(() => {
-      // Soft-update only — never heartbeat here (lock writes re-emit and loop).
-      const active = document.activeElement;
-      const typing = active && root.contains(active)
-        && /^(INPUT|SELECT|TEXTAREA)$/.test(active.tagName);
-      if (typing && StatsHub.holdsEditLock(matchId)) {
-        // Keep focus while our heartbeat / lock refresh arrives
-        const host = root.querySelector('.se-lock-banner');
-        if (host) {
-          const tmp = document.createElement('div');
-          tmp.innerHTML = lockBannerHtml();
-          if (tmp.firstElementChild) {
-            host.replaceWith(tmp.firstElementChild);
-            bindLockButtons();
-          }
-        }
-        return;
-      }
-      paint();
-    });
+  Promise.all([DraftHub.init(), AttendanceHub.init(), StatsHub.init(), FilmHub.init()]).then(() => {
+    StatsHub.onChange(() => paint());
     FilmHub.onChange(() => paint());
-
     if (week == null) week = weeks()[0] || 1;
     const first = matchesForWeek(week)[0];
-    await switchMatch(first?.id || null);
+    switchMatch(first?.id || null);
   }).catch((e) => {
     root.innerHTML = `<p class="draft-msg err">${e.message || e}</p>`;
   });
