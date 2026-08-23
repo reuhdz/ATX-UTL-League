@@ -1531,7 +1531,13 @@ Promise.all([
     if (tab === 'teams') go(tab);
     if (tab === 'attendance') go(tab);
   });
-  StatsHub.onChange(() => {
+  // Remount only when match results change — ignore editLocks heartbeats /
+  // connection flips (those used to call go() → scrollTo(0) in a tight loop).
+  let lastStatsResultsSig = null;
+  StatsHub.onChange((state) => {
+    const sig = JSON.stringify(state?.results ?? {});
+    if (sig === lastStatsResultsSig) return;
+    lastStatsResultsSig = sig;
     let tab = 'overview';
     try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
     if (['overview', 'schedule', 'stats', 'teams', 'media'].includes(tab)) go(tab);
@@ -1541,7 +1547,12 @@ Promise.all([
     try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
     if (tab === 'media' && mediaFilmTab === 'highlights') go(tab);
   });
-  FilmHub.onChange(() => {
+  let lastFilmLinksSig = null;
+  FilmHub.onChange((state) => {
+    // Ignore connection-only emits; remount only when film links change.
+    const sig = JSON.stringify(state?.links ?? {});
+    if (sig === lastFilmLinksSig) return;
+    lastFilmLinksSig = sig;
     let tab = 'overview';
     try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
     // Media film grid + profile/stats game-log Film icons

@@ -180,16 +180,21 @@
     </div>`;
   }
 
-  function syncHeartbeat() {
+  /** Interval-only heartbeat. Never call from StatsHub.onChange — that loops
+   *  (write lock → emit → heartbeat → write → …) and freezes the public site. */
+  function clearHeartbeat() {
     if (heartbeatTimer) {
       clearInterval(heartbeatTimer);
       heartbeatTimer = null;
     }
+  }
+
+  function startHeartbeatInterval() {
+    clearHeartbeat();
     if (!matchId || !StatsHub.holdsEditLock(matchId)) return;
     heartbeatTimer = setInterval(() => {
       StatsHub.heartbeatEditLock(matchId).catch(() => {});
     }, 15_000);
-    StatsHub.heartbeatEditLock(matchId).catch(() => {});
   }
 
   async function claimLock({ force = false } = {}) {
@@ -199,11 +204,12 @@
     try {
       await StatsHub.acquireEditLock(matchId, { force });
       setMsg(force ? 'Took over — you can edit now' : 'Game locked — you can edit now', 'ok');
+      startHeartbeatInterval();
     } catch (e) {
       setMsg(e.message || String(e), 'err');
+      clearHeartbeat();
     } finally {
       lockBusy = false;
-      syncHeartbeat();
       paint();
     }
   }
@@ -219,7 +225,7 @@
       setMsg(e.message || String(e), 'err');
     } finally {
       lockBusy = false;
-      syncHeartbeat();
+      clearHeartbeat();
       paint();
     }
   }
@@ -230,11 +236,12 @@
       try { await StatsHub.releaseEditLock(prev); } catch (e) { /* ignore */ }
     }
     selectMatch(id);
-    syncHeartbeat();
+    clearHeartbeat();
     setMsg('');
     if (id) {
       try { await StatsHub.refreshEditLock(id); } catch (e) { /* ignore */ }
     }
+    if (StatsHub.holdsEditLock(id)) startHeartbeatInterval();
     paint();
   }
 
@@ -789,7 +796,7 @@
 
   Promise.all([DraftHub.init(), AttendanceHub.init(), StatsHub.init(), FilmHub.init()]).then(async () => {
     StatsHub.onChange(() => {
-      syncHeartbeat();
+      // Soft-update only — never heartbeat here (lock writes re-emit and loop).
       const active = document.activeElement;
       const typing = active && root.contains(active)
         && /^(INPUT|SELECT|TEXTAREA)$/.test(active.tagName);
