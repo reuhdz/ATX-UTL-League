@@ -40,13 +40,17 @@ function matchFilmSlug(m) {
 }
 function matchFilmHref(m) {
   if (!m) return '#';
-  // Prefer window.MEDIA so classic-script lexical scope cannot miss overrides.
+  const slug = matchFilmSlug(m);
+  // Live Firebase links first (FilmHub) — updates without a page refresh.
+  if (typeof FilmHub !== 'undefined' && m.id) {
+    const live = FilmHub.urlFor(m.id);
+    if (live) return live;
+  }
   const media = (typeof window !== 'undefined' && window.MEDIA) ||
     (typeof MEDIA !== 'undefined' ? MEDIA : null) || {};
   const byKey = media.filmByMatchId || {};
-  const slug = matchFilmSlug(m);
-  const override = (m.id && byKey[m.id]) || (slug && byKey[slug]) || null;
-  if (override) return override;
+  const fallback = (m.id && byKey[m.id]) || (slug && byKey[slug]) || null;
+  if (fallback) return fallback;
   return slug ? `${media.filmBase || 'clips/'}${slug}/` : '#';
 }
 
@@ -1481,7 +1485,9 @@ initTheme();
 initClicks();
 $('#brand-sub').textContent = DB.league.full;
 $('#footer-venue').textContent = DB.league.venue;
-Promise.all([DraftHub.init(), AttendanceHub.init(), StatsHub.init(), HighlightsHub.init()]).then(() => {
+Promise.all([
+  DraftHub.init(), AttendanceHub.init(), StatsHub.init(), HighlightsHub.init(), FilmHub.init(),
+]).then(() => {
   DraftHub.onChange(() => {
     let tab = 'overview';
     try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
@@ -1499,6 +1505,12 @@ Promise.all([DraftHub.init(), AttendanceHub.init(), StatsHub.init(), HighlightsH
     let tab = 'overview';
     try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
     if (tab === 'media' && mediaFilmTab === 'highlights') go(tab);
+  });
+  FilmHub.onChange(() => {
+    let tab = 'overview';
+    try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
+    // Media film grid + profile/stats game-log Film icons
+    if (['media', 'stats', 'schedule'].includes(tab)) go(tab);
   });
   let startTab = 'overview';
   try { startTab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}

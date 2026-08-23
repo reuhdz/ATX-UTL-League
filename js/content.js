@@ -212,18 +212,14 @@ const RESEARCH = {
 
 /* ---- Media gallery -------------------------------------------------------- */
 const MEDIA = {
-  // Default folder base when a match has no explicit film URL.
+  // Fallback folder base when Firebase has no film URL for a match.
+  // Live links live in RTDB `/matchFilm/season5/{matchId}` (FilmHub).
   // Per-game folder slug: clips/r5-capybara-vs-team3/
   filmBase: 'clips/',
 
-  // Explicit film links by match id and slug (Box / Drive / etc.).
-  // Week 1: Splash Damage vs Lone Starfish · Capybara vs Flying Hellfish
-  filmByMatchId: {
-    r1g0: 'https://app.box.com/s/logpav4g7tl96vzip0c5ape9aumd7n9v',
-    'r1-team3-vs-team2': 'https://app.box.com/s/logpav4g7tl96vzip0c5ape9aumd7n9v',
-    r1g1: 'https://app.box.com/s/8b7pw6fa7dukwu8q68n5wo4stn56xt8a',
-    'r1-capybara-vs-team1': 'https://app.box.com/s/8b7pw6fa7dukwu8q68n5wo4stn56xt8a',
-  },
+  // Offline / pre-Firebase fallback only. Prefer saving links via
+  // Match stats → Game film (writes FilmHub) so open tabs update live.
+  filmByMatchId: {},
 
   featured: {
     kind: 'video',

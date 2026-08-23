@@ -332,7 +332,24 @@
       </section>
 
       <section class="panel">
-        <div class="panel-head"><h3>3 · Individual stats</h3>
+        <div class="panel-head">
+          <h3>3 · Game film link</h3>
+          <span class="muted small">Live on Media for everyone</span>
+        </div>
+        <label>Shared folder URL (Box / Drive)
+          <input id="se-film-url" class="input" type="url" autocomplete="off"
+            placeholder="https://app.box.com/s/…"
+            value="${(typeof FilmHub !== 'undefined' && matchId ? FilmHub.urlFor(matchId) : '').replace(/"/g, '&quot;')}" />
+        </label>
+        <div class="se-actions" style="margin-top:12px">
+          <button type="button" class="btn" id="se-save-film" disabled>Save film link</button>
+          <button type="button" class="btn btn-ghost" id="se-clear-film" disabled>Clear film link</button>
+        </div>
+        <p class="muted small">Open dashboard tabs update immediately — no site deploy or refresh needed.</p>
+      </section>
+
+      <section class="panel">
+        <div class="panel-head"><h3>4 · Individual stats</h3>
           <div class="se-head-actions">
             <button type="button" class="btn btn-ghost" id="se-criteria">Stat criteria</button>
             <span class="muted small">${saved?.boxSavedBy
@@ -353,10 +370,13 @@
       const ok = AdminAuth.isLoggedIn();
       const hasSaved = !!(matchId && StatsHub.getResult(matchId));
       const hasBox = !!(matchId && (StatsHub.getResult(matchId)?.boxSavedAt || StatsHub.getResult(matchId)?.box?.length));
+      const hasFilm = !!(matchId && typeof FilmHub !== 'undefined' && FilmHub.urlFor(matchId));
       if ($('#se-save-series')) $('#se-save-series').disabled = !ok;
       if ($('#se-save-box')) $('#se-save-box').disabled = !ok;
       if ($('#se-clear')) $('#se-clear').disabled = !ok || !hasSaved;
       if ($('#se-clear-box')) $('#se-clear-box').disabled = !ok || !hasBox;
+      if ($('#se-save-film')) $('#se-save-film').disabled = !ok;
+      if ($('#se-clear-film')) $('#se-clear-film').disabled = !ok || !hasFilm;
     };
 
     $('#se-logout')?.addEventListener('click', () => {
@@ -364,6 +384,29 @@
       window.location.href = '../admin/';
     });
     $('#se-criteria')?.addEventListener('click', () => openCriteriaModal());
+
+    $('#se-save-film')?.addEventListener('click', async () => {
+      try {
+        if (!matchId) throw new Error('Select a match');
+        const url = ($('#se-film-url')?.value || '').trim();
+        await FilmHub.setUrl(matchId, url);
+        setMsg('Film link saved — live on Media now', 'ok');
+        paint();
+      } catch (e) {
+        setMsg(e.message || String(e), 'err');
+      }
+    });
+    $('#se-clear-film')?.addEventListener('click', async () => {
+      try {
+        if (!matchId) throw new Error('Select a match');
+        if (!confirm('Remove the film link for this match?')) return;
+        await FilmHub.clearUrl(matchId);
+        setMsg('Film link cleared', 'ok');
+        paint();
+      } catch (e) {
+        setMsg(e.message || String(e), 'err');
+      }
+    });
 
     const syncClipFormFromDom = () => {
       clipForm = {
@@ -610,7 +653,8 @@
   applyTheme();
   bindCriteriaModal();
   if (!AdminAuth.requireLogin('../admin/')) return;
-  Promise.all([DraftHub.init(), AttendanceHub.init(), StatsHub.init()]).then(() => {
+  Promise.all([DraftHub.init(), AttendanceHub.init(), StatsHub.init(), FilmHub.init()]).then(() => {
+    FilmHub.onChange(() => paint());
     paint();
   }).catch((e) => {
     root.innerHTML = `<p class="draft-msg err">${e.message || e}</p>`;
