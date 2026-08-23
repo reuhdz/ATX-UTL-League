@@ -38,18 +38,25 @@ function matchFilmSlug(m) {
   if (!m || m.round == null || !m.home || !m.away) return '';
   return `r${m.round}-${m.home}-vs-${m.away}`;
 }
+function matchFilmMatchId(m) {
+  if (!m) return null;
+  return m.id || m.matchId || null;
+}
 function matchFilmHref(m) {
   if (!m) return '#';
-  const slug = matchFilmSlug(m);
+  const matchId = matchFilmMatchId(m);
+  // Prefer the schedule match object when game-log rows only carry matchId.
+  const full = (matchId && window.DB?.matches?.find((x) => x.id === matchId)) || m;
+  const slug = matchFilmSlug(full);
   // Live Firebase links first (FilmHub) — updates without a page refresh.
-  if (typeof FilmHub !== 'undefined' && m.id) {
-    const live = FilmHub.urlFor(m.id);
+  if (typeof FilmHub !== 'undefined' && matchId) {
+    const live = FilmHub.urlFor(matchId);
     if (live) return live;
   }
   const media = (typeof window !== 'undefined' && window.MEDIA) ||
     (typeof MEDIA !== 'undefined' ? MEDIA : null) || {};
   const byKey = media.filmByMatchId || {};
-  const fallback = (m.id && byKey[m.id]) || (slug && byKey[slug]) || null;
+  const fallback = (matchId && byKey[matchId]) || (slug && byKey[slug]) || null;
   if (fallback) return fallback;
   return slug ? `${media.filmBase || 'clips/'}${slug}/` : '#';
 }
@@ -160,7 +167,7 @@ function gameLogTableHtml(log, { filmCol = true } = {}) {
           <td><span class="res ${g.result}">${g.result} ${g.gf}-${g.ga}</span></td>
           <td>${g.goals}</td><td>${g.assists}</td><td>${g.steals}</td><td>${g.blocks}</td><td>${g.turnovers}</td>
           <td>${g.swimOffAttempts || 0}</td><td>${g.swimOffs || 0}</td><td>${g.shots || 0}</td>
-          ${filmCol ? `<td><a class="film-folder-link" href="${matchFilmHref(g)}" target="_blank" rel="noopener" title="${matchFilmSlug(g)}">📁</a></td>` : ''}
+          ${filmCol ? `<td><a class="film-folder-link" href="${matchFilmHref(g)}" target="_blank" rel="noopener" title="Open game film">📁</a></td>` : ''}
         </tr>`).join('')}</tbody>
     </table>`;
 }
@@ -1191,6 +1198,7 @@ function openProfile(id) {
       </div>
     </div>
   `;
+  $('#profile-card').dataset.playerId = id;
 
   wrapTables($('#profile-card'));
   host.hidden = false;
@@ -1538,6 +1546,11 @@ Promise.all([
     try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
     // Media film grid + profile/stats game-log Film icons
     if (['media', 'stats', 'schedule'].includes(tab)) go(tab);
+    const profileOpen = $('#profile-modal') && !$('#profile-modal').hidden;
+    if (profileOpen) {
+      const pid = $('#profile-card')?.dataset?.playerId;
+      if (pid) openProfile(pid);
+    }
   });
   let startTab = 'overview';
   try { startTab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
