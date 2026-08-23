@@ -40,10 +40,14 @@ function matchFilmSlug(m) {
 }
 function matchFilmHref(m) {
   if (!m) return '#';
-  const byId = MEDIA?.filmByMatchId || {};
-  if (m.id && byId[m.id]) return byId[m.id];
+  // Prefer window.MEDIA so classic-script lexical scope cannot miss overrides.
+  const media = (typeof window !== 'undefined' && window.MEDIA) ||
+    (typeof MEDIA !== 'undefined' ? MEDIA : null) || {};
+  const byKey = media.filmByMatchId || {};
   const slug = matchFilmSlug(m);
-  return slug ? `${(MEDIA && MEDIA.filmBase) || 'clips/'}${slug}/` : '#';
+  const override = (m.id && byKey[m.id]) || (slug && byKey[slug]) || null;
+  if (override) return override;
+  return slug ? `${media.filmBase || 'clips/'}${slug}/` : '#';
 }
 
 const PLAYER_STAT_TILES = (p) => [
