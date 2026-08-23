@@ -39,7 +39,7 @@ const StatsHub = (() => {
   let baseMatches = [];
   const listeners = new Set();
 
-  const LOCK_STALE_MS = 45_000;
+  const LOCK_STALE_MS = 30 * 60 * 1000; // 30 minutes without heartbeat
   let editSessionId = null;
 
   function emit() {
