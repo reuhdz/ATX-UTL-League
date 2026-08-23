@@ -164,9 +164,18 @@
     </div>`;
   }
 
+  function claimSig() {
+    if (!matchId || typeof ClaimHub === 'undefined') return '';
+    const c = ClaimHub.getClaim(matchId);
+    return c ? `${c.sessionId}|${c.username}` : '';
+  }
+
+  let lastClaimSig = '';
+
   async function switchMatch(id) {
     selectMatch(id);
     setMsg('');
+    lastClaimSig = claimSig();
     paint();
   }
 
@@ -497,6 +506,7 @@
       $('#se-claim')?.addEventListener('click', async () => {
         try {
           await ClaimHub.claim(matchId);
+          lastClaimSig = claimSig();
           setMsg('Claimed — others can see you’re editing (they can still save)', 'ok');
           paint();
         } catch (e) {
@@ -506,6 +516,7 @@
       $('#se-claim-release')?.addEventListener('click', async () => {
         try {
           await ClaimHub.release(matchId);
+          lastClaimSig = claimSig();
           setMsg('Claim released', 'ok');
           paint();
         } catch (e) {
@@ -720,9 +731,15 @@
   ]).then(() => {
     StatsHub.onChange(() => paint());
     FilmHub.onChange(() => paint());
-    ClaimHub.onChange(() => paint());
+    ClaimHub.onChange(() => {
+      const next = claimSig();
+      if (next === lastClaimSig) return;
+      lastClaimSig = next;
+      paint();
+    });
     if (week == null) week = weeks()[0] || 1;
     const first = matchesForWeek(week)[0];
+    lastClaimSig = claimSig();
     switchMatch(first?.id || null);
   }).catch((e) => {
     root.innerHTML = `<p class="draft-msg err">${e.message || e}</p>`;
