@@ -146,7 +146,7 @@
     const stale = lock ? StatsHub.isEditLockStale(lock) : true;
     if (held) {
       return `<div class="se-lock-banner mine" role="status">
-        <span>✏️ You hold the edit lock for this game — others can’t submit until you leave or go idle (~45s).</span>
+        <span>✏️ You hold the edit lock for this game — others can’t submit until you leave or go idle (~30 min).</span>
       </div>`;
     }
     if (lock && !stale) {
