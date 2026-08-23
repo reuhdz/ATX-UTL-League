@@ -645,6 +645,24 @@ a.btn:hover, a.btn:focus { text-decoration: none; color: inherit; }
   border: 1px solid var(--border); background: var(--surface-2); color: var(--text); font: inherit; }
 .se-table th, .se-table td { padding: 6px 4px; }
 .se-table .lft { text-align: left; padding-left: 8px; }
+.se-side .table-scroll { max-width: 100%; }
+.se-table { border-collapse: separate; border-spacing: 0; }
+.se-table .se-sticky-name {
+  position: sticky;
+  left: 0;
+  z-index: 2;
+  min-width: 7.5rem;
+  max-width: 11rem;
+  background: var(--surface);
+  box-shadow: 6px 0 8px -6px rgba(0, 0, 0, 0.35);
+}
+.se-table thead .se-sticky-name {
+  z-index: 3;
+  background: var(--surface-2, var(--surface));
+}
+.se-table tbody tr:nth-child(even) .se-sticky-name {
+  background: var(--surface);
+}
 .se-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-left: auto; }
 .stat-criteria-dl { display: grid; grid-template-columns: auto 1fr; gap: 10px 12px; align-items: baseline; margin: 12px 0 0; }
 .stat-criteria-dl dt { margin: 0; font-weight: 700; }

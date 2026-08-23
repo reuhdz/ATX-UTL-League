@@ -306,7 +306,7 @@
           <table class="tbl se-table">
             <thead>
               <tr>
-                <th class="lft">Player</th>
+                <th class="lft se-sticky-name">Player</th>
                 ${FIELDS.map((f) => `<th title="${FIELD_TITLES[f] || FIELD_LABELS[f]}">${FIELD_LABELS[f]}</th>`).join('')}
                 <th></th>
               </tr>
@@ -318,7 +318,7 @@
                 const line = draft.box[id];
                 const guest = !p || p.teamId !== teamId;
                 return `<tr>
-                  <td class="lft strong">${p?.name || id}${guest ? ' <span class="guest">FA</span>' : ''}</td>
+                  <td class="lft strong se-sticky-name">${p?.name || id}${guest ? ' <span class="guest">FA</span>' : ''}</td>
                   ${FIELDS.map((f) => `
                     <td><input class="se-num" type="number" min="0" max="99" step="1"
                       data-player="${id}" data-field="${f}" value="${line[f] || 0}" /></td>`).join('')}
