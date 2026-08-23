@@ -54,17 +54,29 @@ function matchFilmHref(m) {
   return slug ? `${media.filmBase || 'clips/'}${slug}/` : '#';
 }
 
-const PLAYER_STAT_TILES = (p) => [
-  { key: 'goals', label: 'Goals', val: p.goals },
-  { key: 'assists', label: 'Assists', val: p.assists },
-  { key: 'steals', label: 'Steals', val: p.steals },
-  { key: 'blocks', label: 'Blocks', val: p.blocks },
-  { key: 'turnovers', label: 'Turnovers', val: p.turnovers },
-  { key: 'swimOffAttempts', label: 'SO att', val: p.swimOffAttempts || 0 },
-  { key: 'swimOffs', label: 'SO wins', val: p.swimOffs },
-  { key: 'shots', label: 'Shots', val: p.shots },
-  { key: null, label: 'Matches', val: p.matches },
-];
+const PLAYER_STAT_TILES = (p) => {
+  const soAtt = Number(p.swimOffAttempts) || 0;
+  const soWins = Number(p.swimOffs) || 0;
+  const soPct = soAtt > 0 ? Math.round((100 * Math.min(soWins, soAtt)) / soAtt) : null;
+  return [
+    { key: 'goals', label: 'Goals', val: p.goals },
+    { key: 'assists', label: 'Assists', val: p.assists },
+    { key: 'steals', label: 'Steals', val: p.steals },
+    { key: 'blocks', label: 'Blocks', val: p.blocks },
+    { key: 'turnovers', label: 'Turnovers', val: p.turnovers },
+    {
+      key: 'swimOff',
+      label: soAtt ? `SO · ${soWins}/${soAtt}` : 'Swim-offs',
+      val: soPct == null ? '—' : `${soPct}%`,
+      title: soAtt
+        ? `${soWins} swim-off win${soWins === 1 ? '' : 's'} of ${soAtt} attempt${soAtt === 1 ? '' : 's'} (${soPct}%)`
+        : 'No swim-off attempts yet',
+      clipTypes: ['swimOffAttempts', 'swimOffs'],
+    },
+    { key: 'shots', label: 'Shots', val: p.shots },
+    { key: null, label: 'Matches', val: p.matches },
+  ];
+};
 
 function playerStatTilesHtml(p) {
   const clipCounts = (typeof StatsHub !== 'undefined' && StatsHub.clipCountsForPlayer)
@@ -73,9 +85,11 @@ function playerStatTilesHtml(p) {
     if (!tile.key) {
       return `<div class="mini-stat"><span>${tile.val}</span><small>${tile.label}</small></div>`;
     }
-    const clips = clipCounts[tile.key] || 0;
+    const types = tile.clipTypes || [tile.key];
+    const clips = types.reduce((n, t) => n + (clipCounts[t] || 0), 0);
     const clipHint = clips ? `<em class="clip-count">${clips} clip${clips === 1 ? '' : 's'}</em>` : '';
-    return `<button type="button" class="mini-stat mini-stat-btn" data-stat-type="${tile.key}" title="View ${tile.label} clips">
+    const title = tile.title || `View ${tile.label} clips`;
+    return `<button type="button" class="mini-stat mini-stat-btn" data-stat-type="${tile.key}" title="${title}">
       <span>${tile.val}</span><small>${tile.label}${clipHint}</small>
     </button>`;
   }).join('');
@@ -85,7 +99,7 @@ function playerStatTilesHtml(p) {
 function bindStatClipTiles(root, playerId, playerName) {
   const panel = root.querySelector('.stat-clips-panel');
   if (!panel) return;
-  const tiles = PLAYER_STAT_TILES({ playerId, matches: 0 });
+  const tiles = PLAYER_STAT_TILES({ playerId, matches: 0, swimOffAttempts: 0, swimOffs: 0 });
 
   const hide = () => {
     panel.hidden = true;
@@ -95,24 +109,37 @@ function bindStatClipTiles(root, playerId, playerName) {
 
   const show = (type) => {
     if (typeof StatsHub === 'undefined') return;
-    const label = tiles.find((t) => t.key === type)?.label || type;
-    const clips = StatsHub.clipsForPlayer(playerId, type);
+    const tile = tiles.find((t) => t.key === type);
+    const label = tile?.label || type;
+    const types = tile?.clipTypes || [type];
+    const seen = new Set();
+    const clips = [];
+    types.forEach((t) => {
+      StatsHub.clipsForPlayer(playerId, t).forEach((c) => {
+        const id = c.id || `${c.url}|${c.type}|${c.matchId}`;
+        if (seen.has(id)) return;
+        seen.add(id);
+        clips.push(c);
+      });
+    });
     root.querySelectorAll('.mini-stat-btn').forEach((b) => b.classList.toggle('active', b.dataset.statType === type));
     panel.hidden = false;
     panel.innerHTML = `
       <div class="panel-head tight">
-        <h4>${playerName} · ${label} clips</h4>
+        <h4>${playerName} · ${type === 'swimOff' ? 'Swim-off' : label} clips</h4>
         <button type="button" class="btn btn-ghost stat-clips-hide">Hide</button>
       </div>
       ${clips.length ? `<ul class="prof-clip-list">${clips.map((c) => {
         const matchLabel = c.round != null
           ? `Week ${c.round} · ${DB.teamName(c.home)} vs ${DB.teamName(c.away)}`
           : 'Clip';
+        const kind = c.type === 'swimOffAttempts' ? 'attempt'
+          : c.type === 'swimOffs' ? 'win' : '';
         return `<li>
-          <span class="muted small">${matchLabel}${c.note ? ` · ${c.note}` : ''}</span>
+          <span class="muted small">${matchLabel}${kind ? ` · ${kind}` : ''}${c.note ? ` · ${c.note}` : ''}</span>
           <a href="${c.url}" target="_blank" rel="noopener">${c.url}</a>
         </li>`;
-      }).join('')}</ul>` : `<p class="muted small">No clips tagged for ${label} yet. Attach them on Match stats → Stat clips.</p>`}`;
+      }).join('')}</ul>` : `<p class="muted small">No clips tagged for ${type === 'swimOff' ? 'swim-offs' : label} yet. Attach them on Match stats → Stat clips.</p>`}`;
     panel.querySelector('.stat-clips-hide')?.addEventListener('click', hide);
   };
 
