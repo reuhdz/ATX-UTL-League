@@ -170,6 +170,12 @@ const StatsHub = (() => {
     return !!(lock && lock.sessionId === editLockSessionId() && !isEditLockStale(lock));
   }
 
+  /** Fresh / locked by someone else (not me, not stale). */
+  function isEditLockedByOther(matchId) {
+    const lock = editLock(matchId);
+    return !!(lock && !isEditLockStale(lock) && lock.sessionId !== editLockSessionId());
+  }
+
   function buildLockPayload() {
     const actor = actorFromSession();
     const now = Date.now();
@@ -183,37 +189,56 @@ const StatsHub = (() => {
     };
   }
 
+  async function refreshEditLock(matchId) {
+    if (!matchId) return null;
+    if (mode === 'firebase' && db) {
+      const snap = await db.ref(`${locksPath()}/${matchId}`).once('value');
+      const lock = normalizeEditLock(snap.val());
+      if (lock) {
+        editLocks = { ...editLocks, [matchId]: lock };
+      } else {
+        const next = { ...editLocks };
+        delete next[matchId];
+        editLocks = next;
+      }
+      return lock;
+    }
+    return editLock(matchId);
+  }
+
   async function acquireEditLock(matchId, { force = false } = {}) {
     if (!matchId) throw new Error('Select a match');
+    if (!AdminAuth?.isLoggedIn?.()) throw new Error('Log in to lock a game for editing');
     const payload = buildLockPayload();
 
     if (mode === 'firebase' && db) {
       const ref = db.ref(`${locksPath()}/${matchId}`);
+      // applyLocally=false so we don't briefly look locked before the server decides
       const tx = await ref.transaction((cur) => {
         const existing = normalizeEditLock(cur);
         if (force || !existing || isEditLockStale(existing) || existing.sessionId === payload.sessionId) {
           return payload;
         }
         return; // abort — someone else holds a fresh lock
-      });
-      if (!tx.committed) {
-        const holder = normalizeEditLock(
-          (tx.snapshot && typeof tx.snapshot.val === 'function') ? tx.snapshot.val() : editLocks[matchId]
-        );
-        const name = holder?.label || 'another captain';
-        throw new Error(`${name} is already entering stats for this game`);
-      }
-      const next = normalizeEditLock(
+      }, undefined, false);
+
+      const serverLock = normalizeEditLock(
         (tx.snapshot && typeof tx.snapshot.val === 'function') ? tx.snapshot.val() : null
-      ) || payload;
-      editLocks = { ...editLocks, [matchId]: next };
+      );
+
+      if (!tx.committed || !serverLock || serverLock.sessionId !== payload.sessionId) {
+        if (serverLock) editLocks = { ...editLocks, [matchId]: serverLock };
+        const name = serverLock?.label || 'another captain';
+        throw new Error(`${name} already has this game locked`);
+      }
+      editLocks = { ...editLocks, [matchId]: serverLock };
       emit();
-      return next;
+      return serverLock;
     }
 
     const existing = normalizeEditLock(editLocks[matchId]);
     if (!force && existing && !isEditLockStale(existing) && existing.sessionId !== payload.sessionId) {
-      throw new Error(`${existing.label} is already entering stats for this game`);
+      throw new Error(`${existing.label} already has this game locked`);
     }
     editLocks = { ...editLocks, [matchId]: payload };
     writeLocksLocal(editLocks);
@@ -226,10 +251,24 @@ const StatsHub = (() => {
     const prev = editLock(matchId);
     const next = { ...prev, heartbeatAt: Date.now() };
     if (mode === 'firebase' && db) {
-      await db.ref(`${locksPath()}/${matchId}/heartbeatAt`).set(next.heartbeatAt);
+      // Only bump heartbeat if we still own the lock
+      const ref = db.ref(`${locksPath()}/${matchId}`);
+      const tx = await ref.transaction((cur) => {
+        const existing = normalizeEditLock(cur);
+        if (!existing || existing.sessionId !== editLockSessionId()) return; // abort
+        return { ...existing, heartbeatAt: next.heartbeatAt };
+      }, undefined, false);
+      if (!tx.committed) {
+        await refreshEditLock(matchId);
+        emit();
+        return null;
+      }
+      const serverLock = normalizeEditLock(tx.snapshot.val());
+      if (serverLock) editLocks = { ...editLocks, [matchId]: serverLock };
+      return serverLock;
     }
     editLocks = { ...editLocks, [matchId]: next };
-    if (mode !== 'firebase') writeLocksLocal(editLocks);
+    writeLocksLocal(editLocks);
     return next;
   }
 
@@ -243,7 +282,7 @@ const StatsHub = (() => {
         const existing = normalizeEditLock(cur);
         if (existing && existing.sessionId === editLockSessionId()) return null;
         return cur;
-      });
+      }, undefined, false);
     }
     const next = { ...editLocks };
     delete next[matchId];
@@ -252,13 +291,16 @@ const StatsHub = (() => {
     emit();
   }
 
+  /** Require an existing lock owned by this tab — never auto-steals. */
   async function assertEditLock(matchId) {
+    if (!matchId) throw new Error('Select a match');
+    await refreshEditLock(matchId);
     if (holdsEditLock(matchId)) return true;
-    await acquireEditLock(matchId);
-    if (!holdsEditLock(matchId)) {
-      throw new Error('Could not get the edit lock for this game — try again');
+    if (isEditLockedByOther(matchId)) {
+      const lock = editLock(matchId);
+      throw new Error(`${lock.label} has this game locked — ask them to unlock, or take over`);
     }
-    return true;
+    throw new Error('Click “Lock to edit” before changing stats for this game');
   }
 
   function normalizeActor(raw) {
@@ -673,7 +715,8 @@ const StatsHub = (() => {
     init, onChange, status, getResult, saveSeries, saveBox, clearMatch, clearBox,
     checkMasterPin, emptyLine, seriesFromGames, fields: STAT_FIELDS,
     normalizeUrl, clipsForPlayer, clipCountsForPlayer,
-    editLock, holdsEditLock, isEditLockStale, acquireEditLock, releaseEditLock,
+    editLock, holdsEditLock, isEditLockStale, isEditLockedByOther,
+    acquireEditLock, releaseEditLock, refreshEditLock,
     heartbeatEditLock, assertEditLock, editLockSessionId, LOCK_STALE_MS,
   };
 })();

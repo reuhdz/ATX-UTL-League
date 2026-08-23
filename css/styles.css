@@ -609,6 +609,8 @@ a.btn:hover, a.btn:focus { text-decoration: none; color: inherit; }
 }
 .se-lock-banner.mine { border-color: color-mix(in oklab, #4ade80 45%, var(--border)); }
 .se-lock-banner.theirs { border-color: color-mix(in oklab, #f59e0b 50%, var(--border)); }
+.se-lock-banner.unlocked { border-color: color-mix(in oklab, var(--accent) 40%, var(--border)); }
+.se-lock-copy { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .se-lock-banner .btn { flex-shrink: 0; }
 .se-pin { display: flex; flex-direction: column; gap: 4px; font-size: 13px; font-weight: 600; }
 .se-pin .input { min-width: 180px; }

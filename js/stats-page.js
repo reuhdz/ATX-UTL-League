@@ -143,23 +143,40 @@
     if (!matchId) return '';
     const lock = StatsHub.editLock(matchId);
     const held = StatsHub.holdsEditLock(matchId);
-    const stale = lock ? StatsHub.isEditLockStale(lock) : true;
+    const other = StatsHub.isEditLockedByOther(matchId);
+    const st = StatsHub.status?.() || {};
+    const fb = st.mode === 'firebase';
+
+    if (lockBusy) {
+      return `<div class="se-lock-banner" role="status"><span>Updating lock…</span></div>`;
+    }
+
     if (held) {
       return `<div class="se-lock-banner mine" role="status">
-        <span>✏️ You hold the edit lock for this game — others can’t submit until you leave or go idle (~30 min).</span>
+        <div class="se-lock-copy">
+          <strong>Locked by you</strong>
+          <span class="muted small">${lock?.label || AdminAuth.session()?.label || ''} · others are read-only until you unlock (~30 min idle)</span>
+        </div>
+        <button type="button" class="btn btn-ghost" id="se-unlock">Unlock</button>
       </div>`;
     }
-    if (lock && !stale) {
+
+    if (other) {
       return `<div class="se-lock-banner theirs" role="status">
-        <span>🔒 <b>${lock.label}</b> is entering stats for this game. Fields are read-only.</span>
-        <button type="button" class="btn btn-ghost" id="se-take-lock">Take over</button>
+        <div class="se-lock-copy">
+          <strong>🔒 Locked by ${lock.label}</strong>
+          <span class="muted small">Read-only — wait for them to unlock, or take over if they left</span>
+        </div>
+        <button type="button" class="btn" id="se-take-lock">Take over</button>
       </div>`;
     }
-    if (lockBusy) {
-      return `<div class="se-lock-banner" role="status"><span>Acquiring edit lock…</span></div>`;
-    }
-    return `<div class="se-lock-banner" role="status">
-      <span>No active editor — <button type="button" class="btn btn-ghost" id="se-take-lock">Claim edit lock</button></span>
+
+    return `<div class="se-lock-banner unlocked" role="status">
+      <div class="se-lock-copy">
+        <strong>Unlocked</strong>
+        <span class="muted small">${fb ? 'Firebase live lock' : 'Local lock only'} — lock this game before entering stats</span>
+      </div>
+      <button type="button" class="btn" id="se-lock">Lock to edit</button>
     </div>`;
   }
 
@@ -181,7 +198,23 @@
     paint();
     try {
       await StatsHub.acquireEditLock(matchId, { force });
-      setMsg(force ? 'Took over edit lock' : 'Edit lock acquired', 'ok');
+      setMsg(force ? 'Took over — you can edit now' : 'Game locked — you can edit now', 'ok');
+    } catch (e) {
+      setMsg(e.message || String(e), 'err');
+    } finally {
+      lockBusy = false;
+      syncHeartbeat();
+      paint();
+    }
+  }
+
+  async function unlockMatch() {
+    if (!matchId) return;
+    lockBusy = true;
+    paint();
+    try {
+      await StatsHub.releaseEditLock(matchId);
+      setMsg('Unlocked — others can claim this game', 'ok');
     } catch (e) {
       setMsg(e.message || String(e), 'err');
     } finally {
@@ -193,13 +226,16 @@
 
   async function switchMatch(id) {
     const prev = matchId;
-    if (prev && prev !== id) {
+    if (prev && prev !== id && StatsHub.holdsEditLock(prev)) {
       try { await StatsHub.releaseEditLock(prev); } catch (e) { /* ignore */ }
     }
     selectMatch(id);
     syncHeartbeat();
-    if (!id) return;
-    await claimLock({ force: false });
+    setMsg('');
+    if (id) {
+      try { await StatsHub.refreshEditLock(id); } catch (e) { /* ignore */ }
+    }
+    paint();
   }
 
   function addPlayer(side, playerId) {
@@ -534,24 +570,15 @@
     });
 
     syncSubmitButtons();
-
-    $('#se-take-lock')?.addEventListener('click', () => {
-      const lock = StatsHub.editLock(matchId);
-      const heldByOther = lock && !StatsHub.isEditLockStale(lock) && !StatsHub.holdsEditLock(matchId);
-      const force = !!heldByOther;
-      if (force && !confirm(`Take over from ${lock.label}? They will lose the edit lock.`)) return;
-      claimLock({ force });
-    });
+    bindLockButtons();
 
     $('#se-week')?.addEventListener('change', async (e) => {
       week = Number(e.target.value);
       const list = matchesForWeek(week);
-      setMsg('');
       await switchMatch(list[0]?.id || null);
     });
 
     $('#se-match')?.addEventListener('change', async (e) => {
-      setMsg('');
       await switchMatch(e.target.value);
     });
 
@@ -742,13 +769,23 @@
   if (!AdminAuth.requireLogin('../admin/')) return;
 
   const releaseOnLeave = () => {
-    if (matchId) {
+    if (matchId && StatsHub.holdsEditLock(matchId)) {
       // best-effort; may not finish on unload
       StatsHub.releaseEditLock(matchId);
     }
   };
   window.addEventListener('pagehide', releaseOnLeave);
   window.addEventListener('beforeunload', releaseOnLeave);
+
+  function bindLockButtons() {
+    $('#se-lock')?.addEventListener('click', () => claimLock({ force: false }));
+    $('#se-unlock')?.addEventListener('click', () => unlockMatch());
+    $('#se-take-lock')?.addEventListener('click', () => {
+      const lock = StatsHub.editLock(matchId);
+      if (!confirm(`Take over from ${lock?.label || 'the other editor'}? They will lose the edit lock.`)) return;
+      claimLock({ force: true });
+    });
+  }
 
   Promise.all([DraftHub.init(), AttendanceHub.init(), StatsHub.init(), FilmHub.init()]).then(async () => {
     StatsHub.onChange(() => {
@@ -762,7 +799,10 @@
         if (host) {
           const tmp = document.createElement('div');
           tmp.innerHTML = lockBannerHtml();
-          if (tmp.firstElementChild) host.replaceWith(tmp.firstElementChild);
+          if (tmp.firstElementChild) {
+            host.replaceWith(tmp.firstElementChild);
+            bindLockButtons();
+          }
         }
         return;
       }
