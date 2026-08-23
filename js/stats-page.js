@@ -33,6 +33,8 @@
   let draft = null; // { homeLineup, awayLineup, box, events }
   let msg = { text: '', cls: '' };
   let clipForm = { playerId: '', type: 'goals', url: '', note: '' };
+  let heartbeatTimer = null;
+  let lockBusy = false;
 
   const fmtDate = (iso) =>
     new Date(iso + 'T00:00:00').toLocaleDateString('en-US', {
@@ -131,6 +133,73 @@
     }
     seriesGames = loadSeriesForMatch(m);
     draft = loadDraftForMatch(m);
+  }
+
+  function canEditMatch() {
+    return !!(matchId && StatsHub.holdsEditLock(matchId));
+  }
+
+  function lockBannerHtml() {
+    if (!matchId) return '';
+    const lock = StatsHub.editLock(matchId);
+    const held = StatsHub.holdsEditLock(matchId);
+    const stale = lock ? StatsHub.isEditLockStale(lock) : true;
+    if (held) {
+      return `<div class="se-lock-banner mine" role="status">
+        <span>✏️ You hold the edit lock for this game — others can’t submit until you leave or go idle (~45s).</span>
+      </div>`;
+    }
+    if (lock && !stale) {
+      return `<div class="se-lock-banner theirs" role="status">
+        <span>🔒 <b>${lock.label}</b> is entering stats for this game. Fields are read-only.</span>
+        <button type="button" class="btn btn-ghost" id="se-take-lock">Take over</button>
+      </div>`;
+    }
+    if (lockBusy) {
+      return `<div class="se-lock-banner" role="status"><span>Acquiring edit lock…</span></div>`;
+    }
+    return `<div class="se-lock-banner" role="status">
+      <span>No active editor — <button type="button" class="btn btn-ghost" id="se-take-lock">Claim edit lock</button></span>
+    </div>`;
+  }
+
+  function syncHeartbeat() {
+    if (heartbeatTimer) {
+      clearInterval(heartbeatTimer);
+      heartbeatTimer = null;
+    }
+    if (!matchId || !StatsHub.holdsEditLock(matchId)) return;
+    heartbeatTimer = setInterval(() => {
+      StatsHub.heartbeatEditLock(matchId).catch(() => {});
+    }, 15_000);
+    StatsHub.heartbeatEditLock(matchId).catch(() => {});
+  }
+
+  async function claimLock({ force = false } = {}) {
+    if (!matchId) return;
+    lockBusy = true;
+    paint();
+    try {
+      await StatsHub.acquireEditLock(matchId, { force });
+      setMsg(force ? 'Took over edit lock' : 'Edit lock acquired', 'ok');
+    } catch (e) {
+      setMsg(e.message || String(e), 'err');
+    } finally {
+      lockBusy = false;
+      syncHeartbeat();
+      paint();
+    }
+  }
+
+  async function switchMatch(id) {
+    const prev = matchId;
+    if (prev && prev !== id) {
+      try { await StatsHub.releaseEditLock(prev); } catch (e) { /* ignore */ }
+    }
+    selectMatch(id);
+    syncHeartbeat();
+    if (!id) return;
+    await claimLock({ force: false });
   }
 
   function addPlayer(side, playerId) {
@@ -283,6 +352,7 @@
         <button type="button" class="btn btn-ghost" id="se-logout">Log out</button>
       </div>
       <p class="draft-msg ${msg.cls}">${msg.text}</p>
+      ${lockBannerHtml()}
 
       <section class="panel">
         <div class="panel-head"><h3>1 · Pick week &amp; game</h3></div>
@@ -368,15 +438,24 @@
 
     const syncSubmitButtons = () => {
       const ok = AdminAuth.isLoggedIn();
+      const editable = ok && canEditMatch();
       const hasSaved = !!(matchId && StatsHub.getResult(matchId));
       const hasBox = !!(matchId && (StatsHub.getResult(matchId)?.boxSavedAt || StatsHub.getResult(matchId)?.box?.length));
       const hasFilm = !!(matchId && typeof FilmHub !== 'undefined' && FilmHub.urlFor(matchId));
-      if ($('#se-save-series')) $('#se-save-series').disabled = !ok;
-      if ($('#se-save-box')) $('#se-save-box').disabled = !ok;
-      if ($('#se-clear')) $('#se-clear').disabled = !ok || !hasSaved;
-      if ($('#se-clear-box')) $('#se-clear-box').disabled = !ok || !hasBox;
-      if ($('#se-save-film')) $('#se-save-film').disabled = !ok;
-      if ($('#se-clear-film')) $('#se-clear-film').disabled = !ok || !hasFilm;
+      if ($('#se-save-series')) $('#se-save-series').disabled = !editable;
+      if ($('#se-save-box')) $('#se-save-box').disabled = !editable;
+      if ($('#se-clear')) $('#se-clear').disabled = !editable || !hasSaved;
+      if ($('#se-clear-box')) $('#se-clear-box').disabled = !editable || !hasBox;
+      if ($('#se-save-film')) $('#se-save-film').disabled = !editable;
+      if ($('#se-clear-film')) $('#se-clear-film').disabled = !editable || !hasFilm;
+      if ($('#se-clip-add')) $('#se-clip-add').disabled = !editable;
+
+      // Lock all match-entry controls when someone else holds the lock
+      root.querySelectorAll(
+        '.se-score, .se-num, #se-film-url, #se-clip-player, #se-clip-type, #se-clip-url, #se-clip-note, [data-add-side], .se-remove, .se-clip-remove'
+      ).forEach((el) => {
+        el.disabled = !editable;
+      });
     };
 
     $('#se-logout')?.addEventListener('click', () => {
@@ -388,6 +467,7 @@
     $('#se-save-film')?.addEventListener('click', async () => {
       try {
         if (!matchId) throw new Error('Select a match');
+        await StatsHub.assertEditLock(matchId);
         const url = ($('#se-film-url')?.value || '').trim();
         await FilmHub.setUrl(matchId, url);
         setMsg('Film link saved — live on Media now', 'ok');
@@ -399,6 +479,7 @@
     $('#se-clear-film')?.addEventListener('click', async () => {
       try {
         if (!matchId) throw new Error('Select a match');
+        await StatsHub.assertEditLock(matchId);
         if (!confirm('Remove the film link for this match?')) return;
         await FilmHub.clearUrl(matchId);
         setMsg('Film link cleared', 'ok');
@@ -454,18 +535,24 @@
 
     syncSubmitButtons();
 
-    $('#se-week')?.addEventListener('change', (e) => {
-      week = Number(e.target.value);
-      const list = matchesForWeek(week);
-      selectMatch(list[0]?.id || null);
-      setMsg('');
-      paint();
+    $('#se-take-lock')?.addEventListener('click', () => {
+      const lock = StatsHub.editLock(matchId);
+      const heldByOther = lock && !StatsHub.isEditLockStale(lock) && !StatsHub.holdsEditLock(matchId);
+      const force = !!heldByOther;
+      if (force && !confirm(`Take over from ${lock.label}? They will lose the edit lock.`)) return;
+      claimLock({ force });
     });
 
-    $('#se-match')?.addEventListener('change', (e) => {
-      selectMatch(e.target.value);
+    $('#se-week')?.addEventListener('change', async (e) => {
+      week = Number(e.target.value);
+      const list = matchesForWeek(week);
       setMsg('');
-      paint();
+      await switchMatch(list[0]?.id || null);
+    });
+
+    $('#se-match')?.addEventListener('change', async (e) => {
+      setMsg('');
+      await switchMatch(e.target.value);
     });
 
     const bindZeroClear = (inp, { max = null, onCommit } = {}) => {
@@ -653,9 +740,39 @@
   applyTheme();
   bindCriteriaModal();
   if (!AdminAuth.requireLogin('../admin/')) return;
-  Promise.all([DraftHub.init(), AttendanceHub.init(), StatsHub.init(), FilmHub.init()]).then(() => {
+
+  const releaseOnLeave = () => {
+    if (matchId) {
+      // best-effort; may not finish on unload
+      StatsHub.releaseEditLock(matchId);
+    }
+  };
+  window.addEventListener('pagehide', releaseOnLeave);
+  window.addEventListener('beforeunload', releaseOnLeave);
+
+  Promise.all([DraftHub.init(), AttendanceHub.init(), StatsHub.init(), FilmHub.init()]).then(async () => {
+    StatsHub.onChange(() => {
+      syncHeartbeat();
+      const active = document.activeElement;
+      const typing = active && root.contains(active)
+        && /^(INPUT|SELECT|TEXTAREA)$/.test(active.tagName);
+      if (typing && StatsHub.holdsEditLock(matchId)) {
+        // Keep focus while our heartbeat / lock refresh arrives
+        const host = root.querySelector('.se-lock-banner');
+        if (host) {
+          const tmp = document.createElement('div');
+          tmp.innerHTML = lockBannerHtml();
+          if (tmp.firstElementChild) host.replaceWith(tmp.firstElementChild);
+        }
+        return;
+      }
+      paint();
+    });
     FilmHub.onChange(() => paint());
-    paint();
+
+    if (week == null) week = weeks()[0] || 1;
+    const first = matchesForWeek(week)[0];
+    await switchMatch(first?.id || null);
   }).catch((e) => {
     root.innerHTML = `<p class="draft-msg err">${e.message || e}</p>`;
   });

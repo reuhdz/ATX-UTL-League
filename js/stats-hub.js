@@ -30,15 +30,21 @@ const StatsHub = (() => {
   let connected = false;
   let unsub = null;
   let unsubConn = null;
+  let unsubLocks = null;
   /** @type {Record<string, object>} */
   let results = {};
+  /** @type {Record<string, object>} */
+  let editLocks = {};
   /** @type {object[]} */
   let baseMatches = [];
   const listeners = new Set();
 
+  const LOCK_STALE_MS = 45_000;
+  let editSessionId = null;
+
   function emit() {
     listeners.forEach((fn) => {
-      try { fn({ results, mode, connectionError, connected }); } catch (e) { /* ignore */ }
+      try { fn({ results, editLocks, mode, connectionError, connected }); } catch (e) { /* ignore */ }
     });
   }
 
@@ -90,6 +96,169 @@ const StatsHub = (() => {
       role: s.role || null,
       at: Date.now(),
     };
+  }
+
+  function editLockSessionId() {
+    if (editSessionId) return editSessionId;
+    try {
+      editSessionId = sessionStorage.getItem('atxutl.statsEditSession');
+      if (!editSessionId) {
+        editSessionId = `s_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 10)}`;
+        sessionStorage.setItem('atxutl.statsEditSession', editSessionId);
+      }
+    } catch (e) {
+      editSessionId = `s_tmp_${Date.now().toString(36)}`;
+    }
+    return editSessionId;
+  }
+
+  function locksPath() {
+    return `matchEditLocks/${roomId()}`;
+  }
+
+  function locksLocalKey() {
+    return `atxutl.matchEditLocks.${roomId()}`;
+  }
+
+  function readLocksLocal() {
+    try {
+      const raw = localStorage.getItem(locksLocalKey());
+      return raw ? JSON.parse(raw) : {};
+    } catch (e) { return {}; }
+  }
+
+  function writeLocksLocal(map) {
+    try { localStorage.setItem(locksLocalKey(), JSON.stringify(map)); } catch (e) { /* ignore */ }
+  }
+
+  function normalizeEditLock(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const sessionId = String(raw.sessionId || '').trim();
+    const username = String(raw.username || '').trim();
+    if (!sessionId || !username) return null;
+    return {
+      sessionId,
+      username,
+      label: String(raw.label || username).trim() || username,
+      role: raw.role || null,
+      acquiredAt: Number(raw.acquiredAt) || null,
+      heartbeatAt: Number(raw.heartbeatAt) || Number(raw.acquiredAt) || null,
+    };
+  }
+
+  function normalizeLocksMap(raw) {
+    const out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    Object.keys(raw).forEach((id) => {
+      const n = normalizeEditLock(raw[id]);
+      if (n) out[id] = n;
+    });
+    return out;
+  }
+
+  function isEditLockStale(lock) {
+    if (!lock?.heartbeatAt) return true;
+    return (Date.now() - Number(lock.heartbeatAt)) > LOCK_STALE_MS;
+  }
+
+  function editLock(matchId) {
+    return matchId ? (editLocks[matchId] || null) : null;
+  }
+
+  function holdsEditLock(matchId) {
+    const lock = editLock(matchId);
+    return !!(lock && lock.sessionId === editLockSessionId() && !isEditLockStale(lock));
+  }
+
+  function buildLockPayload() {
+    const actor = actorFromSession();
+    const now = Date.now();
+    return {
+      sessionId: editLockSessionId(),
+      username: actor.username,
+      label: actor.label,
+      role: actor.role,
+      acquiredAt: now,
+      heartbeatAt: now,
+    };
+  }
+
+  async function acquireEditLock(matchId, { force = false } = {}) {
+    if (!matchId) throw new Error('Select a match');
+    const payload = buildLockPayload();
+
+    if (mode === 'firebase' && db) {
+      const ref = db.ref(`${locksPath()}/${matchId}`);
+      const tx = await ref.transaction((cur) => {
+        const existing = normalizeEditLock(cur);
+        if (force || !existing || isEditLockStale(existing) || existing.sessionId === payload.sessionId) {
+          return payload;
+        }
+        return; // abort — someone else holds a fresh lock
+      });
+      if (!tx.committed) {
+        const holder = normalizeEditLock(
+          (tx.snapshot && typeof tx.snapshot.val === 'function') ? tx.snapshot.val() : editLocks[matchId]
+        );
+        const name = holder?.label || 'another captain';
+        throw new Error(`${name} is already entering stats for this game`);
+      }
+      const next = normalizeEditLock(
+        (tx.snapshot && typeof tx.snapshot.val === 'function') ? tx.snapshot.val() : null
+      ) || payload;
+      editLocks = { ...editLocks, [matchId]: next };
+      emit();
+      return next;
+    }
+
+    const existing = normalizeEditLock(editLocks[matchId]);
+    if (!force && existing && !isEditLockStale(existing) && existing.sessionId !== payload.sessionId) {
+      throw new Error(`${existing.label} is already entering stats for this game`);
+    }
+    editLocks = { ...editLocks, [matchId]: payload };
+    writeLocksLocal(editLocks);
+    emit();
+    return payload;
+  }
+
+  async function heartbeatEditLock(matchId) {
+    if (!matchId || !holdsEditLock(matchId)) return null;
+    const prev = editLock(matchId);
+    const next = { ...prev, heartbeatAt: Date.now() };
+    if (mode === 'firebase' && db) {
+      await db.ref(`${locksPath()}/${matchId}/heartbeatAt`).set(next.heartbeatAt);
+    }
+    editLocks = { ...editLocks, [matchId]: next };
+    if (mode !== 'firebase') writeLocksLocal(editLocks);
+    return next;
+  }
+
+  async function releaseEditLock(matchId) {
+    if (!matchId) return;
+    const lock = editLock(matchId);
+    if (!lock || lock.sessionId !== editLockSessionId()) return;
+    if (mode === 'firebase' && db) {
+      const ref = db.ref(`${locksPath()}/${matchId}`);
+      await ref.transaction((cur) => {
+        const existing = normalizeEditLock(cur);
+        if (existing && existing.sessionId === editLockSessionId()) return null;
+        return cur;
+      });
+    }
+    const next = { ...editLocks };
+    delete next[matchId];
+    editLocks = next;
+    if (mode !== 'firebase') writeLocksLocal(editLocks);
+    emit();
+  }
+
+  async function assertEditLock(matchId) {
+    if (holdsEditLock(matchId)) return true;
+    await acquireEditLock(matchId);
+    if (!holdsEditLock(matchId)) {
+      throw new Error('Could not get the edit lock for this game — try again');
+    }
+    return true;
   }
 
   function normalizeActor(raw) {
@@ -308,17 +477,23 @@ const StatsHub = (() => {
         connectionError = `Match results sync error: ${err?.message || err}`;
         emit();
       });
+      unsubLocks = db.ref(locksPath()).on('value', (snap) => {
+        editLocks = normalizeLocksMap(snap.val());
+        emit();
+      }, () => { /* lock listen failures shouldn't block stats */ });
       try {
         await ref.once('value');
       } catch (e) {
         connectionError = `Cannot read match results: ${e.message || e}`;
         mode = 'local';
         results = normalizeMap(readLocal());
+        editLocks = normalizeLocksMap(readLocksLocal());
         applyToDB();
         emit();
       }
     } else {
       results = normalizeMap(readLocal());
+      editLocks = normalizeLocksMap(readLocksLocal());
       applyToDB();
       emit();
     }
@@ -351,6 +526,7 @@ const StatsHub = (() => {
   /** Save series scores only (does not wipe existing box/lineups). */
   async function saveSeries(matchId, games, pin) {
     if (!checkMasterPin(pin)) throw new Error('Captain or admin login required to save series');
+    await assertEditLock(matchId);
     const match = (window.DB?.matches || []).find((m) => m.id === matchId);
     if (!match) throw new Error('Unknown match');
 
@@ -380,6 +556,7 @@ const StatsHub = (() => {
   /** Save individual box scores / lineups (keeps existing series games). */
   async function saveBox(matchId, payload, pin) {
     if (!checkMasterPin(pin)) throw new Error('Captain or admin login required to save player stats');
+    await assertEditLock(matchId);
     const match = (window.DB?.matches || []).find((m) => m.id === matchId);
     if (!match) throw new Error('Unknown match');
 
@@ -415,6 +592,7 @@ const StatsHub = (() => {
 
   async function clearMatch(matchId, pin) {
     if (!checkMasterPin(pin)) throw new Error('Captain or admin login required to clear');
+    await assertEditLock(matchId);
     if (mode === 'firebase' && db) {
       await db.ref(`matchResults/${roomId()}/${matchId}`).remove();
       return;
@@ -430,6 +608,7 @@ const StatsHub = (() => {
   /** Clear individual box scores / lineups; keep series scores. */
   async function clearBox(matchId, pin) {
     if (!checkMasterPin(pin)) throw new Error('Captain or admin login required to clear player stats');
+    await assertEditLock(matchId);
     const prev = results[matchId];
     if (!prev) throw new Error('No saved stats for this match');
     if (!prev.games?.length) {
@@ -487,13 +666,15 @@ const StatsHub = (() => {
   }
 
   function status() {
-    return { results, mode, connected, connectionError, fields: STAT_FIELDS };
+    return { results, editLocks, mode, connected, connectionError, fields: STAT_FIELDS };
   }
 
   return {
     init, onChange, status, getResult, saveSeries, saveBox, clearMatch, clearBox,
     checkMasterPin, emptyLine, seriesFromGames, fields: STAT_FIELDS,
     normalizeUrl, clipsForPlayer, clipCountsForPlayer,
+    editLock, holdsEditLock, isEditLockStale, acquireEditLock, releaseEditLock,
+    heartbeatEditLock, assertEditLock, editLockSessionId, LOCK_STALE_MS,
   };
 })();
 
