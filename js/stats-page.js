@@ -93,22 +93,50 @@
     return { homeLineup, awayLineup, box, events: [] };
   }
 
+  /** Add Attendance "In" roster players into the draft without removing anyone already listed. */
+  function mergeAttendanceIntoDraft(match, d) {
+    if (!match || !d) return false;
+    let changed = false;
+    const addSide = (key, otherKey, ids) => {
+      ids.forEach((id) => {
+        if (d[key].includes(id) || d[otherKey].includes(id)) return;
+        d[key].push(id);
+        if (!d.box[id]) d.box[id] = StatsHub.emptyLine(id);
+        changed = true;
+      });
+    };
+    addSide('homeLineup', 'awayLineup', playersInForDate(match.date, match.home));
+    addSide('awayLineup', 'homeLineup', playersInForDate(match.date, match.away));
+    return changed;
+  }
+
+  function syncLineupsFromAttendance() {
+    const match = currentMatch();
+    if (!match || !draft) return false;
+    return mergeAttendanceIntoDraft(match, draft);
+  }
+
   function loadDraftForMatch(match) {
     const saved = StatsHub.getResult(match.id);
+    let d;
     if (saved?.homeLineup?.length || saved?.awayLineup?.length || saved?.box?.length || saved?.events?.length) {
       const box = {};
       (saved.box || []).forEach((b) => { box[b.playerId] = { ...b }; });
       [...(saved.homeLineup || []), ...(saved.awayLineup || [])].forEach((id) => {
         if (!box[id]) box[id] = StatsHub.emptyLine(id);
       });
-      return {
+      d = {
         homeLineup: [...(saved.homeLineup || [])],
         awayLineup: [...(saved.awayLineup || [])],
         box,
         events: (saved.events || []).map((e) => ({ ...e })),
       };
+    } else {
+      d = buildLineupsFromAttendance(match);
     }
-    return buildLineupsFromAttendance(match);
+    // Always pull in newly marked In players (saved lineups used to freeze the form).
+    mergeAttendanceIntoDraft(match, d);
+    return d;
   }
 
   function loadSeriesForMatch(match) {
@@ -737,6 +765,12 @@
       lastClaimSig = next;
       paint();
     });
+    // Keep individual-stats rows in sync when attendance or roster assignments update.
+    const refreshLineups = () => {
+      if (syncLineupsFromAttendance()) paint();
+    };
+    AttendanceHub.onChange(refreshLineups);
+    DraftHub.onChange(refreshLineups);
     if (week == null) week = weeks()[0] || 1;
     const first = matchesForWeek(week)[0];
     lastClaimSig = claimSig();
