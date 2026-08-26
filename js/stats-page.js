@@ -558,7 +558,7 @@
         try {
           await ClaimHub.claim(matchId, claimMetaForCurrent());
           lastClaimSig = claimSig();
-          setMsg('Claimed — week/game logged; others’ save buttons stay off until you Release', 'ok');
+          setMsg(`Claimed at ${ClaimHub.formatClaimedAt(Date.now())} — others locked out until Release (or 16h)`, 'ok');
           paint();
         } catch (e) {
           setMsg(e.message || String(e), 'err');
