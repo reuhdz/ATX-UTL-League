@@ -161,6 +161,22 @@
     draft = loadDraftForMatch(m);
   }
 
+  function claimMetaForCurrent() {
+    const m = currentMatch();
+    if (!m) return {};
+    return {
+      week: m.round,
+      round: m.round,
+      home: m.home,
+      away: m.away,
+    };
+  }
+
+  function claimAllowsEdit() {
+    if (!matchId || typeof ClaimHub === 'undefined') return true;
+    return ClaimHub.canEdit(matchId);
+  }
+
   function claimBannerHtml() {
     if (!matchId || typeof ClaimHub === 'undefined') return '';
     const mine = ClaimHub.isMine(matchId);
@@ -168,8 +184,8 @@
     if (mine) {
       return `<div class="se-claim-banner mine" role="status">
         <div class="se-claim-copy">
-          <strong>You’re marked as editing</strong>
-          <span class="muted small">Others can still save — this is a heads-up only</span>
+          <strong>You claimed this game</strong>
+          <span class="muted small">Week ${claim?.week ?? week} · only you can save until Release</span>
         </div>
         <button type="button" class="btn btn-ghost" id="se-claim-release">Release</button>
       </div>`;
@@ -177,16 +193,15 @@
     if (claim) {
       return `<div class="se-claim-banner theirs" role="status">
         <div class="se-claim-copy">
-          <strong>${claim.label} is editing this game</strong>
-          <span class="muted small">You can still enter and save stats</span>
+          <strong>${claim.label} claimed Week ${claim.week ?? '—'} · this game</strong>
+          <span class="muted small">Save buttons are disabled until they Release</span>
         </div>
-        <button type="button" class="btn btn-ghost" id="se-claim">Claim instead</button>
       </div>`;
     }
     return `<div class="se-claim-banner" role="status">
       <div class="se-claim-copy">
         <strong>Not claimed</strong>
-        <span class="muted small">Optional — lets others know you’re working this game</span>
+        <span class="muted small">Claim this week/game so others can’t overwrite your entry</span>
       </div>
       <button type="button" class="btn" id="se-claim">Claim</button>
     </div>`;
@@ -195,7 +210,7 @@
   function claimSig() {
     if (!matchId || typeof ClaimHub === 'undefined') return '';
     const c = ClaimHub.getClaim(matchId);
-    return c ? `${c.sessionId}|${c.username}` : '';
+    return c ? `${c.username}|${c.claimedAt}|${c.week || ''}` : '';
   }
 
   let lastClaimSig = '';
@@ -442,7 +457,7 @@
       ${clipsPanelHtml()}` : ''}`;
 
     const syncSubmitButtons = () => {
-      const ok = AdminAuth.isLoggedIn();
+      const ok = AdminAuth.isLoggedIn() && claimAllowsEdit();
       const hasSaved = !!(matchId && StatsHub.getResult(matchId));
       const hasBox = !!(matchId && (StatsHub.getResult(matchId)?.boxSavedAt || StatsHub.getResult(matchId)?.box?.length));
       const hasFilm = !!(matchId && typeof FilmHub !== 'undefined' && FilmHub.urlFor(matchId));
@@ -453,6 +468,10 @@
       if ($('#se-save-film')) $('#se-save-film').disabled = !ok;
       if ($('#se-clear-film')) $('#se-clear-film').disabled = !ok || !hasFilm;
       if ($('#se-clip-add')) $('#se-clip-add').disabled = !ok;
+      // Soft-disable entry fields when another user holds the claim
+      const locked = AdminAuth.isLoggedIn() && !claimAllowsEdit();
+      $$('.se-num, .se-score, #se-film-url, [data-add-side], .se-remove, #se-clip-player, #se-clip-type, #se-clip-url, #se-clip-note, .se-clip-remove')
+        .forEach((el) => { el.disabled = locked; });
     };
 
     $('#se-logout')?.addEventListener('click', () => {
@@ -464,6 +483,7 @@
     $('#se-save-film')?.addEventListener('click', async () => {
       try {
         if (!matchId) throw new Error('Select a match');
+        ClaimHub.assertCanEdit(matchId);
         const url = ($('#se-film-url')?.value || '').trim();
         await FilmHub.setUrl(matchId, url);
         setMsg('Film link saved — live on Media now', 'ok');
@@ -475,6 +495,7 @@
     $('#se-clear-film')?.addEventListener('click', async () => {
       try {
         if (!matchId) throw new Error('Select a match');
+        ClaimHub.assertCanEdit(matchId);
         if (!confirm('Remove the film link for this match?')) return;
         await FilmHub.clearUrl(matchId);
         setMsg('Film link cleared', 'ok');
@@ -499,6 +520,7 @@
     $('#se-clip-add')?.addEventListener('click', () => {
       syncClipFormFromDom();
       try {
+        ClaimHub.assertCanEdit(matchId);
         if (!clipForm.playerId) throw new Error('Select a player');
         if (!FIELDS.includes(clipForm.type)) throw new Error('Select a stat');
         const url = StatsHub.normalizeUrl(clipForm.url);
@@ -533,9 +555,9 @@
     const bindClaimButtons = () => {
       $('#se-claim')?.addEventListener('click', async () => {
         try {
-          await ClaimHub.claim(matchId);
+          await ClaimHub.claim(matchId, claimMetaForCurrent());
           lastClaimSig = claimSig();
-          setMsg('Claimed — others can see you’re editing (they can still save)', 'ok');
+          setMsg('Claimed — week/game logged; others’ save buttons stay off until you Release', 'ok');
           paint();
         } catch (e) {
           setMsg(e.message || String(e), 'err');
@@ -545,7 +567,7 @@
         try {
           await ClaimHub.release(matchId);
           lastClaimSig = claimSig();
-          setMsg('Claim released', 'ok');
+          setMsg('Claim released — game is open again', 'ok');
           paint();
         } catch (e) {
           setMsg(e.message || String(e), 'err');
@@ -637,6 +659,7 @@
 
     $('#se-save-series')?.addEventListener('click', async () => {
       try {
+        ClaimHub.assertCanEdit(matchId);
         const games = seriesGames.map((g) => ({
           home: Math.min(5, Math.max(0, Number(g.home) || 0)),
           away: Math.min(5, Math.max(0, Number(g.away) || 0)),
@@ -652,6 +675,7 @@
 
     $('#se-save-box')?.addEventListener('click', async () => {
       try {
+        ClaimHub.assertCanEdit(matchId);
         const homeLineup = [...draft.homeLineup];
         const awayLineup = [...draft.awayLineup];
         const box = [...new Set([...homeLineup, ...awayLineup])].map((id) => {
@@ -675,6 +699,7 @@
     $('#se-clear')?.addEventListener('click', async () => {
       if (!confirm('Clear all saved series + box scores for this match?')) return;
       try {
+        ClaimHub.assertCanEdit(matchId);
         await StatsHub.clearMatch(matchId);
         selectMatch(matchId);
         setMsg('Match cleared', 'ok');
@@ -688,6 +713,7 @@
     $('#se-clear-box')?.addEventListener('click', async () => {
       if (!confirm('Clear individual stats for this match? Series scores will be kept.')) return;
       try {
+        ClaimHub.assertCanEdit(matchId);
         await StatsHub.clearBox(matchId);
         const m = currentMatch();
         draft = m ? buildLineupsFromAttendance(m) : null;
