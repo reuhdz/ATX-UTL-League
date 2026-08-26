@@ -8,10 +8,11 @@
      claimedAt
    }
    Ownership is the logged-in username. Non-owners cannot save that game.
-   Claim stays until the claimer clicks Release.
+   Claims older than 16 hours are treated as expired and cleared.
    ============================================================================ */
 
 const ClaimHub = (() => {
+  const CLAIM_MAX_AGE_MS = 16 * 60 * 60 * 1000; // 16 hours from claimedAt
   const cfg = () => window.DRAFT_CONFIG || {};
   const fbCfg = () => window.FIREBASE_CONFIG || {};
   const roomId = () => cfg().roomId || 'season5';
@@ -24,6 +25,8 @@ const ClaimHub = (() => {
   /** @type {Record<string, object>} */
   let claimsByMatch = Object.create(null);
   const listeners = new Set();
+  /** @type {Set<string>} */
+  const expiring = new Set();
 
   function emit() {
     listeners.forEach((fn) => {
@@ -115,6 +118,59 @@ const ClaimHub = (() => {
     return out;
   }
 
+  function isStale(claim) {
+    if (!claim || !claim.claimedAt) return true;
+    return (Date.now() - Number(claim.claimedAt)) > CLAIM_MAX_AGE_MS;
+  }
+
+  function formatClaimedAt(ts) {
+    const n = Number(ts);
+    if (!n) return '';
+    try {
+      return new Date(n).toLocaleString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+      });
+    } catch (e) {
+      return new Date(n).toISOString();
+    }
+  }
+
+  async function removeClaimRecord(matchId) {
+    const id = String(matchId);
+    if (mode === 'firebase' && db) {
+      await db.ref(`${path()}/${id}`).remove();
+      return;
+    }
+    if (!claimsByMatch[id]) return;
+    const next = { ...claimsByMatch };
+    delete next[id];
+    claimsByMatch = next;
+    writeLocal(claimsByMatch);
+    emit();
+  }
+
+  /** Clear a claim older than 16h (fire-and-forget; deduped per match). */
+  function expireIfStale(matchId) {
+    const id = String(matchId);
+    const claim = claimsByMatch[id];
+    if (!claim || !isStale(claim) || expiring.has(id)) return false;
+    expiring.add(id);
+    removeClaimRecord(id).catch((e) => {
+      console.warn('ClaimHub expire failed', e);
+    }).finally(() => {
+      expiring.delete(id);
+    });
+    return true;
+  }
+
+  function sweepStale() {
+    Object.keys(claimsByMatch).forEach((id) => { expireIfStale(id); });
+  }
+
   async function init() {
     if (ready) return { mode };
     ensureSessionId();
@@ -135,12 +191,14 @@ const ClaimHub = (() => {
     if (mode === 'firebase') {
       db.ref(path()).on('value', (snap) => {
         claimsByMatch = normalizeMap(snap.val());
+        sweepStale();
         emit();
       }, (err) => {
         console.warn('ClaimHub sync error', err);
       });
     } else {
       claimsByMatch = normalizeMap(readLocal());
+      sweepStale();
       emit();
     }
 
@@ -148,11 +206,19 @@ const ClaimHub = (() => {
     return { mode };
   }
 
+  /** Active (non-stale) claim, or null. Stale claims are cleared. */
   function getClaim(matchId) {
-    return claimsByMatch[String(matchId)] || null;
+    const id = String(matchId);
+    const claim = claimsByMatch[id] || null;
+    if (!claim) return null;
+    if (isStale(claim)) {
+      expireIfStale(id);
+      return null;
+    }
+    return claim;
   }
 
-  /** True when the logged-in username owns the claim for this match. */
+  /** True when the logged-in username owns the active claim for this match. */
   function isMine(matchId) {
     const claim = getClaim(matchId);
     const who = actor();
@@ -160,9 +226,9 @@ const ClaimHub = (() => {
   }
 
   /**
-   * Unclaimed → anyone logged in may edit.
+   * Unclaimed / expired → anyone logged in may edit.
    * Claimed by me → edit.
-   * Claimed by someone else → no edit (only they can Release).
+   * Claimed by someone else (fresh) → no edit.
    */
   function canEdit(matchId) {
     const claim = getClaim(matchId);
@@ -174,7 +240,8 @@ const ClaimHub = (() => {
     if (canEdit(matchId)) return;
     const claim = getClaim(matchId);
     const name = claim?.label || claim?.username || 'another captain';
-    throw new Error(`${name} claimed this game — ask them to Release`);
+    const when = claim?.claimedAt ? ` (since ${formatClaimedAt(claim.claimedAt)})` : '';
+    throw new Error(`${name} claimed this game${when} — ask them to Release`);
   }
 
   /**
@@ -188,7 +255,7 @@ const ClaimHub = (() => {
 
     const existing = getClaim(matchId);
     if (existing && !sameUser(existing.username, who.username)) {
-      throw new Error(`${existing.label || existing.username} already claimed this game`);
+      throw new Error(`${existing.label || existing.username} already claimed this game at ${formatClaimedAt(existing.claimedAt)}`);
     }
 
     const payload = {
@@ -226,19 +293,21 @@ const ClaimHub = (() => {
     if (!who || !sameUser(claim.username, who.username)) {
       throw new Error('Only the claimer can release this game');
     }
-    if (mode === 'firebase' && db) {
-      await db.ref(`${path()}/${matchId}`).remove();
-      return;
-    }
-    const next = { ...claimsByMatch };
-    delete next[String(matchId)];
-    claimsByMatch = next;
-    writeLocal(claimsByMatch);
-    emit();
+    await removeClaimRecord(matchId);
   }
 
   return {
-    init, onChange, getClaim, isMine, canEdit, assertCanEdit, claim, release,
+    init,
+    onChange,
+    getClaim,
+    isMine,
+    canEdit,
+    assertCanEdit,
+    claim,
+    release,
+    isStale,
+    formatClaimedAt,
+    CLAIM_MAX_AGE_MS,
   };
 })();
 

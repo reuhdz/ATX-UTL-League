@@ -181,11 +181,12 @@
     if (!matchId || typeof ClaimHub === 'undefined') return '';
     const mine = ClaimHub.isMine(matchId);
     const claim = ClaimHub.getClaim(matchId);
+    const when = claim?.claimedAt ? ClaimHub.formatClaimedAt(claim.claimedAt) : '';
     if (mine) {
       return `<div class="se-claim-banner mine" role="status">
         <div class="se-claim-copy">
           <strong>You claimed this game</strong>
-          <span class="muted small">Week ${claim?.week ?? week} · only you can save until Release</span>
+          <span class="muted small">Week ${claim?.week ?? week}${when ? ` · claimed ${when}` : ''} · auto-clears after 16h · Release when done</span>
         </div>
         <button type="button" class="btn btn-ghost" id="se-claim-release">Release</button>
       </div>`;
@@ -194,14 +195,14 @@
       return `<div class="se-claim-banner theirs" role="status">
         <div class="se-claim-copy">
           <strong>${claim.label} claimed Week ${claim.week ?? '—'} · this game</strong>
-          <span class="muted small">Save buttons are disabled until they Release</span>
+          <span class="muted small">${when ? `Claimed ${when} · ` : ''}Save buttons disabled until they Release (or 16h pass)</span>
         </div>
       </div>`;
     }
     return `<div class="se-claim-banner" role="status">
       <div class="se-claim-copy">
         <strong>Not claimed</strong>
-        <span class="muted small">Claim this week/game so others can’t overwrite your entry</span>
+        <span class="muted small">Claim this week/game so others can’t overwrite your entry (expires after 16h)</span>
       </div>
       <button type="button" class="btn" id="se-claim">Claim</button>
     </div>`;
