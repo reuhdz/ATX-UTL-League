@@ -8,7 +8,7 @@
      claimedAt
    }
    Ownership is the logged-in username. Non-owners cannot save that game.
-   Claim stays until Release (admin can take over if stuck).
+   Claim stays until the claimer clicks Release.
    ============================================================================ */
 
 const ClaimHub = (() => {
