@@ -161,9 +161,49 @@
     draft = loadDraftForMatch(m);
   }
 
+  function claimBannerHtml() {
+    if (!matchId || typeof ClaimHub === 'undefined') return '';
+    const mine = ClaimHub.isMine(matchId);
+    const claim = ClaimHub.getClaim(matchId);
+    if (mine) {
+      return `<div class="se-claim-banner mine" role="status">
+        <div class="se-claim-copy">
+          <strong>You’re marked as editing</strong>
+          <span class="muted small">Others can still save — this is a heads-up only</span>
+        </div>
+        <button type="button" class="btn btn-ghost" id="se-claim-release">Release</button>
+      </div>`;
+    }
+    if (claim) {
+      return `<div class="se-claim-banner theirs" role="status">
+        <div class="se-claim-copy">
+          <strong>${claim.label} is editing this game</strong>
+          <span class="muted small">You can still enter and save stats</span>
+        </div>
+        <button type="button" class="btn btn-ghost" id="se-claim">Claim instead</button>
+      </div>`;
+    }
+    return `<div class="se-claim-banner" role="status">
+      <div class="se-claim-copy">
+        <strong>Not claimed</strong>
+        <span class="muted small">Optional — lets others know you’re working this game</span>
+      </div>
+      <button type="button" class="btn" id="se-claim">Claim</button>
+    </div>`;
+  }
+
+  function claimSig() {
+    if (!matchId || typeof ClaimHub === 'undefined') return '';
+    const c = ClaimHub.getClaim(matchId);
+    return c ? `${c.sessionId}|${c.username}` : '';
+  }
+
+  let lastClaimSig = '';
+
   function switchMatch(id) {
     selectMatch(id);
     setMsg('');
+    lastClaimSig = claimSig();
     paint();
   }
 
@@ -317,6 +357,7 @@
         <button type="button" class="btn btn-ghost" id="se-logout">Log out</button>
       </div>
       <p class="draft-msg ${msg.cls}">${msg.text}</p>
+      ${claimBannerHtml()}
 
       <section class="panel">
         <div class="panel-head"><h3>1 · Pick week &amp; game</h3></div>
@@ -488,6 +529,30 @@
     });
 
     syncSubmitButtons();
+
+    const bindClaimButtons = () => {
+      $('#se-claim')?.addEventListener('click', async () => {
+        try {
+          await ClaimHub.claim(matchId);
+          lastClaimSig = claimSig();
+          setMsg('Claimed — others can see you’re editing (they can still save)', 'ok');
+          paint();
+        } catch (e) {
+          setMsg(e.message || String(e), 'err');
+        }
+      });
+      $('#se-claim-release')?.addEventListener('click', async () => {
+        try {
+          await ClaimHub.release(matchId);
+          lastClaimSig = claimSig();
+          setMsg('Claim released', 'ok');
+          paint();
+        } catch (e) {
+          setMsg(e.message || String(e), 'err');
+        }
+      });
+    };
+    bindClaimButtons();
 
     $('#se-week')?.addEventListener('change', async (e) => {
       week = Number(e.target.value);
@@ -685,9 +750,21 @@
   bindCriteriaModal();
   if (!AdminAuth.requireLogin('../admin/')) return;
 
-  Promise.all([DraftHub.init(), AttendanceHub.init(), StatsHub.init(), FilmHub.init()]).then(() => {
+  Promise.all([
+    DraftHub.init(),
+    AttendanceHub.init(),
+    StatsHub.init(),
+    FilmHub.init(),
+    ClaimHub.init(),
+  ]).then(() => {
     StatsHub.onChange(() => paint());
     FilmHub.onChange(() => paint());
+    ClaimHub.onChange(() => {
+      const next = claimSig();
+      if (next === lastClaimSig) return;
+      lastClaimSig = next;
+      paint();
+    });
     // Keep individual-stats rows in sync when attendance or roster assignments update.
     const refreshLineups = () => {
       if (syncLineupsFromAttendance()) paint();
@@ -696,6 +773,7 @@
     DraftHub.onChange(refreshLineups);
     if (week == null) week = weeks()[0] || 1;
     const first = matchesForWeek(week)[0];
+    lastClaimSig = claimSig();
     switchMatch(first?.id || null);
   }).catch((e) => {
     root.innerHTML = `<p class="draft-msg err">${e.message || e}</p>`;

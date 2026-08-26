@@ -33,6 +33,23 @@ function playerLink(id, label) {
   return `<button class="plink" data-player="${id}">${label || p.name}</button>`;
 }
 
+function playerPosLabel(p) {
+  if (!p) return '';
+  if (p.pos) return p.pos;
+  return DB.positionOf(p) || '';
+}
+function posTag(p) {
+  const pos = playerPosLabel(p);
+  return pos ? `<span class="pos-tag">${pos}</span>` : '<span class="muted">—</span>';
+}
+function posSuffix(p) {
+  const pos = playerPosLabel(p);
+  return pos ? ` · ${pos}` : '';
+}
+function positionInfoHtml() {
+  return `<span class="gl"><b>How position is calculated</b> — ${DB.position.describe}</span>`;
+}
+
 /** Media game-film folder slug/href (same as Media → Film cards). */
 function matchFilmSlug(m) {
   if (!m || m.round == null || !m.home || !m.away) return '';
@@ -444,7 +461,7 @@ function renderTeamsRoster() {
   const careerRated = DB.ratedCareerPlayers();
 
   const colsFor = (view) => [
-    ['rating', 'Rating'], ['name', 'Name'],
+    ['rating', 'Rating'], ['name', 'Name'], ['pos', 'Pos'],
     ...(view === 'season5' ? [['teamId', 'Team']] : []),
     ['goals', 'G'], ['assists', 'A'], ['steals', 'S'], ['blocks', 'B'], ['turnovers', 'TO'],
     ['swimOffAttempts', 'SOA'], ['swimOffs', 'SO'], ['shots', 'SH'], ['matches', 'MP'],
@@ -481,13 +498,16 @@ function renderTeamsRoster() {
     $('#roster-head').innerHTML = `<tr>${cols.map(([k, l]) => {
       const sorted = k === rosterSort.key
         ? (rosterSort.dir === 1 ? ' sorted-asc' : ' sorted-desc') : '';
-      return `<th data-key="${k}" class="sortable${sorted}">${l}${k === 'rating' ? ' ' + infoIcon(ratingInfoHtml()) : ''}</th>`;
+      const tip = k === 'rating' ? ' ' + infoIcon(ratingInfoHtml())
+        : k === 'pos' ? ' ' + infoIcon(positionInfoHtml()) : '';
+      return `<th data-key="${k}" class="sortable${sorted}">${l}${tip}</th>`;
     }).join('')}</tr>`;
 
     $('#roster-body').innerHTML = rows.map((p) => `
       <tr>
         <td>${p.matches ? `<span class="rating-badge">${p.rating}</span>` : '<span class="muted">—</span>'}</td>
         <td class="strong">${playerLink(p.playerId)}</td>
+        <td>${posTag(p)}</td>
         ${seasonView ? `<td>${teamPill(p.teamId)}</td>` : ''}
         <td>${p.goals}</td><td>${p.assists}</td><td>${p.steals}</td>
         <td>${p.blocks}</td><td>${p.turnovers}</td>
@@ -531,11 +551,15 @@ function renderTeamsRoster() {
               <span>🧱 ${tt.blocks}</span><span>🏁 ${tt.swimOffAttempts || 0}/${tt.swimOffs} SO</span><span>🏹 ${tt.shots} SH</span>
             </div>
             <ul class="roster-mini">
-              ${roster.map((p) => `
+              ${roster.map((p) => {
+                const rated = seasonRated.find((r) => r.playerId === p.id);
+                return `
                 <li>
                   <span class="rm-name">${playerLink(p.id)}${p.name === t.captain ? ' <span class="cap">C</span>' : ''}</span>
+                  <span class="rm-pos">${rated ? posTag(rated) : '<span class="muted">—</span>'}</span>
                   <span class="rm-goals">${totals[p.id].goals}G</span>
-                </li>`).join('')}
+                </li>`;
+              }).join('')}
             </ul>
             <div class="team-next">${next ? `Next: ${fmtDate(next.date)} vs ${DB.teamName(next.home === t.id ? next.away : next.home)}` : 'Season complete'}</div>
           </section>`;
@@ -760,7 +784,7 @@ function drawSpotlight() {
         <div class="spot-avatar" style="--tc:${teamColor(p.teamId)}">${p.name[0]}</div>
         <div>
           <h4>${playerLink(p.playerId)}</h4>
-          <p class="muted small">${teamBadge(p.teamId)}${att != null ? ` · ${att}% avail.` : ''}</p>
+          <p class="muted small">${teamBadge(p.teamId)}${posSuffix(p)}${att != null ? ` · ${att}% avail.` : ''}</p>
         </div>
         <div class="spot-rating">${p.matches ? p.rating : '—'}<small>rating</small></div>
       </div>
@@ -1178,7 +1202,7 @@ function openProfile(id) {
         <div class="prof-avatar" style="--tc:${teamColor(p.teamId)}">${p.name[0]}</div>
         <div>
           <h2>${p.name}${DB.isSeason5(p.playerId) ? ' <span class="s5-tag">S5</span>' : ''}</h2>
-          <p class="muted">${DB.isSeason5(p.playerId) ? teamBadge(p.teamId) : 'ATX roster'}${att != null ? ` · ${att}% availability` : ''}</p>
+          <p class="muted">${DB.isSeason5(p.playerId) ? teamBadge(p.teamId) : 'ATX roster'}${posSuffix(p)}${att != null ? ` · ${att}% availability` : ''}</p>
         </div>
       </div>
       <div class="prof-rating">${p.matches ? p.rating : '—'}<small>rating</small></div>

@@ -78,6 +78,14 @@ const FAQ = [
       'Exact weights are on the Teams & Roster tab.',
   },
   {
+    q: 'How is player position determined?',
+    a:
+      'Position is derived from season box scores, not assigned. ' +
+      'Striker leans on goals/shots, Playmaker on assists/swim-off wins, Defender on blocks/steals. ' +
+      'If the top two role scores are within 15%, both show as a combo (e.g. Striker/Defender). ' +
+      'It updates automatically when new match stats are saved.',
+  },
+  {
     q: 'Do I need freediving experience to play?',
     a:
       'No — clubs teach comfort and breath-hold progressively. Never train breath-holding ' +

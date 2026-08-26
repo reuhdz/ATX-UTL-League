@@ -31,6 +31,51 @@ const RATING = {
     'player with only one or two games can’t top the table on a fluke.',
 };
 
+/* ---- Derived position (from season box scores; updates as new games land) - */
+const POSITION = {
+  prior: 2,
+  /** If #2 score is within this fraction of #1, show combo (e.g. Striker/Defender). */
+  utilityMargin: 0.15,
+  describe:
+    'Position is derived from season box scores (not assigned). ' +
+    'Striker ← Goals×3 + Shots + Assists; Playmaker ← Assists×3 + Swim-off wins; ' +
+    'Defender ← Blocks×3 + Steals×1.5 — each divided by (Matches + 2). ' +
+    'Highest score wins; if the top two are within 15%, both show as a combo (e.g. Striker/Defender).',
+};
+
+function derivePosition(t) {
+  const mp = Number(t?.matches) || 0;
+  if (mp <= 0) {
+    return { label: '', primary: '', secondary: '', scores: { Striker: 0, Playmaker: 0, Defender: 0 } };
+  }
+  const denom = mp + POSITION.prior;
+  const scores = {
+    Striker: ((t.goals || 0) * 3 + (t.shots || 0) + (t.assists || 0)) / denom,
+    Playmaker: ((t.assists || 0) * 3 + (t.swimOffs || 0)) / denom,
+    Defender: ((t.blocks || 0) * 3 + (t.steals || 0) * 1.5) / denom,
+  };
+  const ranked = Object.keys(scores)
+    .map((name) => ({ name, score: scores[name] }))
+    .sort((a, b) => b.score - a.score || a.name.localeCompare(b.name));
+  const top = ranked[0];
+  const second = ranked[1];
+  if (!top || top.score <= 0) {
+    return { label: '', primary: '', secondary: '', scores };
+  }
+  const close = second
+    && top.score > 0
+    && second.score / top.score >= (1 - POSITION.utilityMargin);
+  if (close) {
+    return {
+      label: `${top.name}/${second.name}`,
+      primary: top.name,
+      secondary: second.name,
+      scores,
+    };
+  }
+  return { label: top.name, primary: top.name, secondary: '', scores };
+}
+
 /* ---- Season awards (Overview cards) — weighted so both stats count ------- */
 const AWARDS = {
   // Golden Torpedo: offense — goals count twice assists
@@ -266,6 +311,7 @@ const AVAILABILITY = (() => {
 const DB = {
   league: LEAGUE,
   rating: RATING,
+  position: POSITION,
   awards: AWARDS,
   glossary: STANDINGS_GLOSSARY,
   teams: TEAMS,
@@ -376,8 +422,13 @@ const DB = {
       const t = totals[p.id];
       const score = t.goals * w.goals + t.assists * w.assists + t.steals * w.steals +
         t.blocks * w.blocks + t.turnovers * w.turnovers;
+      const derived = derivePosition(t);
       return {
         ...p, ...t,
+        pos: derived.label,
+        posPrimary: derived.primary,
+        posSecondary: derived.secondary,
+        posScores: derived.scores,
         perMatch: t.matches ? score / t.matches : 0,
         eff: t.matches ? score / (t.matches + RATING.prior) : 0,
       };
@@ -392,6 +443,11 @@ const DB = {
           : (max === min ? 5 : Math.round(1 + ((r.eff - min) / (max - min)) * 9)),
       }))
       .sort((a, b) => b.rating - a.rating || b.goals - a.goals);
+  },
+
+  /** Derived position label for a totals-shaped object (or rated player). */
+  positionOf(t) {
+    return derivePosition(t || {}).label;
   },
 
   ratedPlayers() { return this._rateFromTotals(this.playerTotals()); },
