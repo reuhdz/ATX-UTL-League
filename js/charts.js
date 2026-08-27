@@ -76,18 +76,22 @@ const ChartHub = {
     this.destroy(id);
     const text = this._css('--text-muted', '#94a3b8');
     const grid = this._css('--chart-grid', 'rgba(148,163,184,0.2)');
+    const narrow = typeof window !== 'undefined'
+      && window.matchMedia
+      && window.matchMedia('(max-width: 640px)').matches;
     this.registry[id] = new Chart(el, {
       type: 'radar',
       data: { labels, datasets },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { labels: { color: text } } },
+        layout: { padding: narrow ? 2 : 8 },
+        plugins: { legend: { display: false } },
         scales: {
           r: {
             angleLines: { color: grid },
             grid: { color: grid },
-            pointLabels: { color: text, font: { size: 11 } },
+            pointLabels: { color: text, font: { size: narrow ? 10 : 11 } },
             ticks: { display: false, backdropColor: 'transparent' },
           },
         },
