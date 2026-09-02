@@ -194,30 +194,64 @@ const nextGuest = () => {
   return PLAYERS.find((p) => p.id === id);
 };
 
-/* ---- Build an 8-week balanced schedule (each team plays once per week) --- */
+/* ---- Build schedule: weeks 1–6 regular season, 7–8 playoffs --------------- */
 function addDays(iso, days) {
   const [y, m, d] = iso.split('-').map(Number);
   return new Date(y, m - 1, d + days).toLocaleDateString('en-CA');
 }
 
 function buildSchedule() {
-  // 16 games · 8 per team · pairings 2–3× each · 4 home games each
-  // First/second Sunday slot: team1 & team2 4/4; capybara 5/3; team3 3/5 (best possible)
-  const rounds = [
+  // Regular season: 6 weeks · each team plays once per week
+  const regular = [
     [['team3', 'team2'], ['capybara', 'team1']],
     [['team1', 'team3'], ['team2', 'capybara']],
     [['team1', 'team2'], ['capybara', 'team3']],
     [['team1', 'capybara'], ['team3', 'team2']],
     [['team2', 'capybara'], ['team3', 'team1']],
     [['team3', 'capybara'], ['team2', 'team1']],
-    [['capybara', 'team1'], ['team2', 'team3']],
-    [['capybara', 'team2'], ['team1', 'team3']],
   ];
   const matches = [];
-  rounds.forEach((games, i) => {
+  regular.forEach((games, i) => {
     const iso = addDays(LEAGUE.startDate, i * 7);
     games.forEach(([home, away], gi) =>
-      matches.push({ id: `r${i + 1}g${gi}`, round: i + 1, date: iso, home, away }));
+      matches.push({
+        id: `r${i + 1}g${gi}`,
+        round: i + 1,
+        date: iso,
+        home,
+        away,
+        phase: 'regular',
+      }));
+  });
+
+  // Week 7 — Semifinals (seeds from regular-season standings)
+  const d7 = addDays(LEAGUE.startDate, 6 * 7);
+  matches.push({
+    id: 'r7g0', round: 7, date: d7,
+    home: 'seed:1', away: 'seed:4',
+    phase: 'playoff', playoff: 'semi-a',
+    label: 'Semifinal A · Seed 1 vs Seed 4',
+  });
+  matches.push({
+    id: 'r7g1', round: 7, date: d7,
+    home: 'seed:2', away: 'seed:3',
+    phase: 'playoff', playoff: 'semi-b',
+    label: 'Semifinal B · Seed 2 vs Seed 3',
+  });
+
+  // Week 8 — Final + 3rd place
+  const d8 = addDays(LEAGUE.startDate, 7 * 7);
+  matches.push({
+    id: 'r8g0', round: 8, date: d8,
+    home: 'winner:semi-a', away: 'winner:semi-b',
+    phase: 'playoff', playoff: 'final',
+    label: 'Championship Final',
+  });
+  matches.push({
+    id: 'r8g1', round: 8, date: d8,
+    home: 'loser:semi-a', away: 'loser:semi-b',
+    phase: 'playoff', playoff: 'consolation',
+    label: '3rd Place Game',
   });
   return matches;
 }
@@ -331,7 +365,109 @@ const DB = {
 
   team: (id) => TEAMS.find((t) => t.id === id),
   player: (id) => PLAYERS.find((p) => p.id === id),
-  teamName: (id) => (id === 'fa' ? 'Free Agent' : (TEAMS.find((t) => t.id === id) || {}).name || id),
+  teamName: (id) => {
+    if (id === 'fa') return 'Free Agent';
+    if (!id) return 'TBD';
+    if (String(id).startsWith('seed:')) return `Seed ${String(id).slice(5)}`;
+    if (String(id).startsWith('winner:')) return 'Winner TBD';
+    if (String(id).startsWith('loser:')) return 'Loser TBD';
+    return (TEAMS.find((t) => t.id === id) || {}).name || id;
+  },
+  isPlaceholderTeam: (id) => {
+    const s = String(id || '');
+    return s.startsWith('seed:') || s.startsWith('winner:') || s.startsWith('loser:');
+  },
+  matchLabel: (m) => m?.label || null,
+
+  /** Regular-season standings only (rounds 1–6) for playoff seeding. */
+  regularStandings() {
+    const table = {};
+    TEAMS.forEach((t) => (table[t.id] = { teamId: t.id, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0, played: 0 }));
+    this.finals().filter((m) => (m.phase || 'regular') === 'regular' || Number(m.round) <= 6).forEach((m) => {
+      if (this.isPlaceholderTeam(m.home) || this.isPlaceholderTeam(m.away)) return;
+      const h = table[m.home];
+      const a = table[m.away];
+      if (!h || !a) return;
+      h.played++; a.played++;
+      const hg = m.pointsHome != null ? m.pointsHome : m.homeScore;
+      const ag = m.pointsAway != null ? m.pointsAway : m.awayScore;
+      h.gf += hg; h.ga += ag;
+      a.gf += ag; a.ga += hg;
+      if (m.homeScore > m.awayScore) { h.w++; a.l++; h.pts += 3; }
+      else if (m.homeScore < m.awayScore) { a.w++; h.l++; a.pts += 3; }
+      else { h.d++; a.d++; h.pts++; a.pts++; }
+    });
+    return Object.values(table).sort(
+      (x, y) => y.pts - x.pts || (y.gf - y.ga) - (x.gf - x.ga) || y.gf - x.gf);
+  },
+
+  playoffWinner(m) {
+    if (!m || m.status !== 'final') return null;
+    if (this.isPlaceholderTeam(m.home) || this.isPlaceholderTeam(m.away)) return null;
+    if (m.homeScore > m.awayScore) return m.home;
+    if (m.homeScore < m.awayScore) return m.away;
+    return null; // draw — no auto-advance
+  },
+  playoffLoser(m) {
+    if (!m || m.status !== 'final') return null;
+    if (this.isPlaceholderTeam(m.home) || this.isPlaceholderTeam(m.away)) return null;
+    if (m.homeScore > m.awayScore) return m.away;
+    if (m.homeScore < m.awayScore) return m.home;
+    return null;
+  },
+
+  /**
+   * Fill playoff home/away from regular-season seeds + completed semis.
+   * Mutates MATCHES in place (same pattern as StatsHub overlays).
+   */
+  refreshPlayoffAssignments() {
+    const seeds = this.regularStandings().map((s) => s.teamId);
+    const seedOf = (n) => seeds[n - 1] || `seed:${n}`;
+    const bySlot = {};
+    MATCHES.forEach((m) => {
+      if (m.playoff) bySlot[m.playoff] = m;
+    });
+
+    const semiA = bySlot['semi-a'];
+    const semiB = bySlot['semi-b'];
+    const final = bySlot.final;
+    const consol = bySlot.consolation;
+
+    if (semiA) {
+      if (seeds.length >= 4 || semiA.status !== 'final') {
+        // Keep resolved teams once a semi is final; otherwise refresh from seeds
+        if (semiA.status !== 'final') {
+          semiA.home = seedOf(1);
+          semiA.away = seedOf(4);
+        }
+      }
+    }
+    if (semiB) {
+      if (semiB.status !== 'final') {
+        semiB.home = seedOf(2);
+        semiB.away = seedOf(3);
+      }
+    }
+
+    if (final && semiA && semiB) {
+      const wA = this.playoffWinner(semiA);
+      const wB = this.playoffWinner(semiB);
+      if (final.status !== 'final') {
+        final.home = wA || 'winner:semi-a';
+        final.away = wB || 'winner:semi-b';
+      }
+    }
+    if (consol && semiA && semiB) {
+      const lA = this.playoffLoser(semiA);
+      const lB = this.playoffLoser(semiB);
+      if (consol.status !== 'final') {
+        consol.home = lA || 'loser:semi-a';
+        consol.away = lB || 'loser:semi-b';
+      }
+    }
+    return MATCHES;
+  },
+
   rosterOf: (tid) => rosterOf(tid),
   freeAgents: () => PLAYERS.filter((p) => p.teamId === 'fa'),
   season5Roster: () => SEASON5_ROSTER.map((id) => PLAYERS.find((p) => p.id === id)).filter(Boolean),
@@ -341,10 +477,14 @@ const DB = {
   upcoming: () => MATCHES.filter((m) => m.status === 'scheduled'),
 
   standings() {
+    // Regular season only (weeks 1–6) — playoffs do not affect the table / seeding.
     const table = {};
     TEAMS.forEach((t) => (table[t.id] = { teamId: t.id, w: 0, d: 0, l: 0, gf: 0, ga: 0, pts: 0, played: 0 }));
-    this.finals().forEach((m) => {
-      const h = table[m.home], a = table[m.away];
+    this.finals().filter((m) => (m.phase || 'regular') === 'regular' || Number(m.round) <= 6).forEach((m) => {
+      if (this.isPlaceholderTeam(m.home) || this.isPlaceholderTeam(m.away)) return;
+      const h = table[m.home];
+      const a = table[m.away];
+      if (!h || !a) return;
       h.played++; a.played++;
       // Series wins decide W/L; summed game points feed GF/GA when present.
       const hg = m.pointsHome != null ? m.pointsHome : m.homeScore;

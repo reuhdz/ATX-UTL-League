@@ -95,9 +95,25 @@ const FAQ = [
     q: 'How is the schedule structured?',
     a:
       'Season 5 runs 8 weeks — Sunday league nights starting August 23, 2026. ' +
-      'Each team plays once per week (two games per night). Every team faces every ' +
-      'opponent multiple times across the season. Standings use 3 points for a win, ' +
-      '1 for a draw, 0 for a loss.',
+      'Weeks 1–6 are the regular season (each team plays once per week; two games per night). ' +
+      'Standings use 3 points for a win, 1 for a draw, 0 for a loss. ' +
+      'Weeks 7–8 are playoffs: Week 7 semis are Seed 1 vs Seed 4 and Seed 2 vs Seed 3; ' +
+      'Week 8 is the championship final (semi winners) plus a 3rd-place game (semi losers).',
+  },
+  {
+    q: 'How do I contest a box-score stat?',
+    a:
+      'Open a player spotlight or profile and tap Stat contention. Pick the match and stat, ' +
+      'propose a value (contest an existing number or request a missing credit), add a comment, ' +
+      'and optionally a video link. Captains and admin vote on /admin — after 5 votes, a majority ' +
+      'for the request passes it so staff can apply the change to the box score.',
+  },
+  {
+    q: 'How do game-day volunteers work?',
+    a:
+      'Use the Volunteer tab to sign up for referee, camera, or safety for a given week. ' +
+      'The first signup is primary; anyone after that is a backup. You can remove yourself; ' +
+      'if the primary leaves, the next backup becomes primary. Backups can also be promoted manually.',
   },
   {
     q: 'Where does ATX UTL play?',

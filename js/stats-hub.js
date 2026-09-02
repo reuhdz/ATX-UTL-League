@@ -256,6 +256,11 @@ const StatsHub = (() => {
       m.boxSavedBy = res.boxSavedBy;
       m.updatedBy = res.updatedBy;
     });
+    try {
+      if (window.DB && typeof window.DB.refreshPlayoffAssignments === 'function') {
+        window.DB.refreshPlayoffAssignments();
+      }
+    } catch (e) { /* ignore */ }
   }
 
   async function probeDatabase(url) {
