@@ -11,21 +11,36 @@ let teamHighlight = null; // set when navigating via a team link
 let scrollTarget = null;  // CSS selector to scroll to after tab change
 
 /* ---------- small helpers ------------------------------------------------- */
-const teamColor = (id) => (DB.team(id) || {}).color || '#94a3b8';
+const teamColor = (id) => {
+  if (typeof DB.isPlaceholderTeam === 'function' && DB.isPlaceholderTeam(id)) return '#94a3b8';
+  return (DB.team(id) || {}).color || '#94a3b8';
+};
 const fmtDate = (iso) =>
   new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 const diff = (n) => (n > 0 ? `+${n}` : `${n}`);
 
 function teamPill(id) {
   if (id === 'fa') return `<span class="team-pill fa">Free Agent</span>`;
+  if (typeof DB.isPlaceholderTeam === 'function' && DB.isPlaceholderTeam(id)) {
+    return `<span class="team-pill fa">${DB.teamName(id)}</span>`;
+  }
   const t = DB.team(id);
+  if (!t) return `<span class="team-pill fa">${DB.teamName(id) || 'TBD'}</span>`;
   return `<button class="team-pill link" data-team="${id}" style="--tc:${t.color}">${t.name}</button>`;
 }
-const teamBadge = (id) => (id === 'fa' ? 'Free Agent' : DB.team(id).name);
+const teamBadge = (id) => {
+  if (id === 'fa') return 'Free Agent';
+  if (typeof DB.isPlaceholderTeam === 'function' && DB.isPlaceholderTeam(id)) return DB.teamName(id);
+  return (DB.team(id) || {}).name || DB.teamName(id) || id;
+};
 
 function teamTag(id) {
   if (id === 'fa') return `<span class="team-tag">Free Agent</span>`;
+  if (typeof DB.isPlaceholderTeam === 'function' && DB.isPlaceholderTeam(id)) {
+    return `<span class="team-tag">${DB.teamName(id)}</span>`;
+  }
   const t = DB.team(id);
+  if (!t) return `<span class="team-tag">${DB.teamName(id) || 'TBD'}</span>`;
   return `<span class="team-tag" style="--tc:${t.color}">${t.name}</span>`;
 }
 function playerLink(id, label) {
@@ -423,9 +438,13 @@ function goldenGloveInfoHtml() {
 }
 
 function fixtureRow(m) {
+  const tag = m.label
+    ? `<span class="playoff-tag">${m.label}</span>`
+    : `<span class="fx-date">${fmtDate(m.date)} · W${m.round}</span>`;
   return `<div class="fixture">
-      <span class="fx-date">${fmtDate(m.date)} · W${m.round}</span>
+      ${tag}
       <span class="fx-teams">${teamPill(m.home)} <em>vs</em> ${teamPill(m.away)}</span>
+      ${m.label ? `<span class="fx-date">${fmtDate(m.date)}</span>` : ''}
     </div>`;
 }
 function resultRow(m) {
@@ -437,11 +456,15 @@ function resultRow(m) {
   const entered = by?.label
     ? `<span class="fx-entered muted small">Entered by ${by.label}</span>`
     : '';
+  const tag = m.label
+    ? `<span class="playoff-tag">${m.label}</span>`
+    : `<span class="fx-date">${fmtDate(m.date)} · W${m.round}</span>`;
   return `<div class="fixture">
-      <span class="fx-date">${fmtDate(m.date)} · W${m.round}</span>
+      ${tag}
       <span class="fx-teams">${teamPill(m.home)}
         <b class="score ${hw ? 'win' : ''}">${m.homeScore}</b><em>–</em><b class="score ${aw ? 'win' : ''}">${m.awayScore}</b>
         ${teamPill(m.away)}</span>
+      ${m.label ? `<span class="fx-date">${fmtDate(m.date)}</span>` : ''}
       ${games}
       ${entered}
     </div>`;
@@ -612,17 +635,24 @@ function renderTeamsRoster() {
    SCHEDULE
    ============================================================================ */
 function renderSchedule() {
+  try { DB.refreshPlayoffAssignments?.(); } catch (e) { /* ignore */ }
   const byRound = {};
   DB.matches.forEach((m) => (byRound[m.round] = byRound[m.round] || []).push(m));
 
   view.innerHTML = `
-    <div class="page-head"><h2>Schedule &amp; Results</h2></div>
+    <div class="page-head"><h2>Schedule &amp; Results</h2>
+      <p class="muted">Weeks 1–6 regular season · Weeks 7–8 playoffs (1v4 / 2v3 semis, then final + 3rd place)</p>
+    </div>
     <div class="rounds">
       ${Object.keys(byRound).map((r) => {
         const games = byRound[r];
         const played = games.every((g) => g.status === 'final');
+        const isPlayoff = games.some((g) => g.phase === 'playoff');
+        const title = isPlayoff
+          ? (Number(r) === 7 ? 'Week 7 · Semifinals' : 'Week 8 · Finals')
+          : `Week ${r}`;
         return `<section class="panel round">
-            <div class="panel-head"><h3>Week ${r}</h3>
+            <div class="panel-head"><h3>${title}</h3>
               <span class="badge ${played ? 'done' : 'up'}">${played ? 'Final' : 'Upcoming'} · ${fmtDate(games[0].date)}</span></div>
             <div class="fixture-list">${games.map((g) => g.status === 'final' ? resultRow(g) : fixtureRow(g)).join('')}</div>
           </section>`;
@@ -791,7 +821,11 @@ function drawSpotlight() {
       <div class="mini-stats">
         ${playerStatTilesHtml(p)}
       </div>
+      <div class="stat-contention-actions">
+        <button type="button" class="btn btn-ghost" data-contention-player="${p.playerId}">Stat contention</button>
+      </div>
       <div class="stat-clips-panel prof-clips" hidden></div>
+
       <div class="spot-grid">
         <div class="chart-wrap sm"><canvas id="c-spotlight"></canvas></div>
         <div class="prof-log">
@@ -1212,6 +1246,9 @@ function openProfile(id) {
     <div class="mini-stats">
       ${playerStatTilesHtml(p)}
     </div>
+    <div class="stat-contention-actions">
+      <button type="button" class="btn btn-ghost" data-contention-player="${p.playerId}">Stat contention</button>
+    </div>
     <div class="stat-clips-panel prof-clips" hidden></div>
 
     <div class="prof-grid">
@@ -1240,6 +1277,273 @@ function closeProfile() {
   $('#profile-modal').hidden = true;
   document.body.style.overflow = '';
   ChartHub.destroy('c-profile');
+}
+
+/* =============================================================================
+   STAT CONTENTION (player form)
+   ============================================================================ */
+const FIELD_LABEL_MAP = {
+  goals: 'Goals', assists: 'Assists', steals: 'Steals', blocks: 'Blocks',
+  turnovers: 'Turnovers', swimOffAttempts: 'Swim-off attempts', swimOffs: 'Swim-off wins', shots: 'Shots',
+};
+
+function ensureContentionModal() {
+  let host = $('#contention-modal');
+  if (host) return host;
+  host = document.createElement('div');
+  host.id = 'contention-modal';
+  host.className = 'modal-overlay';
+  host.hidden = true;
+  host.innerHTML = `<div class="modal-card contention-card" role="dialog" aria-modal="true" aria-labelledby="contention-title"></div>`;
+  document.body.appendChild(host);
+  host.addEventListener('click', (e) => {
+    if (e.target.id === 'contention-modal') closeContentionModal();
+  });
+  return host;
+}
+
+function closeContentionModal() {
+  const host = $('#contention-modal');
+  if (!host) return;
+  host.hidden = true;
+  if ($('#profile-modal')?.hidden !== false) document.body.style.overflow = '';
+}
+
+function openContentionForm(playerId) {
+  const p = DB.ratedPlayer(playerId) || DB.player(playerId);
+  if (!p) return;
+  const host = ensureContentionModal();
+  const card = host.querySelector('.contention-card');
+  const log = DB.gameLog(playerId);
+  const fields = (typeof ContentionHub !== 'undefined' && ContentionHub.fields) || Object.keys(FIELD_LABEL_MAP);
+  const matchOpts = log.length
+    ? log.map((g) => {
+      const line = g;
+      return `<option value="${g.matchId}" data-round="${g.round}">W${g.round} vs ${DB.teamName(g.opp)} (${g.result} ${g.gf}-${g.ga})</option>`;
+    }).join('')
+    : '<option value="">No games yet — request credit for upcoming entry</option>';
+
+  card.innerHTML = `
+    <div class="modal-head">
+      <h2 id="contention-title">Stat contention · ${p.name}</h2>
+      <button type="button" class="icon-btn" id="contention-close" aria-label="Close">✕</button>
+    </div>
+    <p class="muted small">Contest a recorded value or request credit. Captains/admin vote — majority after ${ContentionHub?.VOTE_QUORUM || 5} votes.</p>
+    <form id="contention-form" class="contention-form">
+      <label>Match
+        <select id="sc-match" class="select">${matchOpts}</select>
+      </label>
+      <label>Stat
+        <select id="sc-field" class="select">
+          ${fields.map((f) => `<option value="${f}">${FIELD_LABEL_MAP[f] || f}</option>`).join('')}
+        </select>
+      </label>
+      <label>Request type
+        <select id="sc-action" class="select">
+          <option value="contest">Contest existing value</option>
+          <option value="request">Request a missing credit</option>
+        </select>
+      </label>
+      <label>Proposed value
+        <input id="sc-value" class="input" type="number" min="0" step="1" value="1" required />
+      </label>
+      <label>Video link (optional)
+        <input id="sc-video" class="input" type="url" placeholder="https://…" />
+      </label>
+      <label>Why / context
+        <textarea id="sc-comment" class="input" rows="3" maxlength="500" required placeholder="Explain what should change and why"></textarea>
+      </label>
+      ${!(typeof AdminAuth !== 'undefined' && AdminAuth.isLoggedIn()) ? `
+      <label>Your name
+        <input id="sc-name" class="input" maxlength="40" placeholder="Name for the request" required />
+      </label>` : ''}
+      <div class="se-actions">
+        <button type="button" class="btn btn-ghost" id="sc-criteria">Stat criteria</button>
+        <button type="submit" class="btn">Submit contention</button>
+      </div>
+      <p id="sc-msg" class="draft-msg"></p>
+    </form>
+    <div id="sc-criteria-panel" class="stat-criteria-inline" hidden></div>
+  `;
+
+  host.hidden = false;
+  document.body.style.overflow = 'hidden';
+  $('#contention-close')?.addEventListener('click', closeContentionModal);
+
+  const syncCurrent = () => {
+    const matchId = $('#sc-match')?.value;
+    const field = $('#sc-field')?.value;
+    const g = log.find((x) => x.matchId === matchId);
+    const cur = g && field != null ? Number(g[field]) || 0 : null;
+    const inp = $('#sc-value');
+    if (inp && cur != null && $('#sc-action')?.value === 'contest') inp.value = String(cur);
+  };
+  ['sc-match', 'sc-field', 'sc-action'].forEach((id) => {
+    $(`#${id}`)?.addEventListener('change', syncCurrent);
+  });
+  syncCurrent();
+
+  $('#sc-criteria')?.addEventListener('click', () => {
+    const panel = $('#sc-criteria-panel');
+    if (!panel) return;
+    if (!panel.hidden) { panel.hidden = true; return; }
+    const items = (window.PLAYER_STAT_INDEX || []).filter((s) =>
+      ['G', 'A', 'S', 'B', 'TO', 'SOA', 'SO', 'SH'].includes(s.key));
+    panel.innerHTML = `<dl class="stat-criteria-dl">${items.map((s) =>
+      `<dt><span class="ix-key">${s.key}</span> ${s.name}</dt><dd>${s.desc}</dd>`).join('')}</dl>`;
+    panel.hidden = false;
+  });
+
+  $('#contention-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = $('#sc-msg');
+    try {
+      const matchId = $('#sc-match')?.value || null;
+      const g = log.find((x) => x.matchId === matchId);
+      const field = $('#sc-field')?.value;
+      const action = $('#sc-action')?.value;
+      await ContentionHub.submit({
+        playerId,
+        matchId,
+        round: g?.round ?? null,
+        field,
+        action,
+        currentValue: g && field ? Number(g[field]) || 0 : null,
+        proposedValue: $('#sc-value')?.value,
+        videoUrl: $('#sc-video')?.value,
+        comment: $('#sc-comment')?.value,
+        submitterName: $('#sc-name')?.value,
+      });
+      if (msg) { msg.className = 'draft-msg ok'; msg.textContent = 'Submitted — captains will vote on /admin.'; }
+      setTimeout(closeContentionModal, 900);
+    } catch (err) {
+      if (msg) { msg.className = 'draft-msg err'; msg.textContent = err.message || String(err); }
+    }
+  });
+}
+
+/* =============================================================================
+   VOLUNTEER TAB
+   ============================================================================ */
+let volunteerWeek = null;
+let volUnsub = null;
+
+function renderVolunteer() {
+  const weeks = [...new Set((DB.matches || []).map((m) => m.round))].sort((a, b) => a - b);
+  if (volunteerWeek == null) volunteerWeek = weeks[0] || 1;
+  if (!weeks.includes(volunteerWeek)) volunteerWeek = weeks[0] || 1;
+  const who = VolunteerHub.identity();
+
+  view.innerHTML = `
+    <div class="page-head">
+      <h2>Game-day volunteers</h2>
+      <p class="muted">Sign up as referee, camera, or safety. First signup is primary; later signups are backups.</p>
+    </div>
+    <p id="vol-msg" class="draft-msg"></p>
+    <section class="panel">
+      <div class="se-pickers" style="margin-bottom:14px">
+        <label>Week
+          <select id="vol-week" class="select">
+            ${weeks.map((w) => `<option value="${w}" ${Number(volunteerWeek) === w ? 'selected' : ''}>Week ${w}</option>`).join('')}
+          </select>
+        </label>
+        <label>Your name
+          <input id="vol-name" class="input" maxlength="40" placeholder="Name for the board"
+            value="${who?.label || ''}" ${typeof AdminAuth !== 'undefined' && AdminAuth.isLoggedIn() ? 'disabled' : ''} />
+        </label>
+        ${!(typeof AdminAuth !== 'undefined' && AdminAuth.isLoggedIn())
+          ? '<button type="button" class="btn btn-ghost" id="vol-save-name">Save name</button>'
+          : `<span class="muted small">Signed in as ${AdminAuth.session()?.label || ''}</span>`}
+      </div>
+      <div id="vol-board" class="vol-board"></div>
+    </section>
+  `;
+
+  const setMsg = (text, cls = '') => {
+    const el = $('#vol-msg');
+    if (!el) return;
+    el.className = `draft-msg ${cls}`.trim();
+    el.textContent = text || '';
+  };
+
+  const paintBoard = () => {
+    const board = $('#vol-board');
+    if (!board) return;
+    const week = Number($('#vol-week')?.value || volunteerWeek);
+    volunteerWeek = week;
+    const me = VolunteerHub.identity();
+    board.innerHTML = VolunteerHub.roles.map((role) => {
+      const list = VolunteerHub.listFor(week, role.id);
+      const rows = list.length
+        ? list.map((p, i) => `
+          <li class="${i === 0 ? 'vol-primary' : 'vol-backup'}">
+            <span class="vol-name">${p.label}${i === 0 ? ' <span class="pill">Primary</span>' : ' <span class="muted small">Backup</span>'}</span>
+            <span class="vol-actions">
+              ${i > 0 ? `<button type="button" class="btn btn-ghost vol-promote" data-role="${role.id}" data-user="${p.username}">Make primary</button>` : ''}
+              ${me && p.username.toLowerCase() === me.username.toLowerCase()
+                ? `<button type="button" class="btn btn-ghost vol-leave" data-role="${role.id}">Remove me</button>` : ''}
+            </span>
+          </li>`).join('')
+        : '<li class="muted">No volunteers yet</li>';
+      const signed = me && VolunteerHub.isSignedUp(week, role.id, me);
+      return `<div class="vol-role panel">
+        <div class="panel-head">
+          <h3>${role.label}</h3>
+          ${signed
+            ? `<span class="muted small">You’re signed up</span>`
+            : `<button type="button" class="btn vol-claim" data-role="${role.id}">Volunteer</button>`}
+        </div>
+        <ul class="vol-list">${rows}</ul>
+      </div>`;
+    }).join('');
+
+    $$('.vol-claim', board).forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        try {
+          if (!VolunteerHub.identity()) {
+            VolunteerHub.setDisplayName($('#vol-name')?.value);
+          }
+          await VolunteerHub.claim(week, btn.dataset.role);
+          setMsg('Signed up — thanks!', 'ok');
+          paintBoard();
+        } catch (e) { setMsg(e.message || String(e), 'err'); }
+      });
+    });
+    $$('.vol-leave', board).forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        try {
+          await VolunteerHub.leave(week, btn.dataset.role);
+          setMsg('Removed. Next backup (if any) is now primary.', 'ok');
+          paintBoard();
+        } catch (e) { setMsg(e.message || String(e), 'err'); }
+      });
+    });
+    $$('.vol-promote', board).forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        try {
+          await VolunteerHub.promote(week, btn.dataset.role, btn.dataset.user);
+          setMsg('Backup promoted to primary.', 'ok');
+          paintBoard();
+        } catch (e) { setMsg(e.message || String(e), 'err'); }
+      });
+    });
+  };
+
+  $('#vol-week')?.addEventListener('change', paintBoard);
+  $('#vol-save-name')?.addEventListener('click', () => {
+    try {
+      VolunteerHub.setDisplayName($('#vol-name')?.value);
+      setMsg('Name saved on this device.', 'ok');
+    } catch (e) { setMsg(e.message || String(e), 'err'); }
+  });
+
+  const st = VolunteerHub.status();
+  if (st.connectionError) setMsg(`Live sync issue: ${st.connectionError}`, 'err');
+  else if (st.mode !== 'firebase') setMsg('Offline mode — volunteers save on this device only.', 'err');
+
+  paintBoard();
+  if (volUnsub) volUnsub();
+  volUnsub = VolunteerHub.onChange(() => paintBoard());
 }
 
 /* =============================================================================
@@ -1462,7 +1766,7 @@ function renderDraft() {
 const ROUTES = {
   overview: renderDashboard, teams: renderTeamsRoster,
   schedule: renderSchedule, stats: renderStats, media: renderMedia,
-  attendance: renderAttendance, draft: renderDraft, faq: renderFaq,
+  attendance: renderAttendance, volunteer: renderVolunteer, draft: renderDraft, faq: renderFaq,
 };
 
 function go(tab) {
@@ -1496,6 +1800,11 @@ function initClicks() {
       return;
     }
     if (e.target.closest('.att-toggle')) return;
+    const contentionBtn = e.target.closest('[data-contention-player]');
+    if (contentionBtn) {
+      openContentionForm(contentionBtn.dataset.contentionPlayer);
+      return;
+    }
     const pl = e.target.closest('[data-player]');
     if (pl) { openProfile(pl.dataset.player); return; }
     const tm = e.target.closest('[data-team]');
@@ -1503,7 +1812,7 @@ function initClicks() {
   });
   $('#profile-modal').addEventListener('click', (e) => { if (e.target.id === 'profile-modal') closeProfile(); });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { closeAllInfoPops(); closeProfile(); }
+    if (e.key === 'Escape') { closeAllInfoPops(); closeContentionModal(); closeProfile(); }
   });
   window.addEventListener('resize', () => {
     $$('.info-pop.is-open').forEach((pop) => {
@@ -1546,7 +1855,9 @@ $('#brand-sub').textContent = DB.league.full;
 $('#footer-venue').textContent = DB.league.venue;
 Promise.all([
   DraftHub.init(), AttendanceHub.init(), StatsHub.init(), HighlightsHub.init(), FilmHub.init(),
+  ContentionHub.init(), VolunteerHub.init(),
 ]).then(() => {
+  try { DB.refreshPlayoffAssignments?.(); } catch (e) { /* ignore */ }
   DraftHub.onChange(() => {
     let tab = 'overview';
     try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
@@ -1561,6 +1872,7 @@ Promise.all([
     const sig = JSON.stringify(state?.results ?? {});
     if (sig === lastStatsResultsSig) return;
     lastStatsResultsSig = sig;
+    try { DB.refreshPlayoffAssignments?.(); } catch (e) { /* ignore */ }
     let tab = 'overview';
     try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
     if (['overview', 'schedule', 'stats', 'teams', 'media'].includes(tab)) go(tab);
@@ -1585,6 +1897,11 @@ Promise.all([
       const pid = $('#profile-card')?.dataset?.playerId;
       if (pid) openProfile(pid);
     }
+  });
+  VolunteerHub.onChange(() => {
+    let tab = 'overview';
+    try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
+    if (tab === 'volunteer') go(tab);
   });
   let startTab = 'overview';
   try { startTab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
