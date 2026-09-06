@@ -13,7 +13,8 @@
        events: [{ id, playerId, type, url, note, createdAt }], // Option A/B clips
        seriesSavedAt, seriesSavedBy,
        boxSavedAt, boxSavedBy,
-       updatedAt, updatedBy
+       updatedAt, updatedBy,
+       saveHistory: [{ at, username, label, role, action }]  // admin audit log
      }
    Overlays window.DB.matches in place.
    ============================================================================ */
@@ -102,6 +103,72 @@ const StatsHub = (() => {
       role: raw.role || null,
       at: raw.at || null,
     };
+  }
+
+  const HISTORY_ACTIONS = {
+    series: 'Series scores',
+    box: 'Player stats',
+    'clear-box': 'Cleared player stats',
+    'clear-match': 'Cleared match',
+  };
+
+  function normalizeHistoryEntry(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    const actor = normalizeActor(raw);
+    const action = String(raw.action || '').trim();
+    if (!actor || !HISTORY_ACTIONS[action]) return null;
+    return {
+      at: Number(raw.at) || Number(actor.at) || 0,
+      username: actor.username,
+      label: actor.label,
+      role: actor.role,
+      action,
+    };
+  }
+
+  function normalizeHistory(raw) {
+    if (!Array.isArray(raw)) return [];
+    return raw.map(normalizeHistoryEntry).filter(Boolean)
+      .sort((a, b) => (a.at || 0) - (b.at || 0));
+  }
+
+  /** Seed history from legacy single-actor fields when no log exists yet. */
+  function seedHistoryFromLegacy(raw) {
+    const out = [];
+    const push = (actor, at, action) => {
+      const a = normalizeActor(actor);
+      if (!a) return;
+      out.push({
+        at: Number(at) || Number(a.at) || 0,
+        username: a.username,
+        label: a.label,
+        role: a.role,
+        action,
+      });
+    };
+    push(raw.seriesSavedBy, raw.seriesSavedAt, 'series');
+    push(raw.boxSavedBy, raw.boxSavedAt, 'box');
+    return normalizeHistory(out);
+  }
+
+  function appendHistory(prevHistory, actor, action) {
+    const entry = normalizeHistoryEntry({
+      ...actor,
+      at: actor?.at || Date.now(),
+      action,
+    });
+    const list = normalizeHistory(prevHistory);
+    if (!entry) return list;
+    return [...list, entry].slice(-40); // keep last 40 saves
+  }
+
+  function historyFor(matchId) {
+    const res = results[String(matchId)];
+    return res?.saveHistory ? [...res.saveHistory] : [];
+  }
+
+  function actionLabel(action) {
+    return HISTORY_ACTIONS[action] || action;
   }
 
   function cloneMatch(m) {
@@ -196,6 +263,8 @@ const StatsHub = (() => {
     const awayLineup = Array.isArray(raw.awayLineup) ? raw.awayLineup.filter(Boolean) : [];
     const box = Array.isArray(raw.box) ? raw.box.filter((b) => b?.playerId).map(normalizeBoxLine) : [];
     const events = normalizeEvents(raw.events);
+    let saveHistory = normalizeHistory(raw.saveHistory);
+    if (!saveHistory.length) saveHistory = seedHistoryFromLegacy(raw);
     return {
       matchId,
       status: 'final',
@@ -215,6 +284,7 @@ const StatsHub = (() => {
       boxSavedBy: normalizeActor(raw.boxSavedBy),
       updatedAt: raw.updatedAt || Date.now(),
       updatedBy: normalizeActor(raw.updatedBy),
+      saveHistory,
     };
   }
 
@@ -256,6 +326,11 @@ const StatsHub = (() => {
       m.boxSavedBy = res.boxSavedBy;
       m.updatedBy = res.updatedBy;
     });
+    try {
+      if (window.DB && typeof window.DB.refreshPlayoffAssignments === 'function') {
+        window.DB.refreshPlayoffAssignments();
+      }
+    } catch (e) { /* ignore */ }
   }
 
   async function probeDatabase(url) {
@@ -373,6 +448,7 @@ const StatsHub = (() => {
       seriesSavedBy: actor,
       updatedAt: actor.at,
       updatedBy: actor,
+      saveHistory: appendHistory(prev.saveHistory, actor, 'series'),
     }, matchId);
     return writeResult(matchId, next);
   }
@@ -409,6 +485,7 @@ const StatsHub = (() => {
       boxSavedBy: actor,
       updatedAt: actor.at,
       updatedBy: actor,
+      saveHistory: appendHistory(prev.saveHistory, actor, 'box'),
     }, matchId);
     return writeResult(matchId, next);
   }
@@ -436,6 +513,7 @@ const StatsHub = (() => {
       // Nothing but box data — clear the whole match
       return clearMatch(matchId, pin);
     }
+    const actor = actorFromSession();
     const next = normalizeResult({
       ...prev,
       games: prev.games || [],
@@ -449,8 +527,9 @@ const StatsHub = (() => {
       events: [],
       boxSavedAt: null,
       boxSavedBy: null,
-      updatedAt: Date.now(),
-      updatedBy: actorFromSession(),
+      updatedAt: actor.at,
+      updatedBy: actor,
+      saveHistory: appendHistory(prev.saveHistory, actor, 'clear-box'),
     }, matchId);
     return writeResult(matchId, next);
   }
@@ -494,6 +573,7 @@ const StatsHub = (() => {
     init, onChange, status, getResult, saveSeries, saveBox, clearMatch, clearBox,
     checkMasterPin, emptyLine, seriesFromGames, fields: STAT_FIELDS,
     normalizeUrl, clipsForPlayer, clipCountsForPlayer,
+    historyFor, actionLabel, HISTORY_ACTIONS,
   };
 })();
 

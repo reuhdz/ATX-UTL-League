@@ -11,21 +11,36 @@ let teamHighlight = null; // set when navigating via a team link
 let scrollTarget = null;  // CSS selector to scroll to after tab change
 
 /* ---------- small helpers ------------------------------------------------- */
-const teamColor = (id) => (DB.team(id) || {}).color || '#94a3b8';
+const teamColor = (id) => {
+  if (typeof DB.isPlaceholderTeam === 'function' && DB.isPlaceholderTeam(id)) return '#94a3b8';
+  return (DB.team(id) || {}).color || '#94a3b8';
+};
 const fmtDate = (iso) =>
   new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 const diff = (n) => (n > 0 ? `+${n}` : `${n}`);
 
 function teamPill(id) {
   if (id === 'fa') return `<span class="team-pill fa">Free Agent</span>`;
+  if (typeof DB.isPlaceholderTeam === 'function' && DB.isPlaceholderTeam(id)) {
+    return `<span class="team-pill fa">${DB.teamName(id)}</span>`;
+  }
   const t = DB.team(id);
+  if (!t) return `<span class="team-pill fa">${DB.teamName(id) || 'TBD'}</span>`;
   return `<button class="team-pill link" data-team="${id}" style="--tc:${t.color}">${t.name}</button>`;
 }
-const teamBadge = (id) => (id === 'fa' ? 'Free Agent' : DB.team(id).name);
+const teamBadge = (id) => {
+  if (id === 'fa') return 'Free Agent';
+  if (typeof DB.isPlaceholderTeam === 'function' && DB.isPlaceholderTeam(id)) return DB.teamName(id);
+  return (DB.team(id) || {}).name || DB.teamName(id) || id;
+};
 
 function teamTag(id) {
   if (id === 'fa') return `<span class="team-tag">Free Agent</span>`;
+  if (typeof DB.isPlaceholderTeam === 'function' && DB.isPlaceholderTeam(id)) {
+    return `<span class="team-tag">${DB.teamName(id)}</span>`;
+  }
   const t = DB.team(id);
+  if (!t) return `<span class="team-tag">${DB.teamName(id) || 'TBD'}</span>`;
   return `<span class="team-tag" style="--tc:${t.color}">${t.name}</span>`;
 }
 function playerLink(id, label) {
@@ -376,7 +391,7 @@ function renderDashboard() {
       <section class="panel">
         <div class="panel-head"><h3>🗓️ Next games</h3></div>
         <div class="fixture-list">
-          ${upcoming.slice(0, 4).map(fixtureRow).join('') || '<p class="muted">Season complete.</p>'}
+          ${sortMatchesByKickoff(upcoming).slice(0, 4).map((m, i) => fixtureRow(m, i)).join('') || '<p class="muted">Season complete.</p>'}
         </div>
       </section>
       <section class="panel">
@@ -422,28 +437,49 @@ function goldenGloveInfoHtml() {
     '<span class="gl">Blocks are weighted higher so shot-stoppers lead, but takeaways still count toward the award.</span>';
 }
 
-function fixtureRow(m) {
+function matchKickoffLabel(m, indexInWeek = 0) {
+  if (m?.timeLabel) return m.timeLabel;
+  if (m?.slot === '9am') return '9:00 AM';
+  if (m?.slot === '8am') return '8:00 AM';
+  return indexInWeek === 0 ? '8:00 AM' : '9:00 AM';
+}
+
+function sortMatchesByKickoff(games) {
+  return [...(games || [])].sort((a, b) => {
+    const slotOrder = (m) => (m.slot === '9am' || m.timeLabel === '9:00 AM' ? 1 : 0);
+    return slotOrder(a) - slotOrder(b) || String(a.id).localeCompare(String(b.id));
+  });
+}
+
+function fixtureRow(m, indexInWeek = 0) {
+  const time = matchKickoffLabel(m, indexInWeek);
+  const tag = m.label
+    ? `<span class="playoff-tag">${m.label}</span>`
+    : `<span class="fx-date">${fmtDate(m.date)} · W${m.round}</span>`;
   return `<div class="fixture">
-      <span class="fx-date">${fmtDate(m.date)} · W${m.round}</span>
+      ${tag}
+      <span class="fx-time">${time}</span>
       <span class="fx-teams">${teamPill(m.home)} <em>vs</em> ${teamPill(m.away)}</span>
+      ${m.label ? `<span class="fx-date">${fmtDate(m.date)}</span>` : ''}
     </div>`;
 }
-function resultRow(m) {
+function resultRow(m, indexInWeek = 0) {
   const hw = m.homeScore > m.awayScore, aw = m.awayScore > m.homeScore;
   const games = Array.isArray(m.games) && m.games.length
     ? `<span class="fx-games muted small">${m.games.map((g, i) => `G${i + 1} ${g.home}–${g.away}`).join(' · ')}</span>`
     : '';
-  const by = m.updatedBy || m.seriesSavedBy || m.boxSavedBy;
-  const entered = by?.label
-    ? `<span class="fx-entered muted small">Entered by ${by.label}</span>`
-    : '';
+  const time = matchKickoffLabel(m, indexInWeek);
+  const tag = m.label
+    ? `<span class="playoff-tag">${m.label}</span>`
+    : `<span class="fx-date">${fmtDate(m.date)} · W${m.round}</span>`;
   return `<div class="fixture">
-      <span class="fx-date">${fmtDate(m.date)} · W${m.round}</span>
+      ${tag}
+      <span class="fx-time">${time}</span>
       <span class="fx-teams">${teamPill(m.home)}
         <b class="score ${hw ? 'win' : ''}">${m.homeScore}</b><em>–</em><b class="score ${aw ? 'win' : ''}">${m.awayScore}</b>
         ${teamPill(m.away)}</span>
+      ${m.label ? `<span class="fx-date">${fmtDate(m.date)}</span>` : ''}
       ${games}
-      ${entered}
     </div>`;
 }
 
@@ -612,19 +648,26 @@ function renderTeamsRoster() {
    SCHEDULE
    ============================================================================ */
 function renderSchedule() {
+  try { DB.refreshPlayoffAssignments?.(); } catch (e) { /* ignore */ }
   const byRound = {};
   DB.matches.forEach((m) => (byRound[m.round] = byRound[m.round] || []).push(m));
 
   view.innerHTML = `
-    <div class="page-head"><h2>Schedule &amp; Results</h2></div>
+    <div class="page-head"><h2>Schedule &amp; Results</h2>
+      <p class="muted">Weeks 1–6 regular season · Weeks 7–8 playoffs · First game 8:00 AM · Second game 9:00 AM</p>
+    </div>
     <div class="rounds">
       ${Object.keys(byRound).map((r) => {
         const games = byRound[r];
         const played = games.every((g) => g.status === 'final');
+        const isPlayoff = games.some((g) => g.phase === 'playoff');
+        const title = isPlayoff
+          ? (Number(r) === 7 ? 'Week 7 · Semifinals' : 'Week 8 · Finals')
+          : `Week ${r}`;
         return `<section class="panel round">
-            <div class="panel-head"><h3>Week ${r}</h3>
+            <div class="panel-head"><h3>${title}</h3>
               <span class="badge ${played ? 'done' : 'up'}">${played ? 'Final' : 'Upcoming'} · ${fmtDate(games[0].date)}</span></div>
-            <div class="fixture-list">${games.map((g) => g.status === 'final' ? resultRow(g) : fixtureRow(g)).join('')}</div>
+            <div class="fixture-list">${sortMatchesByKickoff(games).map((g, i) => g.status === 'final' ? resultRow(g, i) : fixtureRow(g, i)).join('')}</div>
           </section>`;
       }).join('')}
     </div>`;
@@ -791,7 +834,11 @@ function drawSpotlight() {
       <div class="mini-stats">
         ${playerStatTilesHtml(p)}
       </div>
+      <div class="stat-contention-actions">
+        <button type="button" class="btn btn-ghost" data-contention-player="${p.playerId}">Stat appeal</button>
+      </div>
       <div class="stat-clips-panel prof-clips" hidden></div>
+
       <div class="spot-grid">
         <div class="chart-wrap sm"><canvas id="c-spotlight"></canvas></div>
         <div class="prof-log">
@@ -1212,6 +1259,9 @@ function openProfile(id) {
     <div class="mini-stats">
       ${playerStatTilesHtml(p)}
     </div>
+    <div class="stat-contention-actions">
+      <button type="button" class="btn btn-ghost" data-contention-player="${p.playerId}">Stat appeal</button>
+    </div>
     <div class="stat-clips-panel prof-clips" hidden></div>
 
     <div class="prof-grid">
@@ -1240,6 +1290,369 @@ function closeProfile() {
   $('#profile-modal').hidden = true;
   document.body.style.overflow = '';
   ChartHub.destroy('c-profile');
+}
+
+/* =============================================================================
+   STAT CONTENTION (player form)
+   ============================================================================ */
+const FIELD_LABEL_MAP = {
+  goals: 'Goals', assists: 'Assists', steals: 'Steals', blocks: 'Blocks',
+  turnovers: 'Turnovers', swimOffAttempts: 'Swim-off attempts', swimOffs: 'Swim-off wins', shots: 'Shots',
+};
+
+function ensureContentionModal() {
+  let host = $('#contention-modal');
+  if (host) return host;
+  host = document.createElement('div');
+  host.id = 'contention-modal';
+  host.className = 'modal-overlay';
+  host.hidden = true;
+  host.innerHTML = `<div class="modal-card contention-card" role="dialog" aria-modal="true" aria-labelledby="contention-title"></div>`;
+  document.body.appendChild(host);
+  host.addEventListener('click', (e) => {
+    if (e.target.id === 'contention-modal') closeContentionModal();
+  });
+  return host;
+}
+
+function closeContentionModal() {
+  const host = $('#contention-modal');
+  if (!host) return;
+  host.hidden = true;
+  if ($('#profile-modal')?.hidden !== false) document.body.style.overflow = '';
+}
+
+function openContentionForm(playerId) {
+  const p = DB.ratedPlayer(playerId) || DB.player(playerId);
+  if (!p) return;
+  const host = ensureContentionModal();
+  const card = host.querySelector('.contention-card');
+  const log = DB.gameLog(playerId);
+  const fields = (typeof ContentionHub !== 'undefined' && ContentionHub.fields) || Object.keys(FIELD_LABEL_MAP);
+  const matchOpts = log.length
+    ? log.map((g) => {
+      const line = g;
+      return `<option value="${g.matchId}" data-round="${g.round}">W${g.round} vs ${DB.teamName(g.opp)} (${g.result} ${g.gf}-${g.ga})</option>`;
+    }).join('')
+    : '<option value="">No games yet — request credit for upcoming entry</option>';
+
+  card.innerHTML = `
+    <div class="modal-head">
+      <h2 id="contention-title">Stat appeal · ${p.name}</h2>
+      <button type="button" class="icon-btn" id="contention-close" aria-label="Close">✕</button>
+    </div>
+    <p class="muted small">Contest a recorded value or request credit. Captains and admin will review the stat appeal.</p>
+    <form id="contention-form" class="contention-form">
+      <label>Match
+        <select id="sc-match" class="select">${matchOpts}</select>
+      </label>
+      <label>Stat
+        <select id="sc-field" class="select">
+          ${fields.map((f) => `<option value="${f}">${FIELD_LABEL_MAP[f] || f}</option>`).join('')}
+        </select>
+      </label>
+      <label>Request type
+        <select id="sc-action" class="select">
+          <option value="contest">Contest existing value</option>
+          <option value="request">Request a missing credit</option>
+        </select>
+      </label>
+      <label>Proposed value
+        <input id="sc-value" class="input" type="number" min="0" step="1" value="1" required />
+      </label>
+      <label>Video link (optional)
+        <input id="sc-video" class="input" type="url" placeholder="https://…" />
+      </label>
+      <label>Why / context
+        <textarea id="sc-comment" class="input" rows="3" maxlength="500" required placeholder="Explain what should change and why"></textarea>
+      </label>
+      <div class="se-actions">
+        <button type="button" class="btn btn-ghost" id="sc-criteria">Stat criteria</button>
+        <button type="submit" class="btn">Submit appeal</button>
+      </div>
+      <p id="sc-msg" class="draft-msg"></p>
+    </form>
+    <div id="sc-criteria-panel" class="stat-criteria-inline" hidden></div>
+  `;
+
+  host.hidden = false;
+  document.body.style.overflow = 'hidden';
+  $('#contention-close')?.addEventListener('click', closeContentionModal);
+
+  const syncCurrent = () => {
+    const matchId = $('#sc-match')?.value;
+    const field = $('#sc-field')?.value;
+    const g = log.find((x) => x.matchId === matchId);
+    const cur = g && field != null ? Number(g[field]) || 0 : null;
+    const inp = $('#sc-value');
+    if (inp && cur != null && $('#sc-action')?.value === 'contest') inp.value = String(cur);
+  };
+  ['sc-match', 'sc-field', 'sc-action'].forEach((id) => {
+    $(`#${id}`)?.addEventListener('change', syncCurrent);
+  });
+  syncCurrent();
+
+  $('#sc-criteria')?.addEventListener('click', () => {
+    const panel = $('#sc-criteria-panel');
+    if (!panel) return;
+    if (!panel.hidden) { panel.hidden = true; return; }
+    const items = (window.PLAYER_STAT_INDEX || []).filter((s) =>
+      ['G', 'A', 'S', 'B', 'TO', 'SOA', 'SO', 'SH'].includes(s.key));
+    panel.innerHTML = `<dl class="stat-criteria-dl">${items.map((s) =>
+      `<dt><span class="ix-key">${s.key}</span> ${s.name}</dt><dd>${s.desc}</dd>`).join('')}</dl>`;
+    panel.hidden = false;
+  });
+
+  $('#contention-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const msg = $('#sc-msg');
+    try {
+      const matchId = $('#sc-match')?.value || null;
+      const g = log.find((x) => x.matchId === matchId);
+      const field = $('#sc-field')?.value;
+      const action = $('#sc-action')?.value;
+      await ContentionHub.submit({
+        playerId,
+        matchId,
+        round: g?.round ?? null,
+        field,
+        action,
+        currentValue: g && field ? Number(g[field]) || 0 : null,
+        proposedValue: $('#sc-value')?.value,
+        videoUrl: $('#sc-video')?.value,
+        comment: $('#sc-comment')?.value,
+      });
+      if (msg) { msg.className = 'draft-msg ok'; msg.textContent = 'Submitted — captains and admin will review.'; }
+      setTimeout(closeContentionModal, 900);
+    } catch (err) {
+      if (msg) { msg.className = 'draft-msg err'; msg.textContent = err.message || String(err); }
+    }
+  });
+}
+
+/* =============================================================================
+   VOLUNTEER TAB
+   ============================================================================ */
+let volunteerWeek = null;
+let volunteerMatchId = null;
+let volunteerBoardWeek = 'all'; // 'all' | week number
+let volUnsub = null;
+
+function matchTimeLabel(m, indexInWeek = 0) {
+  return matchKickoffLabel(m, indexInWeek);
+}
+
+function matchesForVolunteerWeek(week) {
+  return sortMatchesByKickoff(
+    (DB.matches || []).filter((m) => Number(m.round) === Number(week))
+  );
+}
+
+function gameOptionLabel(m, indexInWeek) {
+  const time = matchTimeLabel(m, indexInWeek);
+  const vs = `${DB.teamName(m.home)} vs ${DB.teamName(m.away)}`;
+  return `${time} · ${m.label || vs}`;
+}
+
+function renderVolunteer() {
+  const weeks = [...new Set((DB.matches || []).map((m) => m.round))].sort((a, b) => a - b);
+  if (volunteerWeek == null) volunteerWeek = weeks[0] || 1;
+  if (!weeks.includes(volunteerWeek)) volunteerWeek = weeks[0] || 1;
+  const weekGames = matchesForVolunteerWeek(volunteerWeek);
+  if (!weekGames.some((m) => m.id === volunteerMatchId)) {
+    volunteerMatchId = weekGames[0]?.id || null;
+  }
+  const who = VolunteerHub.identity();
+
+  view.innerHTML = `
+    <div class="page-head">
+      <h2>Game-day volunteers</h2>
+      <p class="muted">Sign up as referee, camera, or safety for a specific game.</p>
+    </div>
+    <p id="vol-msg" class="draft-msg"></p>
+
+    <section class="panel">
+      <div class="panel-head"><h3>Sign up</h3></div>
+      <form id="vol-form" class="vol-form">
+        <label>Week
+          <select id="vol-week" class="select" required>
+            ${weeks.map((w) => `<option value="${w}" ${Number(volunteerWeek) === w ? 'selected' : ''}>Week ${w}</option>`).join('')}
+          </select>
+        </label>
+        <label>Game
+          <select id="vol-game" class="select" required>
+            ${weekGames.map((m, i) =>
+              `<option value="${m.id}" ${m.id === volunteerMatchId ? 'selected' : ''}>${gameOptionLabel(m, i)}</option>`).join('')}
+          </select>
+        </label>
+        <label>Your name
+          <input id="vol-name" class="input" maxlength="40" placeholder="Name for the board"
+            value="${who?.label || ''}" required />
+        </label>
+        <label>Role
+          <select id="vol-role" class="select" required>
+            ${VolunteerHub.roles.map((r) => `<option value="${r.id}">${r.label}</option>`).join('')}
+          </select>
+        </label>
+        <div class="se-actions">
+          <button type="submit" class="btn" id="vol-submit">Submit</button>
+        </div>
+      </form>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head vol-board-head">
+        <div>
+          <h3>Volunteer board</h3>
+          <p class="muted small" id="vol-board-caption">All weeks</p>
+        </div>
+        <label class="vol-board-filter">Week
+          <select id="vol-board-week" class="select">
+            <option value="all" ${volunteerBoardWeek === 'all' ? 'selected' : ''}>All weeks</option>
+            ${weeks.map((w) => `<option value="${w}" ${String(volunteerBoardWeek) === String(w) ? 'selected' : ''}>Week ${w}</option>`).join('')}
+          </select>
+        </label>
+      </div>
+      <div id="vol-overview" class="vol-overview"></div>
+    </section>
+  `;
+
+  const setMsg = (text, cls = '') => {
+    const el = $('#vol-msg');
+    if (!el) return;
+    el.className = `draft-msg ${cls}`.trim();
+    el.textContent = text || '';
+  };
+
+  const fillGameOptions = () => {
+    const week = Number($('#vol-week')?.value || volunteerWeek);
+    volunteerWeek = week;
+    const games = matchesForVolunteerWeek(week);
+    const sel = $('#vol-game');
+    if (!sel) return;
+    if (!games.some((m) => m.id === volunteerMatchId)) {
+      volunteerMatchId = games[0]?.id || null;
+    }
+    sel.innerHTML = games.map((m, i) =>
+      `<option value="${m.id}" ${m.id === volunteerMatchId ? 'selected' : ''}>${gameOptionLabel(m, i)}</option>`).join('');
+  };
+
+  const paintOverview = () => {
+    const host = $('#vol-overview');
+    if (!host) return;
+    const me = VolunteerHub.identity();
+    const filterVal = $('#vol-board-week')?.value ?? volunteerBoardWeek;
+    volunteerBoardWeek = filterVal === 'all' ? 'all' : Number(filterVal);
+    const visibleWeeks = volunteerBoardWeek === 'all'
+      ? weeks
+      : weeks.filter((w) => Number(w) === Number(volunteerBoardWeek));
+    const caption = $('#vol-board-caption');
+    if (caption) {
+      caption.textContent = volunteerBoardWeek === 'all'
+        ? 'All weeks'
+        : `Week ${volunteerBoardWeek}`;
+    }
+    if (!visibleWeeks.length) {
+      host.innerHTML = '<p class="muted">No games for that week.</p>';
+      return;
+    }
+    host.innerHTML = visibleWeeks.map((week) => {
+      const games = matchesForVolunteerWeek(week);
+      const date = games[0]?.date ? fmtDate(games[0].date) : '';
+      const gameBlocks = games.map((m, i) => {
+        const time = matchTimeLabel(m, i);
+        const vs = m.label || `${DB.teamName(m.home)} vs ${DB.teamName(m.away)}`;
+        const rolesHtml = VolunteerHub.roles.map((role) => {
+          const list = VolunteerHub.listFor(m.id, role.id);
+          const people = list.length
+            ? list.map((p, idx) => {
+              const canLeave = me && p.username.toLowerCase() === me.username.toLowerCase();
+              const canPromote = idx > 0;
+              return `<li class="${idx === 0 ? 'vol-primary' : 'vol-backup'}">
+                <span class="vol-name">${p.label}</span>
+                <span class="vol-actions">
+                  ${canPromote ? `<button type="button" class="btn btn-ghost vol-promote" data-match="${m.id}" data-role="${role.id}" data-user="${p.username}">Make primary</button>` : ''}
+                  ${canLeave ? `<button type="button" class="btn btn-ghost vol-leave" data-match="${m.id}" data-role="${role.id}">Remove me</button>` : ''}
+                </span>
+              </li>`;
+            }).join('')
+            : '<li class="muted">Open</li>';
+          return `<div class="vol-role-col">
+            <h4>${role.label}</h4>
+            <ul class="vol-list">${people}</ul>
+          </div>`;
+        }).join('');
+        return `<div class="vol-game-block">
+          <div class="vol-game-head">
+            <strong>${time}</strong>
+            <span class="muted small">${vs}</span>
+          </div>
+          <div class="vol-role-grid">${rolesHtml}</div>
+        </div>`;
+      }).join('');
+      return `<article class="vol-week-tile">
+        <div class="vol-week-head">
+          <h3>Week ${week}</h3>
+          <span class="muted small">${date}</span>
+        </div>
+        ${gameBlocks}
+      </article>`;
+    }).join('');
+
+    $$('.vol-leave', host).forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        try {
+          await VolunteerHub.leave(btn.dataset.match, btn.dataset.role);
+          setMsg('Removed from that role.', 'ok');
+          paintOverview();
+        } catch (e) { setMsg(e.message || String(e), 'err'); }
+      });
+    });
+    $$('.vol-promote', host).forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        try {
+          await VolunteerHub.promote(btn.dataset.match, btn.dataset.role, btn.dataset.user);
+          setMsg('Updated.', 'ok');
+          paintOverview();
+        } catch (e) { setMsg(e.message || String(e), 'err'); }
+      });
+    });
+  };
+
+  $('#vol-week')?.addEventListener('change', () => {
+    fillGameOptions();
+  });
+  $('#vol-game')?.addEventListener('change', () => {
+    volunteerMatchId = $('#vol-game')?.value || null;
+  });
+  $('#vol-board-week')?.addEventListener('change', () => {
+    paintOverview();
+  });
+
+  $('#vol-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    try {
+      const week = Number($('#vol-week')?.value);
+      const matchId = $('#vol-game')?.value;
+      const role = $('#vol-role')?.value;
+      volunteerWeek = week;
+      volunteerMatchId = matchId;
+      VolunteerHub.setDisplayName($('#vol-name')?.value);
+      await VolunteerHub.claim(matchId, role);
+      setMsg('Signed up — thanks!', 'ok');
+      paintOverview();
+    } catch (err) {
+      setMsg(err.message || String(err), 'err');
+    }
+  });
+
+  const st = VolunteerHub.status();
+  if (st.connectionError) setMsg(`Live sync issue: ${st.connectionError}`, 'err');
+  else if (st.mode !== 'firebase') setMsg('Offline mode — volunteers save on this device only.', 'err');
+
+  paintOverview();
+  if (volUnsub) volUnsub();
+  volUnsub = VolunteerHub.onChange(() => paintOverview());
 }
 
 /* =============================================================================
@@ -1462,7 +1875,7 @@ function renderDraft() {
 const ROUTES = {
   overview: renderDashboard, teams: renderTeamsRoster,
   schedule: renderSchedule, stats: renderStats, media: renderMedia,
-  attendance: renderAttendance, draft: renderDraft, faq: renderFaq,
+  attendance: renderAttendance, volunteer: renderVolunteer, draft: renderDraft, faq: renderFaq,
 };
 
 function go(tab) {
@@ -1496,6 +1909,11 @@ function initClicks() {
       return;
     }
     if (e.target.closest('.att-toggle')) return;
+    const contentionBtn = e.target.closest('[data-contention-player]');
+    if (contentionBtn) {
+      openContentionForm(contentionBtn.dataset.contentionPlayer);
+      return;
+    }
     const pl = e.target.closest('[data-player]');
     if (pl) { openProfile(pl.dataset.player); return; }
     const tm = e.target.closest('[data-team]');
@@ -1503,7 +1921,7 @@ function initClicks() {
   });
   $('#profile-modal').addEventListener('click', (e) => { if (e.target.id === 'profile-modal') closeProfile(); });
   document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') { closeAllInfoPops(); closeProfile(); }
+    if (e.key === 'Escape') { closeAllInfoPops(); closeContentionModal(); closeProfile(); }
   });
   window.addEventListener('resize', () => {
     $$('.info-pop.is-open').forEach((pop) => {
@@ -1546,7 +1964,9 @@ $('#brand-sub').textContent = DB.league.full;
 $('#footer-venue').textContent = DB.league.venue;
 Promise.all([
   DraftHub.init(), AttendanceHub.init(), StatsHub.init(), HighlightsHub.init(), FilmHub.init(),
+  ContentionHub.init(), VolunteerHub.init(),
 ]).then(() => {
+  try { DB.refreshPlayoffAssignments?.(); } catch (e) { /* ignore */ }
   DraftHub.onChange(() => {
     let tab = 'overview';
     try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
@@ -1561,6 +1981,7 @@ Promise.all([
     const sig = JSON.stringify(state?.results ?? {});
     if (sig === lastStatsResultsSig) return;
     lastStatsResultsSig = sig;
+    try { DB.refreshPlayoffAssignments?.(); } catch (e) { /* ignore */ }
     let tab = 'overview';
     try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
     if (['overview', 'schedule', 'stats', 'teams', 'media'].includes(tab)) go(tab);
@@ -1590,6 +2011,8 @@ Promise.all([
   try { startTab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
   if (startTab === 'dashboard') startTab = 'overview';
   if (startTab === 'roster') startTab = 'teams';
+  const hashTab = (location.hash || '').replace(/^#/, '');
+  if (hashTab && ROUTES[hashTab]) startTab = hashTab;
   go(startTab);
 }).catch(() => {
   go('overview');
