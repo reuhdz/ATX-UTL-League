@@ -1463,7 +1463,6 @@ function renderVolunteer() {
     volunteerMatchId = weekGames[0]?.id || null;
   }
   const who = VolunteerHub.identity();
-  const loggedIn = typeof AdminAuth !== 'undefined' && AdminAuth.isLoggedIn();
 
   view.innerHTML = `
     <div class="page-head">
@@ -1488,7 +1487,7 @@ function renderVolunteer() {
         </label>
         <label>Your name
           <input id="vol-name" class="input" maxlength="40" placeholder="Name for the board"
-            value="${who?.label || ''}" ${loggedIn ? 'disabled' : ''} required />
+            value="${who?.label || ''}" required />
         </label>
         <label>Role
           <select id="vol-role" class="select" required>
@@ -1499,7 +1498,6 @@ function renderVolunteer() {
           <button type="submit" class="btn" id="vol-submit">Submit</button>
         </div>
       </form>
-      ${loggedIn ? `<p class="muted small">Signed in as ${AdminAuth.session()?.label || ''}</p>` : ''}
     </section>
 
     <section class="panel">
@@ -1639,11 +1637,7 @@ function renderVolunteer() {
       const role = $('#vol-role')?.value;
       volunteerWeek = week;
       volunteerMatchId = matchId;
-      if (!loggedIn) {
-        VolunteerHub.setDisplayName($('#vol-name')?.value);
-      } else if (!VolunteerHub.identity()) {
-        VolunteerHub.setDisplayName($('#vol-name')?.value || AdminAuth.session()?.label);
-      }
+      VolunteerHub.setDisplayName($('#vol-name')?.value);
       await VolunteerHub.claim(matchId, role);
       setMsg('Signed up — thanks!', 'ok');
       paintOverview();
