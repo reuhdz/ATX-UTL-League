@@ -654,7 +654,7 @@ function renderSchedule() {
 
   view.innerHTML = `
     <div class="page-head"><h2>Schedule &amp; Results</h2>
-      <p class="muted">Weeks 1–6 regular season · Weeks 7–8 playoffs (1v4 / 2v3 semis, then final + 3rd place)</p>
+      <p class="muted">Weeks 1–6 regular season · Weeks 7–8 playoffs · First game 8:00 AM · Second game 9:00 AM</p>
     </div>
     <div class="rounds">
       ${Object.keys(byRound).map((r) => {
@@ -1438,17 +1438,13 @@ let volunteerMatchId = null;
 let volUnsub = null;
 
 function matchTimeLabel(m, indexInWeek = 0) {
-  if (m?.timeLabel) return m.timeLabel;
-  if (m?.slot === '9am') return '9:00 AM';
-  if (m?.slot === '8am') return '8:00 AM';
-  return indexInWeek === 0 ? '8:00 AM' : '9:00 AM';
+  return matchKickoffLabel(m, indexInWeek);
 }
 
 function matchesForVolunteerWeek(week) {
-  return (DB.matches || [])
-    .filter((m) => Number(m.round) === Number(week))
-    .slice()
-    .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+  return sortMatchesByKickoff(
+    (DB.matches || []).filter((m) => Number(m.round) === Number(week))
+  );
 }
 
 function gameOptionLabel(m, indexInWeek) {
