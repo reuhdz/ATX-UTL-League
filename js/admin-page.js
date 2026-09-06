@@ -1,4 +1,4 @@
-/* /admin — login + tool links + stat contention voting + save history */
+/* /admin — login + tool links + stat appeal voting + save history */
 (() => {
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...(root || document).querySelectorAll(sel)];
