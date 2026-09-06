@@ -817,7 +817,7 @@ function drawSpotlight() {
         ${playerStatTilesHtml(p)}
       </div>
       <div class="stat-contention-actions">
-        <button type="button" class="btn btn-ghost" data-contention-player="${p.playerId}">Stat contention</button>
+        <button type="button" class="btn btn-ghost" data-contention-player="${p.playerId}">Stat appeal</button>
       </div>
       <div class="stat-clips-panel prof-clips" hidden></div>
 
@@ -1242,7 +1242,7 @@ function openProfile(id) {
       ${playerStatTilesHtml(p)}
     </div>
     <div class="stat-contention-actions">
-      <button type="button" class="btn btn-ghost" data-contention-player="${p.playerId}">Stat contention</button>
+      <button type="button" class="btn btn-ghost" data-contention-player="${p.playerId}">Stat appeal</button>
     </div>
     <div class="stat-clips-panel prof-clips" hidden></div>
 
@@ -1320,7 +1320,7 @@ function openContentionForm(playerId) {
 
   card.innerHTML = `
     <div class="modal-head">
-      <h2 id="contention-title">Stat contention · ${p.name}</h2>
+      <h2 id="contention-title">Stat appeal · ${p.name}</h2>
       <button type="button" class="icon-btn" id="contention-close" aria-label="Close">✕</button>
     </div>
     <p class="muted small">Contest a recorded value or request credit. Captains/admin vote — majority after ${ContentionHub?.VOTE_QUORUM || 5} votes.</p>
@@ -1354,7 +1354,7 @@ function openContentionForm(playerId) {
       </label>` : ''}
       <div class="se-actions">
         <button type="button" class="btn btn-ghost" id="sc-criteria">Stat criteria</button>
-        <button type="submit" class="btn">Submit contention</button>
+        <button type="submit" class="btn">Submit appeal</button>
       </div>
       <p id="sc-msg" class="draft-msg"></p>
     </form>

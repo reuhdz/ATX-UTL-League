@@ -1,7 +1,7 @@
 /* =============================================================================
-   Stat contention hub — contest / request box-score changes
+   Stat appeal hub — contest / request box-score changes
    -----------------------------------------------------------------------------
-   Path: /statContentions/{roomId}/{id}
+   Path: /statContentions/{roomId}/{id} (legacy key; UI label is “Stat appeal”)
    Shape:
      {
        id, playerId, playerName, matchId, round, field,
@@ -242,7 +242,7 @@ const ContentionHub = (() => {
       status: 'open',
       updatedAt: Date.now(),
     }, id);
-    if (!entry) throw new Error('Could not create contention');
+    if (!entry) throw new Error('Could not create appeal');
     await persist(id, entry);
     return entry;
   }
@@ -253,7 +253,7 @@ const ContentionHub = (() => {
     if (!key) throw new Error('Missing voter identity');
     if (choice !== 'for' && choice !== 'against') throw new Error('Invalid vote');
     const prev = get(id);
-    if (!prev) throw new Error('Contention not found');
+    if (!prev) throw new Error('Appeal not found');
     if (prev.status === 'applied') throw new Error('Already applied');
     if (prev.status === 'failed') throw new Error('Voting closed — request failed');
     if (prev.status === 'passed') throw new Error('Already passed — apply or wait');
@@ -288,9 +288,9 @@ const ContentionHub = (() => {
 
   async function markApplied(id) {
     const prev = get(id);
-    if (!prev) throw new Error('Contention not found');
+    if (!prev) throw new Error('Appeal not found');
     if (prev.status !== 'passed' && prev.status !== 'applied') {
-      throw new Error('Only passed contentions can be applied');
+      throw new Error('Only passed appeals can be applied');
     }
     const next = { ...prev, status: 'applied', updatedAt: Date.now() };
     await persist(id, next);

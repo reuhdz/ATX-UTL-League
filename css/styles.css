@@ -725,7 +725,7 @@ a.btn:hover, a.btn:focus { text-decoration: none; color: inherit; }
 .fixture .playoff-tag,
 .result-row .playoff-tag { margin-right: 8px; }
 
-/* ---- Stat contention form ------------------------------------------------ */
+/* ---- Stat appeal form ---------------------------------------------------- */
 .contention-card { width: min(560px, 100%); }
 .contention-form {
   display: grid;

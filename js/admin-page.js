@@ -186,8 +186,8 @@
     };
 
     host.innerHTML = `
-      <h3>Open / ready contentions</h3>
-      ${open.length ? open.map(card).join('') : '<p class="muted">No open contentions.</p>'}
+      <h3>Open / ready appeals</h3>
+      ${open.length ? open.map(card).join('') : '<p class="muted">No open appeals.</p>'}
       <h3 style="margin-top:18px">Recently closed</h3>
       ${closed.length ? closed.map(card).join('') : '<p class="muted">None yet.</p>'}
       <p id="ad-sc-msg" class="draft-msg"></p>
@@ -283,7 +283,7 @@
       </section>
       <section class="panel">
         <div class="panel-head">
-          <h3>Stat contentions</h3>
+          <h3>Stat appeals</h3>
           <span class="muted small">Majority after ${typeof ContentionHub !== 'undefined' ? ContentionHub.VOTE_QUORUM : 5} votes</span>
         </div>
         <div id="ad-contentions"><p class="muted">Loading…</p></div>
