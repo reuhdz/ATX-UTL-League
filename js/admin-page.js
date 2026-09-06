@@ -1,4 +1,4 @@
-/* /admin — login + tool links + stat contention voting */
+/* /admin — login + tool links + stat contention voting + save history */
 (() => {
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...(root || document).querySelectorAll(sel)];
@@ -14,6 +14,21 @@
     let theme = 'dark';
     try { theme = localStorage.getItem('atxutl.theme') || 'dark'; } catch (e) {}
     document.documentElement.dataset.theme = theme;
+  }
+
+  function fmtWhen(ts) {
+    if (!ts) return '—';
+    try {
+      return new Date(ts).toLocaleString();
+    } catch (e) {
+      return '—';
+    }
+  }
+
+  function matchTitle(m) {
+    if (!m) return 'Unknown match';
+    const label = m.label ? `${m.label} · ` : '';
+    return `${label}W${m.round} · ${DB.teamName(m.home)} vs ${DB.teamName(m.away)}`;
   }
 
   async function applyPassedContention(entry) {
@@ -45,6 +60,93 @@
       allowWithoutSeries: true,
     });
     await ContentionHub.markApplied(entry.id);
+  }
+
+  function ensureHistoryModal() {
+    let host = $('#ad-history-modal');
+    if (host) return host;
+    host = document.createElement('div');
+    host.id = 'ad-history-modal';
+    host.className = 'modal-overlay';
+    host.hidden = true;
+    host.innerHTML = `<div class="modal-card ad-history-card" role="dialog" aria-modal="true" aria-labelledby="ad-history-title"></div>`;
+    document.body.appendChild(host);
+    host.addEventListener('click', (e) => {
+      if (e.target.id === 'ad-history-modal') closeHistoryModal();
+    });
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') closeHistoryModal();
+    });
+    return host;
+  }
+
+  function closeHistoryModal() {
+    const host = $('#ad-history-modal');
+    if (!host) return;
+    host.hidden = true;
+    document.body.style.overflow = '';
+  }
+
+  function openHistoryModal(matchId) {
+    const match = (window.DB?.matches || []).find((m) => m.id === matchId);
+    const history = StatsHub.historyFor(matchId).slice().reverse();
+    const host = ensureHistoryModal();
+    const card = host.querySelector('.ad-history-card');
+    card.innerHTML = `
+      <div class="modal-head">
+        <h2 id="ad-history-title">Save history</h2>
+        <button type="button" class="icon-btn" id="ad-history-close" aria-label="Close">✕</button>
+      </div>
+      <p class="muted small">${matchTitle(match)}</p>
+      ${history.length ? `
+        <ol class="ad-history-list">
+          ${history.map((h) => `
+            <li>
+              <div class="ad-history-main">
+                <strong>${h.label}</strong>
+                <span class="pill">${StatsHub.actionLabel(h.action)}</span>
+              </div>
+              <div class="muted small">${fmtWhen(h.at)}${h.role ? ` · ${h.role}` : ''}</div>
+            </li>`).join('')}
+        </ol>` : '<p class="muted">No save history recorded for this match yet.</p>'}
+    `;
+    host.hidden = false;
+    document.body.style.overflow = 'hidden';
+    $('#ad-history-close')?.addEventListener('click', closeHistoryModal);
+  }
+
+  function paintSaveHistory() {
+    const host = $('#ad-save-history');
+    if (!host || typeof StatsHub === 'undefined') return;
+    const matches = (window.DB?.matches || [])
+      .filter((m) => StatsHub.getResult(m.id))
+      .slice()
+      .sort((a, b) => Number(b.round) - Number(a.round) || String(a.id).localeCompare(b.id));
+
+    if (!matches.length) {
+      host.innerHTML = '<p class="muted">No saved match stats yet.</p>';
+      return;
+    }
+
+    host.innerHTML = `
+      <ul class="ad-history-match-list">
+        ${matches.map((m) => {
+          const hist = StatsHub.historyFor(m.id);
+          const last = hist[hist.length - 1];
+          return `<li>
+            <div>
+              <div class="strong">${matchTitle(m)}</div>
+              <div class="muted small">${hist.length} save${hist.length === 1 ? '' : 's'}
+                ${last ? ` · last: ${last.label} (${StatsHub.actionLabel(last.action)})` : ''}</div>
+            </div>
+            <button type="button" class="btn btn-ghost ad-open-history" data-match="${m.id}">View history</button>
+          </li>`;
+        }).join('')}
+      </ul>`;
+
+    $$('.ad-open-history', host).forEach((btn) => {
+      btn.addEventListener('click', () => openHistoryModal(btn.dataset.match));
+    });
   }
 
   function paintContentions() {
@@ -116,6 +218,7 @@
           await applyPassedContention(entry);
           setMsg('Applied to match box score', 'ok');
           paintContentions();
+          paintSaveHistory();
         } catch (e) {
           setMsg(e.message || String(e), 'err');
         }
@@ -173,6 +276,13 @@
       </section>
       <section class="panel">
         <div class="panel-head">
+          <h3>Match save history</h3>
+          <span class="muted small">Who saved series / box scores</span>
+        </div>
+        <div id="ad-save-history"><p class="muted">Loading…</p></div>
+      </section>
+      <section class="panel">
+        <div class="panel-head">
           <h3>Stat contentions</h3>
           <span class="muted small">Majority after ${typeof ContentionHub !== 'undefined' ? ContentionHub.VOTE_QUORUM : 5} votes</span>
         </div>
@@ -183,18 +293,24 @@
       paint();
     });
 
-    const boot = typeof ContentionHub !== 'undefined'
-      ? Promise.all([
-        ContentionHub.init(),
-        typeof StatsHub !== 'undefined' ? StatsHub.init() : Promise.resolve(),
-      ])
-      : Promise.resolve();
+    const boot = Promise.all([
+      typeof ContentionHub !== 'undefined' ? ContentionHub.init() : Promise.resolve(),
+      typeof StatsHub !== 'undefined' ? StatsHub.init() : Promise.resolve(),
+    ]);
     boot.then(() => {
+      paintSaveHistory();
       paintContentions();
-      ContentionHub.onChange(() => paintContentions());
+      if (typeof StatsHub !== 'undefined') {
+        StatsHub.onChange(() => paintSaveHistory());
+      }
+      if (typeof ContentionHub !== 'undefined') {
+        ContentionHub.onChange(() => paintContentions());
+      }
     }).catch((e) => {
       const host = $('#ad-contentions');
       if (host) host.innerHTML = `<p class="draft-msg err">${e.message || e}</p>`;
+      const hist = $('#ad-save-history');
+      if (hist) hist.innerHTML = `<p class="draft-msg err">${e.message || e}</p>`;
     });
   }
 

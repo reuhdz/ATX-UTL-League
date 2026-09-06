@@ -788,3 +788,48 @@ a.btn:hover, a.btn:focus { text-decoration: none; color: inherit; }
 }
 .vol-name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .vol-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+
+/* ---- Admin save history -------------------------------------------------- */
+.ad-history-match-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ad-history-match-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.ad-history-card { width: min(520px, 100%); }
+.ad-history-list {
+  list-style: none;
+  margin: 14px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+.ad-history-list li {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.ad-history-main {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+}

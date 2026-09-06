@@ -452,10 +452,6 @@ function resultRow(m) {
   const games = Array.isArray(m.games) && m.games.length
     ? `<span class="fx-games muted small">${m.games.map((g, i) => `G${i + 1} ${g.home}–${g.away}`).join(' · ')}</span>`
     : '';
-  const by = m.updatedBy || m.seriesSavedBy || m.boxSavedBy;
-  const entered = by?.label
-    ? `<span class="fx-entered muted small">Entered by ${by.label}</span>`
-    : '';
   const tag = m.label
     ? `<span class="playoff-tag">${m.label}</span>`
     : `<span class="fx-date">${fmtDate(m.date)} · W${m.round}</span>`;
@@ -466,7 +462,6 @@ function resultRow(m) {
         ${teamPill(m.away)}</span>
       ${m.label ? `<span class="fx-date">${fmtDate(m.date)}</span>` : ''}
       ${games}
-      ${entered}
     </div>`;
 }
 
