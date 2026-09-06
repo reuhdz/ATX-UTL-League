@@ -1012,6 +1012,25 @@ a.btn:hover, a.btn:focus { text-decoration: none; color: inherit; }
   .vol-form { grid-template-columns: 1fr; }
 }
 
+.vol-board-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.vol-board-head h3 { margin: 0 0 2px; }
+.vol-board-filter {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  min-width: 140px;
+}
+.vol-board-filter .select { font-weight: 400; }
+
 .vol-overview {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));

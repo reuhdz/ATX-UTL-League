@@ -1435,6 +1435,7 @@ function openContentionForm(playerId) {
    ============================================================================ */
 let volunteerWeek = null;
 let volunteerMatchId = null;
+let volunteerBoardWeek = 'all'; // 'all' | week number
 let volUnsub = null;
 
 function matchTimeLabel(m, indexInWeek = 0) {
@@ -1502,9 +1503,17 @@ function renderVolunteer() {
     </section>
 
     <section class="panel">
-      <div class="panel-head">
-        <h3>Volunteer board</h3>
-        <span class="muted small">All weeks</span>
+      <div class="panel-head vol-board-head">
+        <div>
+          <h3>Volunteer board</h3>
+          <p class="muted small" id="vol-board-caption">All weeks</p>
+        </div>
+        <label class="vol-board-filter">Week
+          <select id="vol-board-week" class="select">
+            <option value="all" ${volunteerBoardWeek === 'all' ? 'selected' : ''}>All weeks</option>
+            ${weeks.map((w) => `<option value="${w}" ${String(volunteerBoardWeek) === String(w) ? 'selected' : ''}>Week ${w}</option>`).join('')}
+          </select>
+        </label>
       </div>
       <div id="vol-overview" class="vol-overview"></div>
     </section>
@@ -1534,7 +1543,22 @@ function renderVolunteer() {
     const host = $('#vol-overview');
     if (!host) return;
     const me = VolunteerHub.identity();
-    host.innerHTML = weeks.map((week) => {
+    const filterVal = $('#vol-board-week')?.value ?? volunteerBoardWeek;
+    volunteerBoardWeek = filterVal === 'all' ? 'all' : Number(filterVal);
+    const visibleWeeks = volunteerBoardWeek === 'all'
+      ? weeks
+      : weeks.filter((w) => Number(w) === Number(volunteerBoardWeek));
+    const caption = $('#vol-board-caption');
+    if (caption) {
+      caption.textContent = volunteerBoardWeek === 'all'
+        ? 'All weeks'
+        : `Week ${volunteerBoardWeek}`;
+    }
+    if (!visibleWeeks.length) {
+      host.innerHTML = '<p class="muted">No games for that week.</p>';
+      return;
+    }
+    host.innerHTML = visibleWeeks.map((week) => {
       const games = matchesForVolunteerWeek(week);
       const date = games[0]?.date ? fmtDate(games[0].date) : '';
       const gameBlocks = games.map((m, i) => {
@@ -1602,6 +1626,9 @@ function renderVolunteer() {
   });
   $('#vol-game')?.addEventListener('change', () => {
     volunteerMatchId = $('#vol-game')?.value || null;
+  });
+  $('#vol-board-week')?.addEventListener('change', () => {
+    paintOverview();
   });
 
   $('#vol-form')?.addEventListener('submit', async (e) => {
