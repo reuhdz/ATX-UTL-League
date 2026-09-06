@@ -97,8 +97,8 @@ const FAQ = [
       'Season 5 runs 8 weeks — Sunday league nights starting August 23, 2026. ' +
       'Weeks 1–6 are the regular season (each team plays once per week; two games per night). ' +
       'Standings use 3 points for a win, 1 for a draw, 0 for a loss. ' +
-      'Weeks 7–8 are playoffs: Week 7 semis are Seed 1 vs Seed 4 and Seed 2 vs Seed 3; ' +
-      'Week 8 is the championship final (semi winners) plus a 3rd-place game (semi losers).',
+      'Weeks 7–8 are playoffs: Week 7 semis are Seed 1 vs Seed 4 (8:00 AM) and Seed 2 vs Seed 3 (9:00 AM); ' +
+      'Week 8 is the 3rd-place game at 8:00 AM and the championship final at 9:00 AM.',
   },
   {
     q: 'How do I contest a box-score stat?',

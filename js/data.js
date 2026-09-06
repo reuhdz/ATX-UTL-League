@@ -243,20 +243,20 @@ function buildSchedule() {
     slot: '9am', timeLabel: '9:00 AM',
   });
 
-  // Week 8 — Final + 3rd place
+  // Week 8 — 3rd place first (8am), Championship second (9am)
   const d8 = addDays(LEAGUE.startDate, 7 * 7);
   matches.push({
     id: 'r8g0', round: 8, date: d8,
-    home: 'winner:semi-a', away: 'winner:semi-b',
-    phase: 'playoff', playoff: 'final',
-    label: 'Championship Final',
+    home: 'loser:semi-a', away: 'loser:semi-b',
+    phase: 'playoff', playoff: 'consolation',
+    label: '3rd Place Game',
     slot: '8am', timeLabel: '8:00 AM',
   });
   matches.push({
     id: 'r8g1', round: 8, date: d8,
-    home: 'loser:semi-a', away: 'loser:semi-b',
-    phase: 'playoff', playoff: 'consolation',
-    label: '3rd Place Game',
+    home: 'winner:semi-a', away: 'winner:semi-b',
+    phase: 'playoff', playoff: 'final',
+    label: 'Championship Final',
     slot: '9am', timeLabel: '9:00 AM',
   });
   return matches;

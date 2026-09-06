@@ -391,7 +391,7 @@ function renderDashboard() {
       <section class="panel">
         <div class="panel-head"><h3>🗓️ Next games</h3></div>
         <div class="fixture-list">
-          ${upcoming.slice(0, 4).map(fixtureRow).join('') || '<p class="muted">Season complete.</p>'}
+          ${sortMatchesByKickoff(upcoming).slice(0, 4).map((m, i) => fixtureRow(m, i)).join('') || '<p class="muted">Season complete.</p>'}
         </div>
       </section>
       <section class="panel">
@@ -437,26 +437,44 @@ function goldenGloveInfoHtml() {
     '<span class="gl">Blocks are weighted higher so shot-stoppers lead, but takeaways still count toward the award.</span>';
 }
 
-function fixtureRow(m) {
+function matchKickoffLabel(m, indexInWeek = 0) {
+  if (m?.timeLabel) return m.timeLabel;
+  if (m?.slot === '9am') return '9:00 AM';
+  if (m?.slot === '8am') return '8:00 AM';
+  return indexInWeek === 0 ? '8:00 AM' : '9:00 AM';
+}
+
+function sortMatchesByKickoff(games) {
+  return [...(games || [])].sort((a, b) => {
+    const slotOrder = (m) => (m.slot === '9am' || m.timeLabel === '9:00 AM' ? 1 : 0);
+    return slotOrder(a) - slotOrder(b) || String(a.id).localeCompare(String(b.id));
+  });
+}
+
+function fixtureRow(m, indexInWeek = 0) {
+  const time = matchKickoffLabel(m, indexInWeek);
   const tag = m.label
     ? `<span class="playoff-tag">${m.label}</span>`
     : `<span class="fx-date">${fmtDate(m.date)} · W${m.round}</span>`;
   return `<div class="fixture">
       ${tag}
+      <span class="fx-time">${time}</span>
       <span class="fx-teams">${teamPill(m.home)} <em>vs</em> ${teamPill(m.away)}</span>
       ${m.label ? `<span class="fx-date">${fmtDate(m.date)}</span>` : ''}
     </div>`;
 }
-function resultRow(m) {
+function resultRow(m, indexInWeek = 0) {
   const hw = m.homeScore > m.awayScore, aw = m.awayScore > m.homeScore;
   const games = Array.isArray(m.games) && m.games.length
     ? `<span class="fx-games muted small">${m.games.map((g, i) => `G${i + 1} ${g.home}–${g.away}`).join(' · ')}</span>`
     : '';
+  const time = matchKickoffLabel(m, indexInWeek);
   const tag = m.label
     ? `<span class="playoff-tag">${m.label}</span>`
     : `<span class="fx-date">${fmtDate(m.date)} · W${m.round}</span>`;
   return `<div class="fixture">
       ${tag}
+      <span class="fx-time">${time}</span>
       <span class="fx-teams">${teamPill(m.home)}
         <b class="score ${hw ? 'win' : ''}">${m.homeScore}</b><em>–</em><b class="score ${aw ? 'win' : ''}">${m.awayScore}</b>
         ${teamPill(m.away)}</span>
@@ -649,7 +667,7 @@ function renderSchedule() {
         return `<section class="panel round">
             <div class="panel-head"><h3>${title}</h3>
               <span class="badge ${played ? 'done' : 'up'}">${played ? 'Final' : 'Upcoming'} · ${fmtDate(games[0].date)}</span></div>
-            <div class="fixture-list">${games.map((g) => g.status === 'final' ? resultRow(g) : fixtureRow(g)).join('')}</div>
+            <div class="fixture-list">${sortMatchesByKickoff(games).map((g, i) => g.status === 'final' ? resultRow(g, i) : fixtureRow(g, i)).join('')}</div>
           </section>`;
       }).join('')}
     </div>`;
@@ -1976,6 +1994,8 @@ Promise.all([
   try { startTab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
   if (startTab === 'dashboard') startTab = 'overview';
   if (startTab === 'roster') startTab = 'teams';
+  const hashTab = (location.hash || '').replace(/^#/, '');
+  if (hashTab && ROUTES[hashTab]) startTab = hashTab;
   go(startTab);
 }).catch(() => {
   go('overview');
