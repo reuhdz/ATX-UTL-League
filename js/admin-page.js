@@ -183,9 +183,7 @@
     host.innerHTML = `
       <div class="ad-welcome">
         <div>
-          <p class="muted small ad-kicker">${escapeHtml(session?.role === 'admin' ? 'League admin' : 'Captain')} workspace</p>
-          <h2>Command center</h2>
-          <p class="muted">Review appeals, track who saved stats, and jump into match tools.</p>
+          <h2>${escapeHtml(session?.role === 'admin' ? 'League admin' : 'Captain')} workspace</h2>
         </div>
         <button type="button" class="btn btn-ghost" id="ad-logout-top">Log out</button>
       </div>
