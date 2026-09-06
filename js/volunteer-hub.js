@@ -100,10 +100,6 @@ const VolunteerHub = (() => {
   }
 
   function identity() {
-    const s = (typeof AdminAuth !== 'undefined' && AdminAuth.session) ? AdminAuth.session() : null;
-    if (s?.username) {
-      return { username: String(s.username), label: String(s.label || s.username) };
-    }
     try {
       const saved = localStorage.getItem(NAME_KEY);
       if (saved && saved.trim()) {
