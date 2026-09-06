@@ -111,9 +111,9 @@ const FAQ = [
   {
     q: 'How do game-day volunteers work?',
     a:
-      'Use the Volunteer tab to sign up for referee, camera, or safety for a given week. ' +
-      'The first signup is primary; anyone after that is a backup. You can remove yourself; ' +
-      'if the primary leaves, the next backup becomes primary. Backups can also be promoted manually.',
+      'Use the Volunteer tab to sign up for referee, camera, or safety for a specific game ' +
+      '(pick the week and 8:00 AM or 9:00 AM slot). The board shows volunteers across all weeks. ' +
+      'You can remove yourself from a role; if you were first on the list, the next person moves up.',
   },
   {
     q: 'Where does ATX UTL play?',

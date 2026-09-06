@@ -221,6 +221,8 @@ function buildSchedule() {
         home,
         away,
         phase: 'regular',
+        slot: gi === 0 ? '8am' : '9am',
+        timeLabel: gi === 0 ? '8:00 AM' : '9:00 AM',
       }));
   });
 
@@ -231,12 +233,14 @@ function buildSchedule() {
     home: 'seed:1', away: 'seed:4',
     phase: 'playoff', playoff: 'semi-a',
     label: 'Semifinal A · Seed 1 vs Seed 4',
+    slot: '8am', timeLabel: '8:00 AM',
   });
   matches.push({
     id: 'r7g1', round: 7, date: d7,
     home: 'seed:2', away: 'seed:3',
     phase: 'playoff', playoff: 'semi-b',
     label: 'Semifinal B · Seed 2 vs Seed 3',
+    slot: '9am', timeLabel: '9:00 AM',
   });
 
   // Week 8 — Final + 3rd place
@@ -246,12 +250,14 @@ function buildSchedule() {
     home: 'winner:semi-a', away: 'winner:semi-b',
     phase: 'playoff', playoff: 'final',
     label: 'Championship Final',
+    slot: '8am', timeLabel: '8:00 AM',
   });
   matches.push({
     id: 'r8g1', round: 8, date: d8,
     home: 'loser:semi-a', away: 'loser:semi-b',
     phase: 'playoff', playoff: 'consolation',
     label: '3rd Place Game',
+    slot: '9am', timeLabel: '9:00 AM',
   });
   return matches;
 }

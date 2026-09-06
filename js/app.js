@@ -1421,36 +1421,83 @@ function openContentionForm(playerId) {
    VOLUNTEER TAB
    ============================================================================ */
 let volunteerWeek = null;
+let volunteerMatchId = null;
 let volUnsub = null;
+
+function matchTimeLabel(m, indexInWeek = 0) {
+  if (m?.timeLabel) return m.timeLabel;
+  if (m?.slot === '9am') return '9:00 AM';
+  if (m?.slot === '8am') return '8:00 AM';
+  return indexInWeek === 0 ? '8:00 AM' : '9:00 AM';
+}
+
+function matchesForVolunteerWeek(week) {
+  return (DB.matches || [])
+    .filter((m) => Number(m.round) === Number(week))
+    .slice()
+    .sort((a, b) => String(a.id).localeCompare(String(b.id)));
+}
+
+function gameOptionLabel(m, indexInWeek) {
+  const time = matchTimeLabel(m, indexInWeek);
+  const vs = `${DB.teamName(m.home)} vs ${DB.teamName(m.away)}`;
+  return `${time} · ${m.label || vs}`;
+}
 
 function renderVolunteer() {
   const weeks = [...new Set((DB.matches || []).map((m) => m.round))].sort((a, b) => a - b);
   if (volunteerWeek == null) volunteerWeek = weeks[0] || 1;
   if (!weeks.includes(volunteerWeek)) volunteerWeek = weeks[0] || 1;
+  const weekGames = matchesForVolunteerWeek(volunteerWeek);
+  if (!weekGames.some((m) => m.id === volunteerMatchId)) {
+    volunteerMatchId = weekGames[0]?.id || null;
+  }
   const who = VolunteerHub.identity();
+  const loggedIn = typeof AdminAuth !== 'undefined' && AdminAuth.isLoggedIn();
 
   view.innerHTML = `
     <div class="page-head">
       <h2>Game-day volunteers</h2>
-      <p class="muted">Sign up as referee, camera, or safety. First signup is primary; later signups are backups.</p>
+      <p class="muted">Sign up as referee, camera, or safety for a specific game.</p>
     </div>
     <p id="vol-msg" class="draft-msg"></p>
+
     <section class="panel">
-      <div class="se-pickers" style="margin-bottom:14px">
+      <div class="panel-head"><h3>Sign up</h3></div>
+      <form id="vol-form" class="vol-form">
         <label>Week
-          <select id="vol-week" class="select">
+          <select id="vol-week" class="select" required>
             ${weeks.map((w) => `<option value="${w}" ${Number(volunteerWeek) === w ? 'selected' : ''}>Week ${w}</option>`).join('')}
+          </select>
+        </label>
+        <label>Game
+          <select id="vol-game" class="select" required>
+            ${weekGames.map((m, i) =>
+              `<option value="${m.id}" ${m.id === volunteerMatchId ? 'selected' : ''}>${gameOptionLabel(m, i)}</option>`).join('')}
           </select>
         </label>
         <label>Your name
           <input id="vol-name" class="input" maxlength="40" placeholder="Name for the board"
-            value="${who?.label || ''}" ${typeof AdminAuth !== 'undefined' && AdminAuth.isLoggedIn() ? 'disabled' : ''} />
+            value="${who?.label || ''}" ${loggedIn ? 'disabled' : ''} required />
         </label>
-        ${!(typeof AdminAuth !== 'undefined' && AdminAuth.isLoggedIn())
-          ? '<button type="button" class="btn btn-ghost" id="vol-save-name">Save name</button>'
-          : `<span class="muted small">Signed in as ${AdminAuth.session()?.label || ''}</span>`}
+        <label>Role
+          <select id="vol-role" class="select" required>
+            ${VolunteerHub.roles.map((r) => `<option value="${r.id}">${r.label}</option>`).join('')}
+          </select>
+        </label>
+        <div class="se-actions">
+          <button type="submit" class="btn" id="vol-submit">Submit</button>
+        </div>
+      </form>
+      ${loggedIn ? `<p class="muted small">Signed in as ${AdminAuth.session()?.label || ''}</p>` : ''}
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h3>Volunteer board</h3>
+        <span class="muted small">All weeks</span>
       </div>
-      <div id="vol-board" class="vol-board"></div>
+      <div id="vol-overview" class="vol-overview"></div>
     </section>
   `;
 
@@ -1461,84 +1508,121 @@ function renderVolunteer() {
     el.textContent = text || '';
   };
 
-  const paintBoard = () => {
-    const board = $('#vol-board');
-    if (!board) return;
+  const fillGameOptions = () => {
     const week = Number($('#vol-week')?.value || volunteerWeek);
     volunteerWeek = week;
+    const games = matchesForVolunteerWeek(week);
+    const sel = $('#vol-game');
+    if (!sel) return;
+    if (!games.some((m) => m.id === volunteerMatchId)) {
+      volunteerMatchId = games[0]?.id || null;
+    }
+    sel.innerHTML = games.map((m, i) =>
+      `<option value="${m.id}" ${m.id === volunteerMatchId ? 'selected' : ''}>${gameOptionLabel(m, i)}</option>`).join('');
+  };
+
+  const paintOverview = () => {
+    const host = $('#vol-overview');
+    if (!host) return;
     const me = VolunteerHub.identity();
-    board.innerHTML = VolunteerHub.roles.map((role) => {
-      const list = VolunteerHub.listFor(week, role.id);
-      const rows = list.length
-        ? list.map((p, i) => `
-          <li class="${i === 0 ? 'vol-primary' : 'vol-backup'}">
-            <span class="vol-name">${p.label}${i === 0 ? ' <span class="pill">Primary</span>' : ' <span class="muted small">Backup</span>'}</span>
-            <span class="vol-actions">
-              ${i > 0 ? `<button type="button" class="btn btn-ghost vol-promote" data-role="${role.id}" data-user="${p.username}">Make primary</button>` : ''}
-              ${me && p.username.toLowerCase() === me.username.toLowerCase()
-                ? `<button type="button" class="btn btn-ghost vol-leave" data-role="${role.id}">Remove me</button>` : ''}
-            </span>
-          </li>`).join('')
-        : '<li class="muted">No volunteers yet</li>';
-      const signed = me && VolunteerHub.isSignedUp(week, role.id, me);
-      return `<div class="vol-role panel">
-        <div class="panel-head">
-          <h3>${role.label}</h3>
-          ${signed
-            ? `<span class="muted small">You’re signed up</span>`
-            : `<button type="button" class="btn vol-claim" data-role="${role.id}">Volunteer</button>`}
+    host.innerHTML = weeks.map((week) => {
+      const games = matchesForVolunteerWeek(week);
+      const date = games[0]?.date ? fmtDate(games[0].date) : '';
+      const gameBlocks = games.map((m, i) => {
+        const time = matchTimeLabel(m, i);
+        const vs = m.label || `${DB.teamName(m.home)} vs ${DB.teamName(m.away)}`;
+        const rolesHtml = VolunteerHub.roles.map((role) => {
+          const list = VolunteerHub.listFor(m.id, role.id);
+          const people = list.length
+            ? list.map((p, idx) => {
+              const canLeave = me && p.username.toLowerCase() === me.username.toLowerCase();
+              const canPromote = idx > 0;
+              return `<li class="${idx === 0 ? 'vol-primary' : 'vol-backup'}">
+                <span class="vol-name">${p.label}</span>
+                <span class="vol-actions">
+                  ${canPromote ? `<button type="button" class="btn btn-ghost vol-promote" data-match="${m.id}" data-role="${role.id}" data-user="${p.username}">Make primary</button>` : ''}
+                  ${canLeave ? `<button type="button" class="btn btn-ghost vol-leave" data-match="${m.id}" data-role="${role.id}">Remove me</button>` : ''}
+                </span>
+              </li>`;
+            }).join('')
+            : '<li class="muted">Open</li>';
+          return `<div class="vol-role-col">
+            <h4>${role.label}</h4>
+            <ul class="vol-list">${people}</ul>
+          </div>`;
+        }).join('');
+        return `<div class="vol-game-block">
+          <div class="vol-game-head">
+            <strong>${time}</strong>
+            <span class="muted small">${vs}</span>
+          </div>
+          <div class="vol-role-grid">${rolesHtml}</div>
+        </div>`;
+      }).join('');
+      return `<article class="vol-week-tile">
+        <div class="vol-week-head">
+          <h3>Week ${week}</h3>
+          <span class="muted small">${date}</span>
         </div>
-        <ul class="vol-list">${rows}</ul>
-      </div>`;
+        ${gameBlocks}
+      </article>`;
     }).join('');
 
-    $$('.vol-claim', board).forEach((btn) => {
+    $$('.vol-leave', host).forEach((btn) => {
       btn.addEventListener('click', async () => {
         try {
-          if (!VolunteerHub.identity()) {
-            VolunteerHub.setDisplayName($('#vol-name')?.value);
-          }
-          await VolunteerHub.claim(week, btn.dataset.role);
-          setMsg('Signed up — thanks!', 'ok');
-          paintBoard();
+          await VolunteerHub.leave(btn.dataset.match, btn.dataset.role);
+          setMsg('Removed from that role.', 'ok');
+          paintOverview();
         } catch (e) { setMsg(e.message || String(e), 'err'); }
       });
     });
-    $$('.vol-leave', board).forEach((btn) => {
+    $$('.vol-promote', host).forEach((btn) => {
       btn.addEventListener('click', async () => {
         try {
-          await VolunteerHub.leave(week, btn.dataset.role);
-          setMsg('Removed. Next backup (if any) is now primary.', 'ok');
-          paintBoard();
-        } catch (e) { setMsg(e.message || String(e), 'err'); }
-      });
-    });
-    $$('.vol-promote', board).forEach((btn) => {
-      btn.addEventListener('click', async () => {
-        try {
-          await VolunteerHub.promote(week, btn.dataset.role, btn.dataset.user);
-          setMsg('Backup promoted to primary.', 'ok');
-          paintBoard();
+          await VolunteerHub.promote(btn.dataset.match, btn.dataset.role, btn.dataset.user);
+          setMsg('Updated.', 'ok');
+          paintOverview();
         } catch (e) { setMsg(e.message || String(e), 'err'); }
       });
     });
   };
 
-  $('#vol-week')?.addEventListener('change', paintBoard);
-  $('#vol-save-name')?.addEventListener('click', () => {
+  $('#vol-week')?.addEventListener('change', () => {
+    fillGameOptions();
+  });
+  $('#vol-game')?.addEventListener('change', () => {
+    volunteerMatchId = $('#vol-game')?.value || null;
+  });
+
+  $('#vol-form')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
     try {
-      VolunteerHub.setDisplayName($('#vol-name')?.value);
-      setMsg('Name saved on this device.', 'ok');
-    } catch (e) { setMsg(e.message || String(e), 'err'); }
+      const week = Number($('#vol-week')?.value);
+      const matchId = $('#vol-game')?.value;
+      const role = $('#vol-role')?.value;
+      volunteerWeek = week;
+      volunteerMatchId = matchId;
+      if (!loggedIn) {
+        VolunteerHub.setDisplayName($('#vol-name')?.value);
+      } else if (!VolunteerHub.identity()) {
+        VolunteerHub.setDisplayName($('#vol-name')?.value || AdminAuth.session()?.label);
+      }
+      await VolunteerHub.claim(matchId, role);
+      setMsg('Signed up — thanks!', 'ok');
+      paintOverview();
+    } catch (err) {
+      setMsg(err.message || String(err), 'err');
+    }
   });
 
   const st = VolunteerHub.status();
   if (st.connectionError) setMsg(`Live sync issue: ${st.connectionError}`, 'err');
   else if (st.mode !== 'firebase') setMsg('Offline mode — volunteers save on this device only.', 'err');
 
-  paintBoard();
+  paintOverview();
   if (volUnsub) volUnsub();
-  volUnsub = VolunteerHub.onChange(() => paintBoard());
+  volUnsub = VolunteerHub.onChange(() => paintOverview());
 }
 
 /* =============================================================================
@@ -1892,11 +1976,6 @@ Promise.all([
       const pid = $('#profile-card')?.dataset?.playerId;
       if (pid) openProfile(pid);
     }
-  });
-  VolunteerHub.onChange(() => {
-    let tab = 'overview';
-    try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
-    if (tab === 'volunteer') go(tab);
   });
   let startTab = 'overview';
   try { startTab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}

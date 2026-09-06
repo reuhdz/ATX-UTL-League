@@ -1,9 +1,9 @@
 /* =============================================================================
-   Volunteer hub — weekly game-day roles
+   Volunteer hub — per-game game-day roles
    -----------------------------------------------------------------------------
-   Path: /volunteers/{roomId}/{week}/{role}
+   Path: /volunteers/{roomId}/{matchId}/{role}
    Shape: [ { username, label, claimedAt }, ... ]
-   First entry = primary; later entries = backups.
+   First entry = primary; later entries = backups (background ordering).
    Roles: ref | camera | safety
    ============================================================================ */
 
@@ -22,7 +22,7 @@ const VolunteerHub = (() => {
   let db = null;
   let mode = 'local';
   let connectionError = null;
-  /** @type {Record<string, Record<string, object[]>>} week -> role -> list */
+  /** @type {Record<string, Record<string, object[]>>} matchId -> role -> list */
   let table = {};
   const listeners = new Set();
 
@@ -44,7 +44,7 @@ const VolunteerHub = (() => {
   }
 
   function localKey() {
-    return `atxutl.volunteers.${roomId()}`;
+    return `atxutl.volunteers.v2.${roomId()}`;
   }
 
   function readLocal() {
@@ -79,15 +79,21 @@ const VolunteerHub = (() => {
     return raw.map(normalizePerson).filter(Boolean);
   }
 
+  function looksLikeRoleMap(row) {
+    if (!row || typeof row !== 'object' || Array.isArray(row)) return false;
+    return ROLES.some((r) => Object.prototype.hasOwnProperty.call(row, r.id));
+  }
+
   function normalizeTable(raw) {
     const out = {};
     if (!raw || typeof raw !== 'object') return out;
-    Object.keys(raw).forEach((week) => {
-      const row = raw[week];
-      if (!row || typeof row !== 'object') return;
-      out[week] = {};
+    Object.keys(raw).forEach((matchId) => {
+      const row = raw[matchId];
+      // Skip legacy week-number maps that aren't match ids with role children
+      if (!looksLikeRoleMap(row)) return;
+      out[matchId] = {};
       ROLES.forEach((r) => {
-        out[week][r.id] = normalizeList(row[r.id]);
+        out[matchId][r.id] = normalizeList(row[r.id]);
       });
     });
     return out;
@@ -115,16 +121,16 @@ const VolunteerHub = (() => {
     return identity();
   }
 
-  async function writeWeekRole(week, role, list) {
-    const w = String(week);
+  async function writeMatchRole(matchId, role, list) {
+    const id = String(matchId);
     if (mode === 'firebase' && db) {
-      await db.ref(`${path()}/${w}/${role}`).set(list);
+      await db.ref(`${path()}/${id}/${role}`).set(list);
       return;
     }
     table = {
       ...table,
-      [w]: {
-        ...(table[w] || {}),
+      [id]: {
+        ...(table[id] || {}),
         [role]: list,
       },
     };
@@ -164,52 +170,52 @@ const VolunteerHub = (() => {
     return { mode };
   }
 
-  function listFor(week, role) {
-    return (table[String(week)] && table[String(week)][role]) || [];
+  function listFor(matchId, role) {
+    return (table[String(matchId)] && table[String(matchId)][role]) || [];
   }
 
-  function primary(week, role) {
-    return listFor(week, role)[0] || null;
+  function primary(matchId, role) {
+    return listFor(matchId, role)[0] || null;
   }
 
-  function isSignedUp(week, role, who = identity()) {
+  function isSignedUp(matchId, role, who = identity()) {
     if (!who) return false;
-    return listFor(week, role).some((p) => sameUser(p.username, who.username));
+    return listFor(matchId, role).some((p) => sameUser(p.username, who.username));
   }
 
-  async function claim(week, role) {
+  async function claim(matchId, role) {
+    if (!matchId) throw new Error('Select a game');
     if (!ROLES.some((r) => r.id === role)) throw new Error('Unknown role');
     const who = identity();
     if (!who) throw new Error('Enter your name first');
-    const list = [...listFor(week, role)];
+    const list = [...listFor(matchId, role)];
     if (list.some((p) => sameUser(p.username, who.username))) {
       throw new Error('You are already on this list');
     }
     list.push({ ...who, claimedAt: Date.now() });
-    await writeWeekRole(week, role, list);
+    await writeMatchRole(matchId, role, list);
     return list;
   }
 
-  async function leave(week, role) {
+  async function leave(matchId, role) {
     const who = identity();
     if (!who) throw new Error('Enter your name first');
-    const prev = listFor(week, role);
+    const prev = listFor(matchId, role);
     const list = prev.filter((p) => !sameUser(p.username, who.username));
     if (list.length === prev.length) throw new Error('You are not on this list');
-    // Primary left → next backup is already first in the array
-    await writeWeekRole(week, role, list);
+    await writeMatchRole(matchId, role, list);
     return list;
   }
 
   /** Promote a backup to primary (must already be on the list). */
-  async function promote(week, role, username) {
-    const list = [...listFor(week, role)];
+  async function promote(matchId, role, username) {
+    const list = [...listFor(matchId, role)];
     const idx = list.findIndex((p) => sameUser(p.username, username));
     if (idx < 0) throw new Error('Volunteer not found');
     if (idx === 0) return list;
     const [person] = list.splice(idx, 1);
     list.unshift(person);
-    await writeWeekRole(week, role, list);
+    await writeMatchRole(matchId, role, list);
     return list;
   }
 

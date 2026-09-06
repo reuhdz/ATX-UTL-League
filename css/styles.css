@@ -755,33 +755,95 @@ a.btn:hover, a.btn:focus { text-decoration: none; color: inherit; }
 .contention-vote-card .se-actions { margin-top: 10px; }
 
 /* ---- Volunteer board ----------------------------------------------------- */
-.vol-board {
+.vol-form {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px 14px;
+  align-items: end;
+}
+.vol-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.vol-form .input,
+.vol-form .select { font-weight: 400; width: 100%; }
+.vol-form .se-actions { grid-column: 1 / -1; }
+@media (max-width: 700px) {
+  .vol-form { grid-template-columns: 1fr; }
+}
+
+.vol-overview {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
 }
 @media (max-width: 900px) {
-  .vol-board { grid-template-columns: 1fr; }
+  .vol-overview { grid-template-columns: 1fr; }
 }
-.vol-role { margin: 0; }
+.vol-week-tile {
+  margin: 0;
+  padding: 14px;
+  border-radius: var(--radius, 10px);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+}
+.vol-week-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.vol-week-head h3 { margin: 0; font-size: 16px; }
+.vol-game-block + .vol-game-block {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+.vol-game-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.vol-role-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+@media (max-width: 640px) {
+  .vol-role-grid { grid-template-columns: 1fr; }
+}
+.vol-role-col h4 {
+  margin: 0 0 6px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  color: var(--text-muted);
+}
 .vol-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 6px;
 }
 .vol-list li {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 8px 10px;
+  gap: 6px;
+  padding: 6px 8px;
   border-radius: 8px;
-  background: var(--surface-2);
+  background: var(--surface);
   border: 1px solid var(--border);
+  font-size: 13px;
 }
 .vol-list li.vol-primary {
   border-color: color-mix(in srgb, var(--accent, #38bdf8) 45%, var(--border));
