@@ -1323,7 +1323,7 @@ function openContentionForm(playerId) {
       <h2 id="contention-title">Stat appeal · ${p.name}</h2>
       <button type="button" class="icon-btn" id="contention-close" aria-label="Close">✕</button>
     </div>
-    <p class="muted small">Contest a recorded value or request credit. Captains/admin vote — majority after ${ContentionHub?.VOTE_QUORUM || 5} votes.</p>
+    <p class="muted small">Contest a recorded value or request credit. Captains and admin will review the stat appeal.</p>
     <form id="contention-form" class="contention-form">
       <label>Match
         <select id="sc-match" class="select">${matchOpts}</select>
@@ -1348,10 +1348,6 @@ function openContentionForm(playerId) {
       <label>Why / context
         <textarea id="sc-comment" class="input" rows="3" maxlength="500" required placeholder="Explain what should change and why"></textarea>
       </label>
-      ${!(typeof AdminAuth !== 'undefined' && AdminAuth.isLoggedIn()) ? `
-      <label>Your name
-        <input id="sc-name" class="input" maxlength="40" placeholder="Name for the request" required />
-      </label>` : ''}
       <div class="se-actions">
         <button type="button" class="btn btn-ghost" id="sc-criteria">Stat criteria</button>
         <button type="submit" class="btn">Submit appeal</button>
@@ -1407,9 +1403,8 @@ function openContentionForm(playerId) {
         proposedValue: $('#sc-value')?.value,
         videoUrl: $('#sc-video')?.value,
         comment: $('#sc-comment')?.value,
-        submitterName: $('#sc-name')?.value,
       });
-      if (msg) { msg.className = 'draft-msg ok'; msg.textContent = 'Submitted — captains will vote on /admin.'; }
+      if (msg) { msg.className = 'draft-msg ok'; msg.textContent = 'Submitted — captains and admin will review.'; }
       setTimeout(closeContentionModal, 900);
     } catch (err) {
       if (msg) { msg.className = 'draft-msg err'; msg.textContent = err.message || String(err); }
