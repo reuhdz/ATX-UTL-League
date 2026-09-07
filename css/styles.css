@@ -758,6 +758,8 @@ a.btn:hover, a.btn:focus { text-decoration: none; color: inherit; }
 }
 .ad-section[hidden] { display: none !important; }
 .ad-section.ad-visible:not([hidden]) { display: block; }
+.ad-boot-msg { margin: 0 0 12px; min-height: 0; }
+.ad-boot-msg[hidden] { display: none !important; }
 
 .ad-welcome {
   display: flex;
