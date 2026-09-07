@@ -583,6 +583,7 @@
       hubsReady = false;
       listenersBound = false;
       shellReady = false;
+      bootStarted = false;
       lastStatsSig = null;
       paintLogin();
       return;
@@ -594,8 +595,11 @@
     hubsReady = true;
     refreshSections();
 
+    if (bootStarted) return;
+    bootStarted = true;
+
     const bootMsg = $('#ad-boot-msg');
-    if (bootMsg && !listenersBound) {
+    if (bootMsg) {
       bootMsg.className = 'draft-msg';
       bootMsg.textContent = 'Connecting to live data…';
     }

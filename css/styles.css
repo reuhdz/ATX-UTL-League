@@ -757,7 +757,7 @@ a.btn:hover, a.btn:focus { text-decoration: none; color: inherit; }
   background: linear-gradient(90deg, var(--accent), var(--accent-2));
 }
 .ad-section[hidden] { display: none !important; }
-.ad-section.ad-visible { display: block; }
+.ad-section.ad-visible:not([hidden]) { display: block; }
 
 .ad-welcome {
   display: flex;
