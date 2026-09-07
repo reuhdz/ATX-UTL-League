@@ -138,6 +138,28 @@ const HighlightsHub = (() => {
     return out;
   }
 
+  function onceWithTimeout(ref, ms = 8000) {
+    return new Promise((resolve, reject) => {
+      let done = false;
+      const timer = setTimeout(() => {
+        if (done) return;
+        done = true;
+        reject(new Error('Firebase read timed out'));
+      }, ms);
+      ref.once('value', (snap) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve(snap);
+      }, (err) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
+  }
+
   async function init() {
     connectionError = null;
     connected = false;
@@ -169,12 +191,13 @@ const HighlightsHub = (() => {
         emit();
       });
       try {
-        await ref.once('value');
+        await onceWithTimeout(ref, 8000);
       } catch (e) {
         connectionError = e.message || String(e);
-        mode = 'local';
-        entries = normalizeMap(readLocal());
-        emit();
+        if (!Object.keys(entries).length) {
+          entries = normalizeMap(readLocal());
+          emit();
+        }
       }
     } else {
       entries = normalizeMap(readLocal());

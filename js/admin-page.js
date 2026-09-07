@@ -12,6 +12,7 @@
 
   let activeSection = 'overview';
   let hubsReady = false;
+  let listenersBound = false;
 
   function applyTheme() {
     let theme = 'dark';
@@ -542,36 +543,56 @@
     const s = AdminAuth.session();
     if (!s) {
       hubsReady = false;
+      listenersBound = false;
       paintLogin();
       return;
     }
 
     paintShell(s);
+    // Paint immediately so the console is usable even if Firebase is slow.
+    hubsReady = true;
+    refreshSections();
+
     const bootMsg = $('#ad-boot-msg');
     if (bootMsg) {
       bootMsg.className = 'draft-msg';
-      bootMsg.textContent = 'Loading live data…';
+      bootMsg.textContent = 'Connecting to live data…';
     }
 
-    const boot = Promise.all([
-      typeof ContentionHub !== 'undefined' ? ContentionHub.init() : Promise.resolve(),
-      typeof StatsHub !== 'undefined' ? StatsHub.init() : Promise.resolve(),
-      typeof VolunteerHub !== 'undefined' ? VolunteerHub.init() : Promise.resolve(),
-      typeof HighlightsHub !== 'undefined' ? HighlightsHub.init() : Promise.resolve(),
-    ]);
+    const withTimeout = (promise, ms, label) => Promise.race([
+      Promise.resolve().then(() => promise),
+      new Promise((resolve) => {
+        setTimeout(() => resolve({ timedOut: true, label }), ms);
+      }),
+    ]).catch((e) => ({ error: e, label }));
 
-    boot.then(() => {
-      hubsReady = true;
-      if (bootMsg) bootMsg.textContent = '';
-      refreshSections();
-      if (typeof StatsHub !== 'undefined') StatsHub.onChange(() => refreshSections());
-      if (typeof ContentionHub !== 'undefined') ContentionHub.onChange(() => refreshSections());
-      if (typeof VolunteerHub !== 'undefined') VolunteerHub.onChange(() => refreshSections());
-      if (typeof HighlightsHub !== 'undefined') HighlightsHub.onChange(() => refreshSections());
-    }).catch((e) => {
+    Promise.all([
+      typeof ContentionHub !== 'undefined' ? withTimeout(ContentionHub.init(), 10000, 'appeals') : Promise.resolve(),
+      typeof StatsHub !== 'undefined' ? withTimeout(StatsHub.init(), 10000, 'stats') : Promise.resolve(),
+      typeof VolunteerHub !== 'undefined' ? withTimeout(VolunteerHub.init(), 10000, 'volunteers') : Promise.resolve(),
+      typeof HighlightsHub !== 'undefined' ? withTimeout(HighlightsHub.init(), 10000, 'highlights') : Promise.resolve(),
+    ]).then((results) => {
+      const timed = results.filter((r) => r && r.timedOut).map((r) => r.label);
+      const errored = results.filter((r) => r && r.error);
       if (bootMsg) {
-        bootMsg.className = 'draft-msg err';
-        bootMsg.textContent = e.message || String(e);
+        if (errored.length) {
+          bootMsg.className = 'draft-msg err';
+          bootMsg.textContent = errored.map((r) => r.error?.message || r.label).join(' · ');
+        } else if (timed.length) {
+          bootMsg.className = 'draft-msg';
+          bootMsg.textContent = `Still syncing ${timed.join(', ')}… UI is ready.`;
+          setTimeout(() => { if (bootMsg.textContent.includes('Still syncing')) bootMsg.textContent = ''; }, 4000);
+        } else {
+          bootMsg.textContent = '';
+        }
+      }
+      refreshSections();
+      if (!listenersBound) {
+        listenersBound = true;
+        if (typeof StatsHub !== 'undefined') StatsHub.onChange(() => refreshSections());
+        if (typeof ContentionHub !== 'undefined') ContentionHub.onChange(() => refreshSections());
+        if (typeof VolunteerHub !== 'undefined') VolunteerHub.onChange(() => refreshSections());
+        if (typeof HighlightsHub !== 'undefined') HighlightsHub.onChange(() => refreshSections());
       }
     });
   }

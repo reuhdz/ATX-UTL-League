@@ -334,8 +334,15 @@ const StatsHub = (() => {
   }
 
   async function probeDatabase(url) {
+    const ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+    const timer = setTimeout(() => {
+      try { ctrl?.abort(); } catch (e) { /* ignore */ }
+    }, 6000);
     try {
-      const res = await fetch(`${url.replace(/\/$/, '')}/.json`, { method: 'GET' });
+      const res = await fetch(`${url.replace(/\/$/, '')}/.json`, {
+        method: 'GET',
+        signal: ctrl?.signal,
+      });
       const text = await res.text();
       if (res.status === 404) throw new Error('Realtime Database not found at databaseURL (404).');
       if (res.status === 401 || res.status === 403 || text.includes('Permission denied')) {
@@ -344,8 +351,33 @@ const StatsHub = (() => {
       return { ok: true, locked: false };
     } catch (e) {
       if (e.message.includes('Realtime Database not found')) throw e;
+      if (e.name === 'AbortError') throw new Error(`Database probe timed out (${url})`);
       throw new Error(`Cannot reach databaseURL (${url}): ${e.message}`);
+    } finally {
+      clearTimeout(timer);
     }
+  }
+
+  function onceWithTimeout(ref, ms = 8000) {
+    return new Promise((resolve, reject) => {
+      let done = false;
+      const timer = setTimeout(() => {
+        if (done) return;
+        done = true;
+        reject(new Error('Firebase read timed out'));
+      }, ms);
+      ref.once('value', (snap) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        resolve(snap);
+      }, (err) => {
+        if (done) return;
+        done = true;
+        clearTimeout(timer);
+        reject(err);
+      });
+    });
   }
 
   async function init() {
@@ -384,13 +416,15 @@ const StatsHub = (() => {
         emit();
       });
       try {
-        await ref.once('value');
+        await onceWithTimeout(ref, 8000);
       } catch (e) {
         connectionError = `Cannot read match results: ${e.message || e}`;
-        mode = 'local';
-        results = normalizeMap(readLocal());
-        applyToDB();
-        emit();
+        // Keep firebase listeners attached; fall back to any local cache for first paint
+        if (!Object.keys(results).length) {
+          results = normalizeMap(readLocal());
+          applyToDB();
+          emit();
+        }
       }
     } else {
       results = normalizeMap(readLocal());
