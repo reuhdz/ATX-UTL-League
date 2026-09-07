@@ -993,7 +993,7 @@ function renderMedia() {
         const top = (typeof HighlightsHub !== 'undefined' && HighlightsHub.topForMatch)
           ? HighlightsHub.topForMatch(m.id, 3, m.round) : [];
         if (!top.length) return;
-        const hueA = DB.team(m.home).color, hueB = DB.team(m.away).color;
+        const hueA = teamColor(m.home), hueB = teamColor(m.away);
         top.forEach((h, i) => {
           const player = h.playerId ? DB.player(h.playerId) : null;
           const primary = (h.urls && h.urls[0]) || h.url || '#';
@@ -1030,7 +1030,7 @@ function renderMedia() {
     $('#game-film').innerHTML = rows.length ? rows.map((m) => {
       const slug = matchFilmSlug(m);
       const href = matchFilmHref(m);
-      const hueA = DB.team(m.home).color, hueB = DB.team(m.away).color;
+      const hueA = teamColor(m.home), hueB = teamColor(m.away);
       const scoreline = m.status === 'final'
         ? `<span class="game-score">${m.homeScore} – ${m.awayScore}</span>`
         : `<span class="game-score up">Upcoming</span>`;
