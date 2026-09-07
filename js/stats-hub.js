@@ -127,8 +127,10 @@ const StatsHub = (() => {
   }
 
   function normalizeHistory(raw) {
-    if (!Array.isArray(raw)) return [];
-    return raw.map(normalizeHistoryEntry).filter(Boolean)
+    const list = Array.isArray(raw)
+      ? raw
+      : (raw && typeof raw === 'object' ? Object.values(raw) : []);
+    return list.map(normalizeHistoryEntry).filter(Boolean)
       .sort((a, b) => (a.at || 0) - (b.at || 0));
   }
 
@@ -164,7 +166,7 @@ const StatsHub = (() => {
 
   function historyFor(matchId) {
     const res = results[String(matchId)];
-    return res?.saveHistory ? [...res.saveHistory] : [];
+    return normalizeHistory(res?.saveHistory);
   }
 
   function actionLabel(action) {
@@ -303,28 +305,34 @@ const StatsHub = (() => {
     const matches = window.DB?.matches;
     if (!matches) return;
     matches.forEach((m) => {
-      const base = baseMatches.find((b) => b.id === m.id) || cloneMatch(m);
-      Object.assign(m, cloneMatch(base));
-      m.seriesSavedBy = null;
-      m.boxSavedBy = null;
-      m.updatedBy = null;
-      m.events = [];
-      const res = results[m.id];
-      if (!res) return;
-      m.status = 'final';
-      m.format = res.format;
-      m.games = res.games.map((g) => ({ ...g }));
-      m.homeScore = res.homeScore;
-      m.awayScore = res.awayScore;
-      m.pointsHome = res.pointsHome;
-      m.pointsAway = res.pointsAway;
-      m.homeLineup = [...res.homeLineup];
-      m.awayLineup = [...res.awayLineup];
-      m.box = res.box.map((b) => ({ ...b }));
-      m.events = (res.events || []).map((e) => ({ ...e }));
-      m.seriesSavedBy = res.seriesSavedBy;
-      m.boxSavedBy = res.boxSavedBy;
-      m.updatedBy = res.updatedBy;
+      try {
+        const base = baseMatches.find((b) => b.id === m.id) || cloneMatch(m);
+        Object.assign(m, cloneMatch(base));
+        m.seriesSavedBy = null;
+        m.boxSavedBy = null;
+        m.updatedBy = null;
+        m.events = [];
+        const res = results[m.id];
+        if (!res) return;
+        const games = Array.isArray(res.games) ? res.games : [];
+        const box = Array.isArray(res.box) ? res.box : [];
+        m.status = 'final';
+        m.format = res.format;
+        m.games = games.map((g) => ({ ...g }));
+        m.homeScore = res.homeScore;
+        m.awayScore = res.awayScore;
+        m.pointsHome = res.pointsHome;
+        m.pointsAway = res.pointsAway;
+        m.homeLineup = [...(res.homeLineup || [])];
+        m.awayLineup = [...(res.awayLineup || [])];
+        m.box = box.map((b) => ({ ...b }));
+        m.events = (res.events || []).map((e) => ({ ...e }));
+        m.seriesSavedBy = res.seriesSavedBy;
+        m.boxSavedBy = res.boxSavedBy;
+        m.updatedBy = res.updatedBy;
+      } catch (e) {
+        console.warn('Stats overlay failed for', m?.id, e);
+      }
     });
     try {
       if (window.DB && typeof window.DB.refreshPlayoffAssignments === 'function') {
@@ -403,7 +411,9 @@ const StatsHub = (() => {
     if (mode === 'firebase') {
       const ref = db.ref(`matchResults/${roomId()}`);
       unsubConn = db.ref('.info/connected').on('value', (snap) => {
-        connected = !!snap.val();
+        const next = !!snap.val();
+        if (next === connected) return;
+        connected = next;
         emit();
       });
       unsub = ref.on('value', (snap) => {
