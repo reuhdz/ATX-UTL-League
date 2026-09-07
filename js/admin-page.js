@@ -1,6 +1,6 @@
 /* /admin — staff console: overview, appeals, save history, tools */
 (() => {
-  const $ = (sel, root = document) => root.querySelector(sel);
+  const $ = (sel, root = document) => (root || document).querySelector(sel);
   const $$ = (sel, root = document) => [...(root || document).querySelectorAll(sel)];
   const root = $('#admin-app');
   if (!root) return;
@@ -13,6 +13,10 @@
   let activeSection = 'overview';
   let hubsReady = false;
   let listenersBound = false;
+  let shellReady = false;
+  let refreshTimer = null;
+  let lastStatsSig = null;
+  let bootStarted = false;
 
   function applyTheme() {
     let theme = 'dark';
@@ -53,9 +57,12 @@
     const open = appeals.filter((e) => e.status === 'open');
     const passed = appeals.filter((e) => e.status === 'passed');
     const matches = (window.DB?.matches || []).filter((m) => typeof StatsHub !== 'undefined' && StatsHub.getResult(m.id));
-    const pendingHl = typeof HighlightsHub !== 'undefined'
-      ? HighlightsHub.list().filter((e) => e.status === 'pending').length
-      : 0;
+    let pendingHl = 0;
+    try {
+      if (typeof HighlightsHub !== 'undefined' && typeof HighlightsHub.list === 'function') {
+        pendingHl = HighlightsHub.list().filter((e) => e && e.status === 'pending').length;
+      }
+    } catch (e) { pendingHl = 0; }
     let volClaims = 0;
     if (typeof VolunteerHub !== 'undefined') {
       (window.DB?.matches || []).forEach((m) => {
@@ -223,7 +230,7 @@
         </div>`}
 
       <div class="ad-split">
-        <section class="ad-panel">
+        <div class="ad-panel">
           <div class="panel-head">
             <h3>Recent appeals</h3>
             <button type="button" class="btn btn-ghost ad-goto" data-goto-section="appeals">View all</button>
@@ -234,13 +241,13 @@
                 <li>
                   <div>
                     <strong>${escapeHtml(e.playerName)}</strong>
-                    <span class="muted small"> · ${FIELD_LABEL[e.field] || e.field} → ${e.proposedValue}</span>
+                    <span class="muted small"> · ${escapeHtml(FIELD_LABEL[e.field] || e.field)} → ${escapeHtml(e.proposedValue)}</span>
                   </div>
-                  <span class="badge ${e.status === 'passed' ? 'done' : (e.status === 'open' ? 'up' : '')}">${e.status}</span>
+                  <span class="badge ${e.status === 'passed' ? 'done' : (e.status === 'open' ? 'up' : '')}">${escapeHtml(e.status)}</span>
                 </li>`).join('')}
             </ul>` : '<p class="muted">No appeals yet.</p>'}
-        </section>
-        <section class="ad-panel">
+        </div>
+        <div class="ad-panel">
           <div class="panel-head">
             <h3>Latest saves</h3>
             <button type="button" class="btn btn-ghost ad-goto" data-goto-section="history">View all</button>
@@ -256,7 +263,7 @@
                   <button type="button" class="btn btn-ghost ad-open-history" data-match="${m.id}">History</button>
                 </li>`).join('')}
             </ul>` : '<p class="muted">No saved match stats yet.</p>'}
-        </section>
+        </div>
       </div>
     `;
 
@@ -452,20 +459,50 @@
   }
 
   function refreshSections() {
-    if (!hubsReady) return;
-    paintOverview();
-    paintContentions();
-    paintSaveHistory();
-    paintTools();
+    if (!hubsReady || !shellReady) return;
+    const painters = [
+      ['overview', paintOverview],
+      ['appeals', paintContentions],
+      ['history', paintSaveHistory],
+      ['tools', paintTools],
+    ];
+    painters.forEach(([id, fn]) => {
+      try {
+        fn();
+      } catch (e) {
+        console.error(`Admin ${id} paint failed`, e);
+        const host = $(`#ad-section-${id === 'history' ? 'history' : id === 'appeals' ? 'appeals' : id === 'tools' ? 'tools' : 'overview'}`);
+        if (host) {
+          host.innerHTML = `<p class="draft-msg err">${escapeHtml(e.message || String(e))}</p>`;
+        }
+      }
+    });
     syncNav();
   }
 
+  function scheduleRefresh() {
+    if (refreshTimer) clearTimeout(refreshTimer);
+    refreshTimer = setTimeout(() => {
+      refreshTimer = null;
+      refreshSections();
+    }, 50);
+  }
+
+  function onStatsHubChange(state) {
+    const sig = JSON.stringify(state?.results ?? {});
+    if (sig === lastStatsSig) return;
+    lastStatsSig = sig;
+    scheduleRefresh();
+  }
+
   function syncNav() {
-    $$('.ad-nav-btn').forEach((b) => {
+    $$('.ad-nav-btn', root).forEach((b) => {
       b.classList.toggle('active', b.dataset.section === activeSection);
     });
-    $$('.ad-section').forEach((sec) => {
-      sec.hidden = sec.dataset.section !== activeSection;
+    $$('.ad-section', root).forEach((sec) => {
+      const on = sec.dataset.section === activeSection;
+      sec.hidden = !on;
+      sec.classList.toggle('ad-visible', on);
     });
   }
 
@@ -485,18 +522,19 @@
         <button type="button" class="ad-nav-btn" data-section="tools">Tools</button>
       </nav>
       <div id="ad-boot-msg" class="draft-msg"></div>
-      <section class="ad-section" data-section="overview" id="ad-section-overview"></section>
+      <section class="ad-section ad-visible" data-section="overview" id="ad-section-overview"></section>
       <section class="ad-section" data-section="appeals" id="ad-section-appeals" hidden></section>
       <section class="ad-section" data-section="history" id="ad-section-history" hidden></section>
       <section class="ad-section" data-section="tools" id="ad-section-tools" hidden></section>
     `;
-    $$('.ad-nav-btn').forEach((btn) => {
+    $$('.ad-nav-btn', root).forEach((btn) => {
       btn.addEventListener('click', () => setSection(btn.dataset.section));
     });
     try {
       const saved = localStorage.getItem('atxutl.adminSection');
       if (saved && ['overview', 'appeals', 'history', 'tools'].includes(saved)) activeSection = saved;
     } catch (e) { /* ignore */ }
+    shellReady = true;
     syncNav();
   }
 
@@ -544,17 +582,20 @@
     if (!s) {
       hubsReady = false;
       listenersBound = false;
+      shellReady = false;
+      lastStatsSig = null;
       paintLogin();
       return;
     }
 
-    paintShell(s);
-    // Paint immediately so the console is usable even if Firebase is slow.
+    if (!shellReady || !$('.ad-nav', root)) {
+      paintShell(s);
+    }
     hubsReady = true;
     refreshSections();
 
     const bootMsg = $('#ad-boot-msg');
-    if (bootMsg) {
+    if (bootMsg && !listenersBound) {
       bootMsg.className = 'draft-msg';
       bootMsg.textContent = 'Connecting to live data…';
     }
@@ -574,25 +615,26 @@
     ]).then((results) => {
       const timed = results.filter((r) => r && r.timedOut).map((r) => r.label);
       const errored = results.filter((r) => r && r.error);
-      if (bootMsg) {
+      const msg = $('#ad-boot-msg');
+      if (msg) {
         if (errored.length) {
-          bootMsg.className = 'draft-msg err';
-          bootMsg.textContent = errored.map((r) => r.error?.message || r.label).join(' · ');
+          msg.className = 'draft-msg err';
+          msg.textContent = errored.map((r) => r.error?.message || r.label).join(' · ');
         } else if (timed.length) {
-          bootMsg.className = 'draft-msg';
-          bootMsg.textContent = `Still syncing ${timed.join(', ')}… UI is ready.`;
-          setTimeout(() => { if (bootMsg.textContent.includes('Still syncing')) bootMsg.textContent = ''; }, 4000);
+          msg.className = 'draft-msg';
+          msg.textContent = `Still syncing ${timed.join(', ')}… UI is ready.`;
+          setTimeout(() => { if (msg.textContent.includes('Still syncing')) msg.textContent = ''; }, 4000);
         } else {
-          bootMsg.textContent = '';
+          msg.textContent = '';
         }
       }
       refreshSections();
       if (!listenersBound) {
         listenersBound = true;
-        if (typeof StatsHub !== 'undefined') StatsHub.onChange(() => refreshSections());
-        if (typeof ContentionHub !== 'undefined') ContentionHub.onChange(() => refreshSections());
-        if (typeof VolunteerHub !== 'undefined') VolunteerHub.onChange(() => refreshSections());
-        if (typeof HighlightsHub !== 'undefined') HighlightsHub.onChange(() => refreshSections());
+        if (typeof StatsHub !== 'undefined') StatsHub.onChange(onStatsHubChange);
+        if (typeof ContentionHub !== 'undefined') ContentionHub.onChange(() => scheduleRefresh());
+        if (typeof VolunteerHub !== 'undefined') VolunteerHub.onChange(() => scheduleRefresh());
+        if (typeof HighlightsHub !== 'undefined') HighlightsHub.onChange(() => scheduleRefresh());
       }
     });
   }

@@ -756,6 +756,8 @@ a.btn:hover, a.btn:focus { text-decoration: none; color: inherit; }
   color: #041018;
   background: linear-gradient(90deg, var(--accent), var(--accent-2));
 }
+.ad-section[hidden] { display: none !important; }
+.ad-section.ad-visible { display: block; }
 
 .ad-welcome {
   display: flex;
