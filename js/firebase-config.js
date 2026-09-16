@@ -3,6 +3,12 @@
    -----------------------------------------------------------------------------
    Project: utl-draft
    Captain PINs = "utl" + team name as one lowercase word.
+
+   Realtime Database rules live in /database.rules.json (no test-mode expiry).
+   Publish them from Firebase Console → Realtime Database → Rules, or:
+     firebase deploy --only database
+   The dashboard does not use Firebase Auth; staff login is client-side, so
+   these paths stay world-readable/writable. Unknown top-level keys are denied.
    ============================================================================ */
 
 window.FIREBASE_CONFIG = {
