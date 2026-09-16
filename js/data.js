@@ -371,6 +371,26 @@ const DB = {
     return p.blocks * w.blocks + p.steals * w.steals;
   },
 
+  /** Players with at least one match, already sorted by rating. */
+  playedPlayers() {
+    return this.ratedPlayers().filter((p) => p.matches > 0);
+  },
+
+  /**
+   * Live top-N for Overview award tiles. Recomputed from current box scores
+   * (including StatsHub overlays) so the lists move as stats are saved.
+   * kind: 'rated' | 'torpedo' | 'glove'
+   */
+  awardContenders(kind, n = 5) {
+    const played = this.playedPlayers();
+    const ranked = kind === 'torpedo'
+      ? [...played].sort((a, b) => this.torpedoScore(b) - this.torpedoScore(a) || b.goals - a.goals)
+      : kind === 'glove'
+        ? [...played].sort((a, b) => this.gloveScore(b) - this.gloveScore(a) || b.blocks - a.blocks)
+        : played;
+    return ranked.slice(0, n);
+  },
+
   team: (id) => TEAMS.find((t) => t.id === id),
   player: (id) => PLAYERS.find((p) => p.id === id),
   teamName: (id) => {

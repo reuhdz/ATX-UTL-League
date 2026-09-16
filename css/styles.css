@@ -140,6 +140,17 @@ img, canvas, video, table { max-width: 100%; }
   background: linear-gradient(160deg, var(--surface), var(--surface-2));
   border: 1px solid var(--border); border-radius: var(--radius); box-shadow: var(--shadow);
 }
+.stat-card.has-leaders {
+  cursor: pointer;
+  transition: border-color .15s, box-shadow .15s;
+}
+.stat-card.has-leaders:hover,
+.stat-card.has-leaders:focus-visible,
+.stat-card.has-leaders.is-open {
+  border-color: color-mix(in srgb, var(--accent) 50%, var(--border));
+  box-shadow: var(--shadow), 0 0 0 1px color-mix(in srgb, var(--accent) 25%, transparent);
+  outline: none;
+}
 .stat-icon {
   width: 48px; height: 48px; flex: none; border-radius: 14px; display: grid; place-items: center;
   font-size: 24px; background: color-mix(in srgb, var(--accent) 18%, transparent);
@@ -348,6 +359,18 @@ th.sorted-desc::after { content: " ▼"; color: var(--accent); opacity: 1; }
 .info-pop.is-open { display: flex; }
 .info-pop b { color: var(--text); }
 .info-pop .gl { display: block; }
+.info-pop.leaders-pop { width: min(320px, calc(100vw - 24px)); gap: 4px; }
+.contender-list { list-style: none; margin: 2px 0 0; padding: 0; }
+.contender-list li {
+  display: flex; align-items: center; gap: 8px;
+  padding: 7px 0; border-bottom: 1px solid var(--border);
+}
+.contender-list li:last-child { border-bottom: 0; }
+.contender-list .lead-rank { width: 18px; font-size: 12px; }
+.contender-list li:first-child .lead-rank { color: var(--accent); }
+.contender-list .lead-name { font-size: 13px; }
+.contender-list .lead-name .plink { font-size: 13px; }
+.contender-list .lead-stat { font-size: 12px; white-space: nowrap; }
 
 /* ---- Free agents grid ---------------------------------------------------- */
 .fa-panel { margin-top: 8px; }

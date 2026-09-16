@@ -213,6 +213,11 @@ function closeAllInfoPops(except) {
     pop.classList.remove('is-open');
     const btn = pop.previousElementSibling;
     if (btn?.classList?.contains('info-i')) btn.setAttribute('aria-expanded', 'false');
+    const card = pop.closest('.stat-card.has-leaders');
+    if (card) {
+      card.classList.remove('is-open');
+      card.setAttribute('aria-expanded', 'false');
+    }
   });
 }
 
@@ -222,10 +227,12 @@ function positionInfoPop(info) {
   if (!pop || !icon) return;
   pop.classList.add('is-open');
   icon.setAttribute('aria-expanded', 'true');
+  placePop(icon, pop);
+}
 
+function placePop(anchor, pop) {
   const pad = 12;
-  // Measure after display so size is correct
-  const ir = icon.getBoundingClientRect();
+  const ir = anchor.getBoundingClientRect();
   const pw = pop.offsetWidth;
   const ph = pop.offsetHeight;
   let left = ir.left + ir.width / 2 - pw / 2;
@@ -239,6 +246,88 @@ function positionInfoPop(info) {
 
   pop.style.left = `${Math.round(left)}px`;
   pop.style.top = `${Math.round(top)}px`;
+}
+
+function leadersPopHtml(kind) {
+  const meta = {
+    rated: { title: '⭐ Top 5 rated', stat: (p) => `${p.rating}/10` },
+    torpedo: { title: '🔥 Golden Torpedo — top 5', stat: (p) => `${p.goals}G · ${p.assists}A` },
+    glove: { title: '🧤 Golden Glove — top 5', stat: (p) => `${p.steals}S · ${p.blocks}B` },
+  }[kind];
+  if (!meta) return '';
+  // Always read live totals so the list matches the latest saved box scores.
+  const list = DB.awardContenders(kind, 5);
+  if (!list.length) {
+    return `<b>${meta.title}</b><span class="gl">No games yet.</span>`;
+  }
+  return `<b>${meta.title}</b><ol class="contender-list">${list.map((p, i) => `
+    <li>
+      <span class="lead-rank">${i + 1}</span>
+      <span class="lead-name">${playerLink(p.playerId)}<small>${teamBadge(p.teamId)}</small></span>
+      <span class="lead-stat">${meta.stat(p)}</span>
+    </li>`).join('')}</ol>`;
+}
+
+function positionLeadersPop(card) {
+  const pop = card.querySelector('.leaders-pop');
+  if (!pop) return;
+  const kind = card.dataset.leaders;
+  pop.innerHTML = leadersPopHtml(kind);
+  pop.classList.add('is-open');
+  card.classList.add('is-open');
+  card.setAttribute('aria-expanded', 'true');
+  placePop(card, pop);
+}
+
+function bindLeadersPops(root = document) {
+  $$('.stat-card.has-leaders', root).forEach((card) => {
+    if (card.dataset.bound) return;
+    card.dataset.bound = '1';
+    const pop = card.querySelector('.leaders-pop');
+    if (!pop) return;
+    let hideTimer = null;
+    const canHover = () => window.matchMedia('(hover: hover)').matches;
+
+    const show = () => {
+      clearTimeout(hideTimer);
+      closeAllInfoPops(pop);
+      positionLeadersPop(card);
+    };
+    const hide = () => {
+      pop.classList.remove('is-open');
+      card.classList.remove('is-open');
+      card.setAttribute('aria-expanded', 'false');
+    };
+    const scheduleHide = () => {
+      if (!canHover()) return;
+      clearTimeout(hideTimer);
+      hideTimer = setTimeout(hide, 140);
+    };
+    const fromInfo = (e) => e.target.closest('.info');
+
+    card.addEventListener('mouseenter', (e) => {
+      if (!canHover() || fromInfo(e)) return;
+      show();
+    });
+    pop.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+    card.addEventListener('mouseleave', scheduleHide);
+    pop.addEventListener('mouseleave', scheduleHide);
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('.info, .plink, .leaders-pop')) return;
+      if (canHover()) return;
+      e.preventDefault();
+      e.stopPropagation();
+      if (pop.classList.contains('is-open')) hide();
+      else show();
+    });
+    card.addEventListener('keydown', (e) => {
+      if (e.target !== card) return;
+      if (e.key !== 'Enter' && e.key !== ' ') return;
+      e.preventDefault();
+      if (pop.classList.contains('is-open')) hide();
+      else show();
+    });
+  });
 }
 
 function bindInfoPops(root = document) {
@@ -291,6 +380,7 @@ function wrapTables(root) {
     }
   });
   bindInfoPops(root);
+  bindLeadersPops(root);
 }
 
 /* =============================================================================
@@ -298,31 +388,27 @@ function wrapTables(root) {
    ============================================================================ */
 function renderDashboard() {
   const standings = DB.standings();
-  const rated = DB.ratedPlayers().filter((p) => p.matches > 0);
+  const rated = DB.playedPlayers();
   const finals = DB.finals();
   const upcoming = DB.upcoming();
-  const leader = rated[0];
-  // Golden Torpedo: Goals×2 + Assists×1 (goals weighted higher)
-  const topScorer = [...rated].sort((a, b) =>
-    DB.torpedoScore(b) - DB.torpedoScore(a) || b.goals - a.goals)[0];
-  // Golden Glove: Blocks×2 + Steals×1 (blocks weighted higher)
-  const topDefense = [...rated].sort((a, b) =>
-    DB.gloveScore(b) - DB.gloveScore(a) || b.blocks - a.blocks)[0];
+  const leader = DB.awardContenders('rated', 1)[0];
+  const topScorer = DB.awardContenders('torpedo', 1)[0];
+  const topDefense = DB.awardContenders('glove', 1)[0];
 
   const cards = [
     { icon: '🎮', label: 'Matches played', value: finals.length, sub: `${upcoming.length} upcoming` },
     {
-      icon: '⭐', label: 'Top rated', info: ratingInfoHtml(),
+      icon: '⭐', label: 'Top rated', info: ratingInfoHtml(), leaders: 'rated',
       value: leader ? playerLink(leader.playerId) : '—',
       sub: leader ? `${teamBadge(leader.teamId)} · ${leader.rating}/10` : 'No games yet',
     },
     {
-      icon: '🔥', label: 'Golden Torpedo', info: goldenTorpedoInfoHtml(),
+      icon: '🔥', label: 'Golden Torpedo', info: goldenTorpedoInfoHtml(), leaders: 'torpedo',
       value: topScorer ? playerLink(topScorer.playerId) : '—',
       sub: topScorer ? `${topScorer.goals} goals · ${topScorer.assists} assists` : 'No offense yet',
     },
     {
-      icon: '🧤', label: 'Golden Glove', info: goldenGloveInfoHtml(),
+      icon: '🧤', label: 'Golden Glove', info: goldenGloveInfoHtml(), leaders: 'glove',
       value: topDefense ? playerLink(topDefense.playerId) : '—',
       sub: topDefense ? `${topDefense.steals} steals · ${topDefense.blocks} blocks` : 'No defense yet',
     },
@@ -336,13 +422,14 @@ function renderDashboard() {
 
     <div class="stat-cards">
       ${cards.map((c) => `
-        <div class="stat-card">
+        <div class="stat-card${c.leaders ? ' has-leaders' : ''}"${c.leaders ? ` data-leaders="${c.leaders}" tabindex="0" aria-haspopup="true" aria-expanded="false" title="Hover or tap for top 5"` : ''}>
           <div class="stat-icon">${c.icon}</div>
           <div class="stat-body">
             <div class="stat-value">${c.value}</div>
             <div class="stat-label">${c.label}${c.info ? ' ' + infoIcon(c.info) : ''}</div>
             <div class="stat-sub">${c.sub}</div>
           </div>
+          ${c.leaders ? '<div class="info-pop leaders-pop" role="tooltip"></div>' : ''}
         </div>`).join('')}
     </div>
 
@@ -1901,7 +1988,7 @@ function go(tab) {
 
 function initClicks() {
   document.body.addEventListener('click', (e) => {
-    if (!e.target.closest('.info')) closeAllInfoPops();
+    if (!e.target.closest('.info, .stat-card.has-leaders')) closeAllInfoPops();
     const goTo = e.target.closest('[data-goto]');
     if (goTo) {
       scrollTarget = goTo.dataset.scroll || null;
@@ -1915,7 +2002,7 @@ function initClicks() {
       return;
     }
     const pl = e.target.closest('[data-player]');
-    if (pl) { openProfile(pl.dataset.player); return; }
+    if (pl) { closeAllInfoPops(); openProfile(pl.dataset.player); return; }
     const tm = e.target.closest('[data-team]');
     if (tm && !tm.classList.contains('seg-btn')) { teamHighlight = tm.dataset.team; go('teams'); return; }
   });
@@ -1927,6 +2014,8 @@ function initClicks() {
     $$('.info-pop.is-open').forEach((pop) => {
       const info = pop.closest('.info');
       if (info) positionInfoPop(info);
+      const card = pop.closest('.stat-card.has-leaders');
+      if (card) positionLeadersPop(card);
     });
   }, { passive: true });
   window.addEventListener('scroll', (e) => {
