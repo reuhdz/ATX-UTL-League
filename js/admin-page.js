@@ -62,6 +62,7 @@
       <section class="panel admin-links">
         <ul class="admin-link-list">
           <li><a class="btn" href="../stats/">Match stats entry</a></li>
+          <li><a class="btn btn-ghost" href="../contention/">Stat contention</a></li>
           <li><a class="btn btn-ghost" href="../season-5-highlights/">Highlight nominations</a></li>
           <li><a class="btn btn-ghost" href="../#volunteer">Volunteer board</a></li>
           <li><a class="btn btn-ghost" href="../">League dashboard</a></li>

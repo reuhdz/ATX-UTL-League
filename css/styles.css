@@ -1018,6 +1018,12 @@ a.btn:hover, a.btn:focus { text-decoration: none; color: inherit; }
   background: var(--surface-2);
 }
 .contention-vote-card .se-actions { margin-top: 10px; }
+.contention-vote-meta { display: flex; flex-wrap: wrap; gap: 8px 12px; align-items: center; margin: 0 0 8px; }
+.contention-vote-tally { font-size: 13px; color: var(--text-muted); }
+.pill.open { background: color-mix(in srgb, var(--accent) 22%, transparent); color: var(--accent); }
+.pill.passed { background: color-mix(in srgb, #22c55e 22%, transparent); color: #4ade80; }
+.pill.failed { background: color-mix(in srgb, #ef4444 20%, transparent); color: #fca5a5; }
+.pill.applied { background: color-mix(in srgb, #a78bfa 22%, transparent); color: #c4b5fd; }
 
 /* ---- Volunteer board ----------------------------------------------------- */
 .vol-form {
