@@ -105,7 +105,7 @@ const FAQ = [
     a:
       'Open a player spotlight or profile and tap Stat appeal. Pick the match and stat, ' +
       'propose a value (contest an existing number or request a missing credit), add a comment, ' +
-      'and optionally a video link. Captains and admin vote on /admin — after 5 votes, a majority ' +
+      'and optionally a video link. Captains and admin vote from Admin → Stat contention — after 5 votes, a majority ' +
       'for the request passes it so staff can apply the change to the box score.',
   },
   {
