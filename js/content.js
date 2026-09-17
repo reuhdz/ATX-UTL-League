@@ -7,8 +7,10 @@ const RULES = [
   {
     title: 'The objective',
     body:
-      'Two teams of five compete in the deep end (ideally 13–14 ft) to place an ' +
-      '~11 oz rubber torpedo into the opponent’s bottom-anchored goal. Substitutes ' +
+      'Two teams of five compete in the deep end (ideally 13–14 ft) to score with an ' +
+      '~11 oz rubber torpedo at the opponent’s bottom-anchored goal. A goal counts when ' +
+      'any part of the torpedo breaks the plane of the goal line — same idea as the ball ' +
+      'crossing the line in soccer or breaking the plane in football. Substitutes ' +
       'wait on the wall and rotate in as players surface for air.',
   },
   {
@@ -67,7 +69,10 @@ const FAQ = [
   },
   {
     q: 'How do you score?',
-    a: 'Get the torpedo into the opposing goal while staying submerged. Matches are played to 5.',
+    a:
+      'A goal counts when any part of the torpedo breaks the plane of the goal line — ' +
+      'like the ball crossing the line in soccer or breaking the plane in football — ' +
+      'while you stay submerged. Matches are played to 5.',
   },
   {
     q: 'How are player ratings calculated?',
@@ -266,7 +271,8 @@ const PLAYER_STAT_INDEX = [
   {
     key: 'G', name: 'Goals',
     desc:
-      'Torpedo fully placed in the opponent’s goal on a legal play. Closest to a soccer/hockey goal. ' +
+      'Any part of the torpedo breaks the plane of the opponent’s goal line on a legal play — ' +
+      'same standard as soccer (ball crosses the line) and football (ball breaks the plane). ' +
       'One value per score — no 2s/3s.',
   },
   {

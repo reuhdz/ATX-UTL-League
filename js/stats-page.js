@@ -15,7 +15,7 @@
     turnovers: 'TO', swimOffAttempts: 'SOA', swimOffs: 'SO', shots: 'SH',
   };
   const FIELD_TITLES = {
-    goals: 'Goals — torpedo placed in the opponent’s goal',
+    goals: 'Goals — any part of the torpedo breaks the goal-line plane (like soccer / football)',
     assists: 'Assists — last pass/hand-off leading to a teammate’s goal',
     steals: 'Steals — takeaway from carrier or clear interception of an attempted pass (not a loose recovery)',
     blocks: 'Blocks — deny a look at goal only inside the scoring zone (near wall to 3rd lane line)',
