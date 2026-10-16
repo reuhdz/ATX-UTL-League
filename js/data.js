@@ -445,11 +445,22 @@ const DB = {
   },
 
   /**
-   * Fill playoff home/away from regular-season seeds + completed semis.
+   * Official Season 5 playoff seeds (locked). Falls back to regular-season
+   * standings only if this list is empty.
+   * 1 Lone Starfish · 2 Capybara · 3 Splash Damage · 4 Flying Hellfish
+   */
+  playoffSeeds: ['team2', 'capybara', 'team3', 'team1'],
+
+  /**
+   * Fill playoff home/away from seeds + completed semis.
+   * Always resolves placeholders — even after a match is marked final — so the
+   * schedule and /stats entry never stay stuck on "Seed 1" / "Winner TBD".
    * Mutates MATCHES in place (same pattern as StatsHub overlays).
    */
   refreshPlayoffAssignments() {
-    const seeds = this.regularStandings().map((s) => s.teamId);
+    const seeds = (this.playoffSeeds && this.playoffSeeds.length >= 4)
+      ? this.playoffSeeds.slice()
+      : this.regularStandings().map((s) => s.teamId);
     const seedOf = (n) => seeds[n - 1] || `seed:${n}`;
     const bySlot = {};
     MATCHES.forEach((m) => {
@@ -461,37 +472,28 @@ const DB = {
     const final = bySlot.final;
     const consol = bySlot.consolation;
 
+    // Semis always follow the seed bracket (1v4 @ 8am, 2v3 @ 9am).
     if (semiA) {
-      if (seeds.length >= 4 || semiA.status !== 'final') {
-        // Keep resolved teams once a semi is final; otherwise refresh from seeds
-        if (semiA.status !== 'final') {
-          semiA.home = seedOf(1);
-          semiA.away = seedOf(4);
-        }
-      }
+      semiA.home = seedOf(1);
+      semiA.away = seedOf(4);
     }
     if (semiB) {
-      if (semiB.status !== 'final') {
-        semiB.home = seedOf(2);
-        semiB.away = seedOf(3);
-      }
+      semiB.home = seedOf(2);
+      semiB.away = seedOf(3);
     }
 
+    // Championship / 3rd place: winners & losers of semis when known.
     if (final && semiA && semiB) {
       const wA = this.playoffWinner(semiA);
       const wB = this.playoffWinner(semiB);
-      if (final.status !== 'final') {
-        final.home = wA || 'winner:semi-a';
-        final.away = wB || 'winner:semi-b';
-      }
+      final.home = wA || 'winner:semi-a';
+      final.away = wB || 'winner:semi-b';
     }
     if (consol && semiA && semiB) {
       const lA = this.playoffLoser(semiA);
       const lB = this.playoffLoser(semiB);
-      if (consol.status !== 'final') {
-        consol.home = lA || 'loser:semi-a';
-        consol.away = lB || 'loser:semi-b';
-      }
+      consol.home = lA || 'loser:semi-a';
+      consol.away = lB || 'loser:semi-b';
     }
     return MATCHES;
   },

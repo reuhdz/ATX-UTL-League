@@ -387,7 +387,8 @@
             <select id="se-match">
               ${weekMatches.map((m) => {
                 const tag = StatsHub.getResult(m.id) ? ' · saved' : '';
-                return `<option value="${m.id}" ${m.id === matchId ? 'selected' : ''}>${teamName(m.home)} vs ${teamName(m.away)} · ${fmtDate(m.date)}${tag}</option>`;
+                const playoff = m.label ? `${m.label} · ` : '';
+                return `<option value="${m.id}" ${m.id === matchId ? 'selected' : ''}>${playoff}${teamName(m.home)} vs ${teamName(m.away)} · ${fmtDate(m.date)}${tag}</option>`;
               }).join('')}
             </select>
           </label>
