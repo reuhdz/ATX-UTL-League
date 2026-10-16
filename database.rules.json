@@ -1,0 +1,40 @@
+{
+  "rules": {
+    "matchResults": {
+      ".read": true,
+      ".write": true
+    },
+    "matchFilm": {
+      ".read": true,
+      ".write": true
+    },
+    "matchClaims": {
+      ".read": true,
+      ".write": true
+    },
+    "statContentions": {
+      ".read": true,
+      ".write": true
+    },
+    "volunteers": {
+      ".read": true,
+      ".write": true
+    },
+    "attendance": {
+      ".read": true,
+      ".write": true
+    },
+    "drafts": {
+      ".read": true,
+      ".write": true
+    },
+    "rosterAssignments": {
+      ".read": true,
+      ".write": true
+    },
+    "season5-highlights": {
+      ".read": true,
+      ".write": true
+    }
+  }
+}

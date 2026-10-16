@@ -386,6 +386,13 @@ function wrapTables(root) {
 /* =============================================================================
    DASHBOARD
    ============================================================================ */
+function liveSyncNoticeHtml() {
+  const err = (typeof StatsHub !== 'undefined' && StatsHub.status?.())?.connectionError;
+  if (!err) return '';
+  const safe = String(err).replace(/[<>&]/g, '');
+  return `<p class="draft-msg err">Live scores are offline (${safe}). The overview is empty until Firebase Realtime Database rules allow client access — the utl-draft test-mode rules expire after 30 days. Publish <code>database.rules.json</code> in the Firebase console to restore match stats.</p>`;
+}
+
 function renderDashboard() {
   const standings = DB.standings();
   const rated = DB.playedPlayers();
@@ -419,6 +426,7 @@ function renderDashboard() {
       <h2>${DB.league.season} Overview</h2>
       <p class="muted">Starts ${fmtDate(DB.league.startDate)} · ${DB.league.weeks} weeks</p>
     </div>
+    ${liveSyncNoticeHtml()}
 
     <div class="stat-cards">
       ${cards.map((c) => `
@@ -2067,7 +2075,10 @@ Promise.all([
   // Remount when match results change (ignore connection-only emits).
   let lastStatsResultsSig = null;
   StatsHub.onChange((state) => {
-    const sig = JSON.stringify(state?.results ?? {});
+    const sig = JSON.stringify({
+      results: state?.results ?? {},
+      err: state?.connectionError || '',
+    });
     if (sig === lastStatsResultsSig) return;
     lastStatsResultsSig = sig;
     try { DB.refreshPlayoffAssignments?.(); } catch (e) { /* ignore */ }
