@@ -534,7 +534,7 @@ function matchKickoffLabel(m, indexInWeek = 0) {
 function sortMatchesByKickoff(games) {
   return [...(games || [])].sort((a, b) => {
     const slotOrder = (m) => (m.slot === '9am' || m.timeLabel === '9:00 AM' ? 1 : 0);
-    return slotOrder(a) - slotOrder(b) || String(a.id).localeCompare(String(b.id));
+    return slotOrder(a) - slotOrder(b) || String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
   });
 }
 
@@ -1072,7 +1072,7 @@ function renderMedia() {
     }
   });
 
-  const games = [...DB.matches].sort((a, b) => a.round - b.round || a.id.localeCompare(b.id));
+  const games = [...DB.matches].sort((a, b) => a.round - b.round || a.id.localeCompare(b.id, undefined, { numeric: true }));
 
   const draw = () => {
     const q = mediaFilter.q.trim().toLowerCase();

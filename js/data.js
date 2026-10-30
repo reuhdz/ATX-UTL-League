@@ -143,33 +143,35 @@ function addDays(iso, days) {
 }
 
 /* ---- Playoff bracket (shared): semis 1v4 / 2v3, then 3rd place + final.
-        Match ids are the Firebase result keys — never renumber a played season. */
+        Match ids are the Firebase result keys — never renumber a played season.
+        firstGame offsets the ids when semis and finals share a round. */
 function bracketMatches(semis, finals) {
   const at = (stage, i) => ({ ...(stage.times?.[i] || {}) });
+  const id = (stage, i) => `r${stage.round}g${(stage.firstGame || 0) + i}`;
   return [
     {
-      id: `r${semis.round}g0`, round: semis.round, date: semis.date,
+      id: id(semis, 0), round: semis.round, date: semis.date,
       home: 'seed:1', away: 'seed:4',
       phase: 'playoff', playoff: 'semi-a',
       label: 'Semifinal A · Seed 1 vs Seed 4',
       ...at(semis, 0),
     },
     {
-      id: `r${semis.round}g1`, round: semis.round, date: semis.date,
+      id: id(semis, 1), round: semis.round, date: semis.date,
       home: 'seed:2', away: 'seed:3',
       phase: 'playoff', playoff: 'semi-b',
       label: 'Semifinal B · Seed 2 vs Seed 3',
       ...at(semis, 1),
     },
     {
-      id: `r${finals.round}g0`, round: finals.round, date: finals.date,
+      id: id(finals, 0), round: finals.round, date: finals.date,
       home: 'loser:semi-a', away: 'loser:semi-b',
       phase: 'playoff', playoff: 'consolation',
       label: '3rd Place Game',
       ...at(finals, 0),
     },
     {
-      id: `r${finals.round}g1`, round: finals.round, date: finals.date,
+      id: id(finals, 1), round: finals.round, date: finals.date,
       home: 'winner:semi-a', away: 'winner:semi-b',
       phase: 'playoff', playoff: 'final',
       label: 'Championship Final',
@@ -254,41 +256,33 @@ const NATIONALS_ROSTER = [
   'justin', 'benb', 'manny', 'eddy', 'jack', 'river', 'walter',
 ];
 
-/* Tournament weekend — Sat Nov 7 (pool play) and Sun Nov 8 (pool play + bracket). */
+/* Tournament weekend — Sat Nov 7 (round robin) and Sun Nov 8 (placement games). */
 const NATIONALS_DAYS = ['2026-11-07', '2026-11-08'];
 
 function buildNationalsSchedule() {
-  // Pool play: single round robin (circle method) — every team plays the other five once.
-  const pool = [
-    [['tx1', 'lsoc'], ['tx2', 'kcmisfits'], ['tx3', 'scguapos']],
-    [['tx1', 'kcmisfits'], ['lsoc', 'scguapos'], ['tx2', 'tx3']],
-    [['tx1', 'scguapos'], ['kcmisfits', 'tx3'], ['lsoc', 'tx2']],
-    [['tx1', 'tx3'], ['scguapos', 'tx2'], ['kcmisfits', 'lsoc']],
-    [['tx1', 'tx2'], ['tx3', 'lsoc'], ['scguapos', 'kcmisfits']],
+  // Saturday (round 1): single round robin — every team plays the other five once.
+  // LSOC vs KC Misfits opens the tournament, and the order gives every team at least
+  // one game off between games.
+  const saturday = [
+    ['lsoc', 'kcmisfits'], ['tx1', 'tx3'], ['scguapos', 'tx2'],
+    ['tx1', 'kcmisfits'], ['lsoc', 'scguapos'], ['tx2', 'tx3'],
+    ['tx1', 'scguapos'], ['kcmisfits', 'tx3'], ['lsoc', 'tx2'],
+    ['tx3', 'scguapos'], ['tx1', 'lsoc'], ['tx2', 'kcmisfits'],
+    ['tx3', 'lsoc'], ['scguapos', 'kcmisfits'], ['tx1', 'tx2'],
   ];
-  const dayOf = (round) => NATIONALS_DAYS[round <= 3 ? 0 : 1];
-  const gameNo = {};
-  const nextGame = (date) => {
-    gameNo[date] = (gameNo[date] || 0) + 1;
-    return { timeLabel: `Game ${gameNo[date]}` };
-  };
+  const [satDay, sunDay] = NATIONALS_DAYS;
+  const game = (n) => ({ timeLabel: `Game ${n}` });
 
-  const matches = [];
-  pool.forEach((games, i) => {
-    const round = i + 1;
-    const date = dayOf(round);
-    games.forEach(([home, away], gi) =>
-      matches.push({
-        id: `r${round}g${gi}`, round, date, home, away,
-        phase: 'regular',
-        ...nextGame(date),
-      }));
-  });
+  const matches = saturday.map(([home, away], i) => ({
+    id: `r1g${i}`, round: 1, date: satDay, home, away,
+    phase: 'regular',
+    ...game(i + 1),
+  }));
 
-  const finalDay = NATIONALS_DAYS[1];
+  // Sunday (round 2): Saturday's standings seed the semis, then 3rd place + final.
   matches.push(...bracketMatches(
-    { round: 6, date: finalDay, times: [nextGame(finalDay), nextGame(finalDay)] },
-    { round: 7, date: finalDay, times: [nextGame(finalDay), nextGame(finalDay)] },
+    { round: 2, date: sunDay, times: [game(1), game(2)] },
+    { round: 2, firstGame: 2, date: sunDay, times: [game(3), game(4)] },
   ));
   return matches;
 }
@@ -304,12 +298,12 @@ const SEASONS = [
     archived: false,
     startDate: NATIONALS_DAYS[0],
     venue: 'Austin, Texas',
-    overviewSub: 'Nov 7–8, 2026 · Austin, Texas · 6-team tournament · pool play, then a 4-team bracket',
+    overviewSub: 'Nov 7–8, 2026 · Austin, Texas · 6-team tournament · Saturday round robin, Sunday placement games',
     footer: 'Nov 7–8, 2026',
-    scheduleSub: 'Pool play: single round robin (Rounds 1–5) · Top 4 seeds advance to the Semifinals (Round 6) · 3rd place + Championship (Round 7)',
-    roundNoun: 'Round',
-    roundAbbr: 'R',
-    roundTitles: { 6: 'Semifinals', 7: 'Finals' },
+    scheduleSub: 'Saturday: round robin — every team plays the other five once · Sunday: placement — Saturday\'s top 4 seeds play the Semifinals (1 vs 4, 2 vs 3), then the 3rd-place game and the Championship Final',
+    roundNoun: 'Day',
+    roundAbbr: 'D',
+    roundTitles: { 1: 'Saturday, Nov 7 · Round robin', 2: 'Sunday, Nov 8 · Placement' },
     teams: NATIONALS_TEAMS,
     rosterIds: NATIONALS_ROSTER,
     baseTeams: { zach: 'tx1', reuben: 'tx2', river: 'tx3' },
@@ -317,10 +311,10 @@ const SEASONS = [
     minNights: 0,
     faqSchedule:
       'UTL Nationals is a 6-team tournament: Lone Starfish, Capybaras and Splash Damage (drafted from the ' +
-      'Texas pool) plus SC Guapos, KC Misfits and LSOC. Pool play is a single round robin — every team ' +
-      'plays the other five once (3 points for a win, 1 for a draw). The top 4 seeds advance: ' +
-      'Semifinals are Seed 1 vs Seed 4 and Seed 2 vs Seed 3, followed by the 3rd-place game and the ' +
-      'Championship Final. Played Saturday–Sunday, Nov 7–8, 2026 in Austin, Texas.',
+      'Texas pool) plus SC Guapos, KC Misfits and LSOC, played Nov 7–8, 2026 in Austin, Texas. ' +
+      'Saturday is a single round robin — every team plays the other five once (3 points for a win, ' +
+      '1 for a draw) — and the final standings set Sunday\'s placement games: Semifinals are Seed 1 vs ' +
+      'Seed 4 and Seed 2 vs Seed 3, followed by the 3rd-place game and the Championship Final.',
     schedule: buildNationalsSchedule,
   },
   {
