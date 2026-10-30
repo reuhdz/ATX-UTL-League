@@ -135,6 +135,28 @@ const PLAYERS = [
   // Added for UTL Nationals
   { id: 'john',    name: 'John',        teamId: 'fa', skill: 0.40 },
   { id: 'trevor',  name: 'Trevor',      teamId: 'fa', skill: 0.40 },
+
+  // SC Guapos (Nationals). teamId stays free-agent here; Nationals baseTeams assigns the club.
+  { id: 'erikflegal',    name: 'Erik Flegal',    teamId: 'fa', skill: 0.50 },
+  { id: 'aquilaturk',    name: 'Aquila Turk',    teamId: 'fa', skill: 0.50 },
+  { id: 'chrisemde',     name: 'Chris Emde',     teamId: 'fa', skill: 0.50 },
+  { id: 'isaackeohone',  name: 'Isaac Keohone',  teamId: 'fa', skill: 0.50 },
+  { id: 'lanejohnson',   name: 'Lane Johnson',   teamId: 'fa', skill: 0.50 },
+  { id: 'matmacdonnell', name: 'Mat MacDonnell', teamId: 'fa', skill: 0.50 },
+  { id: 'rickyquintero', name: 'Ricky Quintero', teamId: 'fa', skill: 0.50 },
+  { id: 'samuelbrooks',  name: 'Samuel Brooks',  teamId: 'fa', skill: 0.50 },
+  { id: 'josecaride',    name: 'Jose Caride',    teamId: 'fa', skill: 0.50 },
+
+  // KC Misfits (Nationals)
+  { id: 'jeremygulley',   name: 'Jeremy Gulley',   teamId: 'fa', skill: 0.50 },
+  { id: 'scottstecklein', name: 'Scott Stecklein', teamId: 'fa', skill: 0.50 },
+  { id: 'xavierperry',    name: 'Xavier Perry',    teamId: 'fa', skill: 0.50 },
+  { id: 'elimills',       name: 'Eli Mills',       teamId: 'fa', skill: 0.50 },
+  { id: 'nickfisher',     name: 'Nick Fisher',     teamId: 'fa', skill: 0.50 },
+  { id: 'graydenpeoples', name: 'Grayden Peoples', teamId: 'fa', skill: 0.50 },
+  { id: 'joshpreston',    name: 'Josh Preston',    teamId: 'fa', skill: 0.50 },
+  { id: 'israelgulley',   name: 'Israel Gulley',   teamId: 'fa', skill: 0.50 },
+  { id: 'mikejohnson',    name: 'Mike Johnson',    teamId: 'fa', skill: 0.50 },
 ];
 
 function addDays(iso, days) {
@@ -237,23 +259,27 @@ function buildSeason5Schedule(season) {
 
 /* =============================================================================
    UTL Nationals (current) — 6-team tournament.
-   Texas sends three drafted teams; the other three are visiting clubs whose
-   rosters are not tracked here (series scores only).
+   Texas sends three drafted teams. SC Guapos and KC Misfits bring set rosters
+   (not drafted). LSOC is still a visiting club — series scores only.
    ============================================================================ */
 const NATIONALS_TEAMS = [
-  { id: 'tx1',       name: 'Lone Starfish', color: '#f59e0b', captain: 'Zach',   region: 'TX' },
-  { id: 'tx2',       name: 'Capybaras',     color: '#0ea5e9', captain: 'Reuben', region: 'TX' },
-  { id: 'tx3',       name: 'Splash Damage', color: '#ef4444', captain: 'River',  region: 'TX' },
-  { id: 'scguapos',  name: 'SC Guapos',     color: '#a855f7', visiting: true },
-  { id: 'kcmisfits', name: 'KC Misfits',    color: '#ec4899', visiting: true },
+  { id: 'tx1',       name: 'Lone Starfish', color: '#f59e0b', captain: 'Zach',         region: 'TX' },
+  { id: 'tx2',       name: 'Capybaras',     color: '#0ea5e9', captain: 'Reuben',       region: 'TX' },
+  { id: 'tx3',       name: 'Splash Damage', color: '#ef4444', captain: 'River',        region: 'TX' },
+  { id: 'scguapos',  name: 'SC Guapos',     color: '#a855f7', captain: 'Erik Flegal',  region: 'SC' },
+  { id: 'kcmisfits', name: 'KC Misfits',    color: '#ec4899', captain: 'Jeremy Gulley', region: 'KC' },
   { id: 'lsoc',      name: 'LSOC',          color: '#22c55e', visiting: true },
 ];
 
-/* Texas player pool for the Nationals draft (captains included, locked to their team). */
+/* Texas draft pool, plus the locked SC Guapos and KC Misfits rosters. */
 const NATIONALS_ROSTER = [
   'sk', 'jacqueline', 'reuben', 'max', 'sage', 'john', 'trevor',
   'glenn', 'bonney', 'lesley', 'zach', 'scheese', 'rich', 'eric',
   'justin', 'benb', 'manny', 'eddy', 'jack', 'river', 'walter',
+  'erikflegal', 'aquilaturk', 'chrisemde', 'isaackeohone', 'lanejohnson',
+  'matmacdonnell', 'rickyquintero', 'samuelbrooks', 'josecaride',
+  'jeremygulley', 'scottstecklein', 'xavierperry', 'elimills', 'nickfisher',
+  'graydenpeoples', 'joshpreston', 'israelgulley', 'mikejohnson',
 ];
 
 /* Tournament weekend — Sat Nov 7 (round robin) and Sun Nov 8 (placement games). */
@@ -306,7 +332,15 @@ const SEASONS = [
     roundTitles: { 1: 'Saturday, Nov 7 · Round robin', 2: 'Sunday, Nov 8 · Placement' },
     teams: NATIONALS_TEAMS,
     rosterIds: NATIONALS_ROSTER,
-    baseTeams: { zach: 'tx1', reuben: 'tx2', river: 'tx3' },
+    baseTeams: {
+      zach: 'tx1', reuben: 'tx2', river: 'tx3',
+      erikflegal: 'scguapos', aquilaturk: 'scguapos', chrisemde: 'scguapos',
+      isaackeohone: 'scguapos', lanejohnson: 'scguapos', matmacdonnell: 'scguapos',
+      rickyquintero: 'scguapos', samuelbrooks: 'scguapos', josecaride: 'scguapos',
+      jeremygulley: 'kcmisfits', scottstecklein: 'kcmisfits', xavierperry: 'kcmisfits',
+      elimills: 'kcmisfits', nickfisher: 'kcmisfits', graydenpeoples: 'kcmisfits',
+      joshpreston: 'kcmisfits', israelgulley: 'kcmisfits', mikejohnson: 'kcmisfits',
+    },
     playoffSeeds: [],
     minNights: 0,
     faqSchedule:
@@ -533,7 +567,7 @@ const DB = {
   roundShort: (n) => `${SEASON.roundAbbr}${n}`,
   roundTitle: (n) => (SEASON.roundTitles && SEASON.roundTitles[n]) || `${SEASON.roundNoun} ${n}`,
 
-  /** Teams whose players are tracked here (visiting clubs have no roster). */
+  /** Teams whose players are tracked here (a visiting club has no roster). */
   rosterTeams: () => TEAMS.filter((t) => !t.visiting),
 
   torpedoScore(p) {

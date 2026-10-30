@@ -1794,6 +1794,12 @@ function formatClock(ms) {
   return `${m}:${String(s).padStart(2, '0')}`;
 }
 
+function draftPoolSize() {
+  const cfg = window.DRAFT_CONFIG || {};
+  const locked = new Set([...(cfg.captainIds || []), ...(cfg.preAssignedIds || [])]);
+  return (DB.seasonRosterIds || []).filter((id) => !locked.has(id)).length;
+}
+
 function renderDraft() {
   const pinVal = () => ($('#draft-pin')?.value || '').trim();
   const setMsg = (sel, text, cls = '') => {
@@ -1928,7 +1934,7 @@ function renderDraft() {
   view.innerHTML = `
     <div class="page-head">
       <h2>${DB.season.label} Draft Room</h2>
-      <p class="muted">${DB.seasonRosterIds.length}-player pool · ${draftTeams.map((t) => t.name).join(', ')}</p>
+      <p class="muted">${draftPoolSize()}-player pool · ${draftTeams.map((t) => t.name).join(', ')}</p>
     </div>
 
     <section class="panel">
