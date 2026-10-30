@@ -282,27 +282,33 @@ const NATIONALS_ROSTER = [
   'graydenpeoples', 'joshpreston', 'israelgulley', 'mikejohnson',
 ];
 
-/* Tournament weekend — Sat Nov 7 (round robin) and Sun Nov 8 (placement games). */
+/* Tournament weekend — Sat Nov 7 (9 games) and Sun Nov 8 (placement games). */
 const NATIONALS_DAYS = ['2026-11-07', '2026-11-08'];
 
 function buildNationalsSchedule() {
-  // Saturday (round 1): single round robin — every team plays the other five once.
-  // LSOC vs KC Misfits opens the tournament, and the order gives every team at least
-  // one game off between games.
+  // Saturday run of show: 30-minute games, 8-minute transitions.
+  // Warmup 10:00–10:15 AM, cleanup 3:49–4:00 PM. Each team plays three.
+  // Listed first team is home. Texas clubs are named by captain on the run sheet:
+  // River = Splash Damage, Reuben = Capybaras, Zach = Lone Starfish.
   const saturday = [
-    ['lsoc', 'kcmisfits'], ['tx1', 'tx3'], ['scguapos', 'tx2'],
-    ['tx1', 'kcmisfits'], ['lsoc', 'scguapos'], ['tx2', 'tx3'],
-    ['tx1', 'scguapos'], ['kcmisfits', 'tx3'], ['lsoc', 'tx2'],
-    ['tx3', 'scguapos'], ['tx1', 'lsoc'], ['tx2', 'kcmisfits'],
-    ['tx3', 'lsoc'], ['scguapos', 'kcmisfits'], ['tx1', 'tx2'],
+    { home: 'lsoc', away: 'kcmisfits', timeLabel: '10:15 AM' },
+    { home: 'tx3', away: 'scguapos', timeLabel: '10:53 AM' },
+    { home: 'tx2', away: 'lsoc', timeLabel: '11:31 AM' },
+    { home: 'tx3', away: 'kcmisfits', timeLabel: '12:09 PM' },
+    { home: 'tx1', away: 'scguapos', timeLabel: '12:47 PM' },
+    { home: 'tx3', away: 'tx2', timeLabel: '1:25 PM' },
+    { home: 'tx1', away: 'lsoc', timeLabel: '2:03 PM' },
+    { home: 'scguapos', away: 'kcmisfits', timeLabel: '2:41 PM' },
+    { home: 'tx2', away: 'tx1', timeLabel: '3:19 PM' },
   ];
   const [satDay, sunDay] = NATIONALS_DAYS;
   const game = (n) => ({ timeLabel: `Game ${n}` });
 
-  const matches = saturday.map(([home, away], i) => ({
-    id: `r1g${i}`, round: 1, date: satDay, home, away,
+  const matches = saturday.map((g, i) => ({
+    id: `r1g${i}`, round: 1, date: satDay,
+    home: g.home, away: g.away,
     phase: 'regular',
-    ...game(i + 1),
+    timeLabel: g.timeLabel,
   }));
 
   // Sunday (round 2): Saturday's standings seed the semis, then 3rd place + final.
@@ -324,12 +330,12 @@ const SEASONS = [
     archived: false,
     startDate: NATIONALS_DAYS[0],
     venue: 'Austin, Texas',
-    overviewSub: 'Nov 7–8, 2026 · Austin, Texas · 6-team tournament · Saturday round robin, Sunday placement games',
+    overviewSub: 'Nov 7–8, 2026 · Austin, Texas · 6-team tournament · Saturday 9 games, Sunday placement games',
     footer: 'Nov 7–8, 2026',
-    scheduleSub: 'Saturday: round robin — every team plays the other five once · Sunday: placement — Saturday\'s top 4 seeds play the Semifinals (1 vs 4, 2 vs 3), then the 3rd-place game and the Championship Final',
+    scheduleSub: 'Saturday: 9 games, 30 minutes each, 8-minute transitions (warmup 10:00 AM, first game 10:15 AM, cleanup 3:49 PM) · Sunday: placement — Saturday standings seed the Semifinals (1 vs 4, 2 vs 3), then the 3rd-place game and the Championship Final',
     roundNoun: 'Day',
     roundAbbr: 'D',
-    roundTitles: { 1: 'Saturday, Nov 7 · Round robin', 2: 'Sunday, Nov 8 · Placement' },
+    roundTitles: { 1: 'Saturday, Nov 7 · 10:15 AM–3:49 PM', 2: 'Sunday, Nov 8 · Placement' },
     teams: NATIONALS_TEAMS,
     rosterIds: NATIONALS_ROSTER,
     baseTeams: {
@@ -346,8 +352,9 @@ const SEASONS = [
     faqSchedule:
       'UTL Nationals is a 6-team tournament: Lone Starfish, Capybaras and Splash Damage (drafted from the ' +
       'Texas pool) plus SC Guapos, KC Misfits and LSOC, played Nov 7–8, 2026 in Austin, Texas. ' +
-      'Saturday is a single round robin — every team plays the other five once (3 points for a win, ' +
-      '1 for a draw) — and the final standings set Sunday\'s placement games: Semifinals are Seed 1 vs ' +
+      'Saturday is nine 30-minute games with 8-minute transitions (warmup at 10:00 AM, first game at 10:15 AM, ' +
+      'cleanup at 3:49 PM). Each team plays three (3 points for a win, 1 for a draw). ' +
+      'Saturday standings set Sunday\'s placement games: Semifinals are Seed 1 vs ' +
       'Seed 4 and Seed 2 vs Seed 3, followed by the 3rd-place game and the Championship Final.',
     schedule: buildNationalsSchedule,
   },
