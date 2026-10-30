@@ -417,7 +417,7 @@ function renderDashboard() {
   view.innerHTML = `
     <div class="page-head">
       <h2>${DB.season.label} Overview</h2>
-      <p class="muted">${DB.season.overviewSub}${DB.season.datesTentative ? ' · <span class="tentative-tag">dates tentative</span>' : ''}</p>
+      <p class="muted">${DB.season.overviewSub}</p>
     </div>
 
     <div class="stat-cards">
@@ -747,7 +747,7 @@ function renderSchedule() {
 
   view.innerHTML = `
     <div class="page-head"><h2>${DB.season.label} Schedule &amp; Results</h2>
-      <p class="muted">${DB.season.scheduleSub || ''}${DB.season.datesTentative ? ' <span class="tentative-tag">dates tentative</span>' : ''}</p>
+      <p class="muted">${DB.season.scheduleSub || ''}</p>
     </div>
     <div class="rounds">
       ${Object.keys(byRound).map((r) => {

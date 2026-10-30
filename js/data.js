@@ -256,8 +256,8 @@ const NATIONALS_ROSTER = [
   'justin', 'benb', 'manny', 'eddy', 'jack', 'river', 'walter',
 ];
 
-/* Tentative tournament weekend — update once the dates are confirmed. */
-const NATIONALS_DAYS = ['2026-11-21', '2026-11-22'];
+/* Tournament weekend — Sat Nov 7 (pool play) and Sun Nov 8 (pool play + bracket). */
+const NATIONALS_DAYS = ['2026-11-07', '2026-11-08'];
 
 function buildNationalsSchedule() {
   // Pool play: single round robin (circle method) — every team plays the other five once.
@@ -305,10 +305,9 @@ const SEASONS = [
     tag: 'NAT',
     archived: false,
     startDate: NATIONALS_DAYS[0],
-    datesTentative: true,
-    venue: 'Venue TBD',
-    overviewSub: '6-team tournament · pool play, then a 4-team bracket',
-    footer: 'dates TBD',
+    venue: 'Austin, Texas',
+    overviewSub: 'Nov 7–8, 2026 · Austin, Texas · 6-team tournament · pool play, then a 4-team bracket',
+    footer: 'Nov 7–8, 2026',
     scheduleSub: 'Pool play: single round robin (Rounds 1–5) · Top 4 seeds advance to the Semifinals (Round 6) · 3rd place + Championship (Round 7)',
     roundNoun: 'Round',
     roundAbbr: 'R',
@@ -323,7 +322,7 @@ const SEASONS = [
       'Texas pool) plus SC Guapos, KC Misfits and LSOC. Pool play is a single round robin — every team ' +
       'plays the other five once (3 points for a win, 1 for a draw). The top 4 seeds advance: ' +
       'Semifinals are Seed 1 vs Seed 4 and Seed 2 vs Seed 3, followed by the 3rd-place game and the ' +
-      'Championship Final. Dates are tentative until announced.',
+      'Championship Final. Played Saturday–Sunday, Nov 7–8, 2026 in Austin, Texas.',
     schedule: buildNationalsSchedule,
   },
   {
