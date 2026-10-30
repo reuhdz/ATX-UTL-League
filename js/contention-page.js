@@ -33,10 +33,10 @@
   function matchLabel(entry) {
     const m = (window.DB?.matches || []).find((x) => x.id === entry.matchId);
     if (m) {
-      const round = m.round != null ? `Week ${m.round}` : '';
+      const round = m.round != null ? DB.roundName(m.round) : '';
       return `${round}${round ? ' · ' : ''}${DB.teamName(m.home)} vs ${DB.teamName(m.away)}`;
     }
-    if (entry.round != null) return `Week ${entry.round}`;
+    if (entry.round != null) return DB.roundName(entry.round);
     return 'Match not specified';
   }
 
@@ -105,14 +105,16 @@
 
     root.innerHTML = `
       <div class="page-head">
-        <h2>Stat contention</h2>
+        <h2>${escapeHtml(DB.season.label)} stat contention</h2>
       </div>
       <div class="se-toolbar">
+        ${SeasonSwitcher.html()}
         <span class="muted small">${escapeHtml(AdminAuth.session()?.label || 'Staff')}</span>
         <a class="muted small" href="../admin/">← Admin</a>
         <a class="muted small" href="../">Dashboard</a>
         <button type="button" class="btn btn-ghost" id="sc-logout">Log out</button>
       </div>
+      ${SeasonSwitcher.bannerHtml()}
       <p class="draft-msg ${msg.cls}">${escapeHtml(msg.text)}</p>
       <p class="muted small">Vote on player stat appeals. After ${ContentionHub.VOTE_QUORUM} votes, a majority <b>for</b> passes the request so it can be applied on Match stats.</p>
 

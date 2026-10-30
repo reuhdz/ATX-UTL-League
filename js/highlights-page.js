@@ -1,4 +1,4 @@
-/* /season-5-highlights — public vote page (one vote per video per session) */
+/* /season-5-highlights — public vote page for the active season (one vote per video per session) */
 (() => {
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -28,8 +28,12 @@
   function matchLabel(matchId) {
     const m = (DB.matches || []).find((x) => x.id === matchId);
     if (!m) return matchId || 'Unknown match';
-    return `Week ${m.round} · ${DB.teamName(m.home)} vs ${DB.teamName(m.away)}`;
+    return `${DB.roundName(m.round)} · ${DB.teamName(m.home)} vs ${DB.teamName(m.away)}`;
   }
+
+  const seasonTitle = `${DB.season.label} highlights`;
+  document.title = `ATX UTL — ${seasonTitle}`;
+  if ($('#hl-brand-sub')) $('#hl-brand-sub').textContent = seasonTitle;
 
   function paint() {
     const voter = HighlightsHub.sessionVoterKey();
@@ -41,10 +45,11 @@
       items = items.filter((e) => e.matchId === filterMatch);
     }
 
+    const noun = DB.season.roundNoun;
     const weekOpts = [
-      `<option value="all" ${filterRound === 'all' ? 'selected' : ''}>All weeks</option>`,
+      `<option value="all" ${filterRound === 'all' ? 'selected' : ''}>All ${noun.toLowerCase()}s</option>`,
       ...weeks().map((r) =>
-        `<option value="${r}" ${String(filterRound) === String(r) ? 'selected' : ''}>Week ${r}</option>`),
+        `<option value="${r}" ${String(filterRound) === String(r) ? 'selected' : ''}>${DB.roundTitle(r)}</option>`),
     ].join('');
     const matchOpts = [
       `<option value="all" ${filterMatch === 'all' ? 'selected' : ''}>All matches</option>`,
@@ -54,18 +59,20 @@
 
     root.innerHTML = `
       <div class="page-head">
-        <h2>Season 5 highlights</h2>
+        <h2>${seasonTitle}</h2>
       </div>
       <div class="se-toolbar">
+        ${SeasonSwitcher.html()}
         <a class="muted small" href="../">← Dashboard</a>
         <a class="muted small" href="../" id="hl-nominate-link">Nominate a clip</a>
       </div>
+      ${SeasonSwitcher.bannerHtml()}
       <p class="draft-msg ${msg.cls}">${msg.text}</p>
-      <p class="muted small">Vote for as many clips as you like — one vote per clip from this browser. Top 3 per week &amp; match appear under Media → Highlights.</p>
+      <p class="muted small">Vote for as many clips as you like — one vote per clip from this browser. Top 3 per ${noun.toLowerCase()} &amp; match appear under Media → Highlights.</p>
 
       <section class="panel">
         <div class="se-pickers">
-          <label>Week
+          <label>${noun}
             <select id="hl-filter-week">${weekOpts}</select>
           </label>
           <label>Match
