@@ -118,6 +118,9 @@ const VolunteerHub = (() => {
   }
 
   async function writeMatchRole(matchId, role, list) {
+    if (window.DB?.isArchived?.()) {
+      throw new Error(`${window.DB.season.label} is archived — the volunteer board is read-only`);
+    }
     const id = String(matchId);
     if (mode === 'firebase' && db) {
       await db.ref(`${path()}/${id}/${role}`).set(list);

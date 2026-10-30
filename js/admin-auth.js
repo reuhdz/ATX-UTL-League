@@ -24,7 +24,7 @@ const AdminAuth = (() => {
       label: 'League admin',
       voterKey: 'utladmin',
     }];
-    (window.DB?.teams || []).forEach((t) => {
+    (window.DB?.teams || []).filter((t) => t.captain).forEach((t) => {
       list.push({
         role: 'captain',
         username: norm(t.captain),

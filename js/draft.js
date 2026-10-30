@@ -3,14 +3,25 @@
    -----------------------------------------------------------------------------
    Paths in Realtime Database:
      /drafts/{roomId}     live draft state
-     /rosterAssignments   { [playerId]: { teamId, updatedAt, by } }
+     /{rosterPath}        { [playerId]: { teamId, updatedAt, by } }
+                          (Season 5: /rosterAssignments, later seasons nest
+                          under it, e.g. /rosterAssignments/nationals)
    Falls back to localStorage when Firebase is unavailable.
+   Archived seasons are read-only: no draft start/reset/picks/assignments.
    ============================================================================ */
 
 const DraftHub = (() => {
   const cfg = () => window.DRAFT_CONFIG || {};
   const fbCfg = () => window.FIREBASE_CONFIG || {};
   const roomId = () => cfg().roomId || 'season5';
+  const rosterPath = () => cfg().rosterPath || 'rosterAssignments';
+  const isArchived = () => !!window.DB?.isArchived?.();
+
+  function assertWritable() {
+    if (isArchived()) {
+      throw new Error(`${window.DB?.season?.label || 'This season'} is archived — its draft and rosters are locked`);
+    }
+  }
 
   const BASE_TEAMS = Object.fromEntries(
     (window.DB?.players || []).map((p) => [p.id, p.teamId])
@@ -117,7 +128,7 @@ const DraftHub = (() => {
 
   function defaultDraft() {
     const locked = new Set(lockedIds());
-    const pool = (window.DB?.season5RosterIds || []).filter((id) => !locked.has(id));
+    const pool = (window.DB?.seasonRosterIds || []).filter((id) => !locked.has(id));
     const teamIds = draftTeamOrder();
     const order = [];
     const rounds = Math.ceil(pool.length / Math.max(teamIds.length, 1));
@@ -144,7 +155,7 @@ const DraftHub = (() => {
     const ready = { ...base.ready, ...(raw.ready || {}) };
     let status = raw.status || 'waiting';
     if (status === 'idle') status = 'waiting';
-    // Waiting room always tracks current Season 5 roster minus captains.
+    // Waiting room always tracks the current season roster minus captains.
     const pool = status === 'waiting'
       ? base.pool
       : (Array.isArray(raw.pool) ? raw.pool : base.pool);
@@ -236,7 +247,7 @@ const DraftHub = (() => {
 
     if (mode === 'firebase') {
       const draftRef = db.ref(`drafts/${roomId()}`);
-      const rosterRef = db.ref('rosterAssignments');
+      const rosterRef = db.ref(rosterPath());
       unsubConn = db.ref('.info/connected').on('value', (snap) => {
         connected = !!snap.val();
         emit();
@@ -259,11 +270,11 @@ const DraftHub = (() => {
       try {
         const snap = await draftRef.once('value');
         if (!snap.exists()) {
-          await draftRef.set(defaultDraft());
+          if (!isArchived()) await draftRef.set(defaultDraft());
         } else {
           draftState = normalizeDraft(snap.val());
-          // Persist refreshed waiting-room pool/order from current Season 5 roster.
-          if (draftState.status === 'waiting') {
+          // Persist refreshed waiting-room pool/order from the current season roster.
+          if (draftState.status === 'waiting' && !isArchived()) {
             const fresh = defaultDraft();
             const poolChanged = JSON.stringify(snap.val()?.pool || []) !== JSON.stringify(fresh.pool);
             const orderChanged = JSON.stringify(snap.val()?.order || []) !== JSON.stringify(fresh.order);
@@ -286,11 +297,12 @@ const DraftHub = (() => {
       emit();
     }
 
-    scheduleExpireWatch();
+    if (!isArchived()) scheduleExpireWatch();
     return { mode, configured: mode === 'firebase', connectionError };
   }
 
   async function setDraft(next) {
+    assertWritable();
     next = normalizeDraft({ ...next, updatedAt: Date.now() });
     draftState = next;
     if (mode === 'firebase') {
@@ -308,11 +320,12 @@ const DraftHub = (() => {
   }
 
   async function clearDraftAssignments() {
+    assertWritable();
     const locked = new Set(lockedIds());
 
     if (mode === 'firebase') {
       try {
-        await db.ref('rosterAssignments').remove();
+        await db.ref(rosterPath()).remove();
       } catch (e) {
         throw new Error(`Could not clear roster assignments: ${e.message || e}`);
       }
@@ -345,6 +358,7 @@ const DraftHub = (() => {
   }
 
   async function startDraft(pin) {
+    assertWritable();
     const d = normalizeDraft(draftState || defaultDraft());
     if (d.status === 'live') throw new Error('Draft is already live');
     if (d.status === 'done') throw new Error('Draft is complete — reset first');
@@ -381,6 +395,7 @@ const DraftHub = (() => {
   }
 
   async function resetDraft(pin) {
+    assertWritable();
     if (!canAuthorizeReset(pin)) throw new Error('Enter master or captain PIN to reset');
     await clearDraftAssignments();
     await setDraft(defaultDraft());
@@ -400,6 +415,7 @@ const DraftHub = (() => {
   }
 
   async function expireTurn() {
+    if (isArchived()) return;
     const d = normalizeDraft(draftState || defaultDraft());
     if (d.status !== 'live' || !d.turnStartedAt) return;
     if (turnRemainingMs(d) > 0) return;
@@ -441,6 +457,7 @@ const DraftHub = (() => {
   }
 
   async function makePick(playerId, pin) {
+    assertWritable();
     const d = normalizeDraft(draftState || defaultDraft());
     if (d.status !== 'live') throw new Error('Draft is not live yet');
     if (!d.pool.includes(playerId)) throw new Error('Player not in pool');
@@ -485,6 +502,7 @@ const DraftHub = (() => {
   }
 
   async function assignTeam(playerId, teamId, opts = {}) {
+    assertWritable();
     const validTeam = teamId === 'fa' || (window.DB?.teams || []).some((t) => t.id === teamId);
     if (!validTeam) throw new Error('Unknown team');
     if (!window.DB?.player(playerId)) throw new Error('Unknown player');
@@ -494,7 +512,7 @@ const DraftHub = (() => {
 
     if (mode === 'firebase') {
       try {
-        await db.ref(`rosterAssignments/${playerId}`).set(entry);
+        await db.ref(`${rosterPath()}/${playerId}`).set(entry);
       } catch (e) {
         throw new Error(`Roster write failed: ${e.message || e}`);
       }
@@ -531,7 +549,7 @@ const DraftHub = (() => {
   return {
     init, onChange, status,
     startDraft, resetDraft, makePick, assignTeam, expireTurn,
-    defaultDraft, teamPin, checkTeamPin, draftTeamOrder, turnRemainingMs,
+    defaultDraft, teamPin, checkTeamPin, draftTeamOrder, turnRemainingMs, isArchived,
   };
 })();
 

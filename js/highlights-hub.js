@@ -1,7 +1,8 @@
 /* =============================================================================
    Highlights hub — public nominations + session votes
    -----------------------------------------------------------------------------
-   Path: /season5-highlights/{id}
+   Path: /{highlightsPath}/{id} — Season 5 uses /season5-highlights; later
+         seasons nest under it (e.g. /season5-highlights/nationals/{id})
    Shape:
      {
        urls, url, comment, createdAt, status,
@@ -15,7 +16,7 @@
    ============================================================================ */
 
 const HighlightsHub = (() => {
-  const PATH = 'season5-highlights';
+  const PATH = (window.DRAFT_CONFIG && window.DRAFT_CONFIG.highlightsPath) || 'season5-highlights';
   const VOTER_KEY = 'atxutl.hlVoter';
   const fbCfg = () => window.FIREBASE_CONFIG || {};
 
@@ -45,7 +46,7 @@ const HighlightsHub = (() => {
   }
 
   function localKey() {
-    return 'atxutl.season5-highlights';
+    return `atxutl.${PATH.replace(/\//g, '.')}`;
   }
 
   function readLocal() {

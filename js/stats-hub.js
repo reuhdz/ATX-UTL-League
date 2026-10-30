@@ -80,6 +80,19 @@ const StatsHub = (() => {
     return !!expected && normalizePin(pin) === expected;
   }
 
+  /** Archived seasons stay correctable (e.g. passed stat appeals) by the league admin only. */
+  function canEditSeason() {
+    if (!window.DB?.isArchived?.()) return true;
+    return typeof AdminAuth !== 'undefined' && AdminAuth.isAdmin();
+  }
+
+  function assertCanWrite(pin, what) {
+    if (!checkMasterPin(pin)) throw new Error(`Captain or admin login required to ${what}`);
+    if (!canEditSeason()) {
+      throw new Error(`${window.DB?.season?.label || 'This season'} is archived — only the league admin can ${what}`);
+    }
+  }
+
   function actorFromSession() {
     const s = (typeof AdminAuth !== 'undefined' && AdminAuth.session) ? AdminAuth.session() : null;
     if (!s) {
@@ -388,6 +401,40 @@ const StatsHub = (() => {
     });
   }
 
+  function totalsFromResults(map) {
+    const totals = {};
+    Object.values(map || {}).forEach((res) => {
+      (res.box || []).forEach((b) => {
+        const t = totals[b.playerId] || (totals[b.playerId] = { matches: 0 });
+        STAT_FIELDS.forEach((k) => { t[k] = (t[k] || 0) + (b[k] || 0); });
+        t.matches += 1;
+      });
+    });
+    return totals;
+  }
+
+  /** Read-only load of every other season's results so Overall shows all-time totals. */
+  async function loadOtherSeasonTotals() {
+    const configs = window.DRAFT_CONFIGS || {};
+    const others = (window.DB?.seasons || []).filter((s) => s.id !== window.DB?.season?.id);
+    await Promise.all(others.map(async (s) => {
+      const room = configs[s.id]?.roomId;
+      if (!room) return;
+      let raw = null;
+      try {
+        if (mode === 'firebase' && db) {
+          raw = (await onceWithTimeout(db.ref(`matchResults/${room}`), 8000)).val();
+        } else {
+          raw = JSON.parse(localStorage.getItem(`atxutl.matchResults.${room}`) || 'null');
+        }
+      } catch (e) {
+        console.warn('Could not load results for', s.id, e);
+        return;
+      }
+      window.DB?.setSeasonTotals?.(s.id, totalsFromResults(normalizeMap(raw)));
+    }));
+  }
+
   async function init() {
     snapshotBase();
     connectionError = null;
@@ -442,6 +489,7 @@ const StatsHub = (() => {
       emit();
     }
 
+    await loadOtherSeasonTotals();
     return { mode, configured: mode === 'firebase', connectionError };
   }
 
@@ -469,7 +517,7 @@ const StatsHub = (() => {
 
   /** Save series scores only (does not wipe existing box/lineups). */
   async function saveSeries(matchId, games, pin) {
-    if (!checkMasterPin(pin)) throw new Error('Captain or admin login required to save series');
+    assertCanWrite(pin, 'save series');
     const match = (window.DB?.matches || []).find((m) => m.id === matchId);
     if (!match) throw new Error('Unknown match');
 
@@ -499,7 +547,7 @@ const StatsHub = (() => {
 
   /** Save individual box scores / lineups (keeps existing series games). */
   async function saveBox(matchId, payload, pin) {
-    if (!checkMasterPin(pin)) throw new Error('Captain or admin login required to save player stats');
+    assertCanWrite(pin, 'save player stats');
     const match = (window.DB?.matches || []).find((m) => m.id === matchId);
     if (!match) throw new Error('Unknown match');
 
@@ -535,7 +583,7 @@ const StatsHub = (() => {
   }
 
   async function clearMatch(matchId, pin) {
-    if (!checkMasterPin(pin)) throw new Error('Captain or admin login required to clear');
+    assertCanWrite(pin, 'clear');
     if (mode === 'firebase' && db) {
       await db.ref(`matchResults/${roomId()}/${matchId}`).remove();
       return;
@@ -550,7 +598,7 @@ const StatsHub = (() => {
 
   /** Clear individual box scores / lineups; keep series scores. */
   async function clearBox(matchId, pin) {
-    if (!checkMasterPin(pin)) throw new Error('Captain or admin login required to clear player stats');
+    assertCanWrite(pin, 'clear player stats');
     const prev = results[matchId];
     if (!prev) throw new Error('No saved stats for this match');
     if (!prev.games?.length) {
@@ -615,7 +663,7 @@ const StatsHub = (() => {
 
   return {
     init, onChange, status, getResult, saveSeries, saveBox, clearMatch, clearBox,
-    checkMasterPin, emptyLine, seriesFromGames, fields: STAT_FIELDS,
+    checkMasterPin, canEditSeason, emptyLine, seriesFromGames, fields: STAT_FIELDS,
     normalizeUrl, clipsForPlayer, clipCountsForPlayer,
     historyFor, actionLabel, HISTORY_ACTIONS,
   };

@@ -95,13 +95,8 @@ const FAQ = [
       'alone or unsupervised; shallow-water blackout gives no warning.',
   },
   {
-    q: 'How is the schedule structured?',
-    a:
-      'Season 5 runs 8 weeks — Sunday league nights starting August 23, 2026. ' +
-      'Weeks 1–6 are the regular season (each team plays once per week; two games per night). ' +
-      'Standings use 3 points for a win, 1 for a draw, 0 for a loss. ' +
-      'Weeks 7–8 are playoffs: Week 7 semis are Seed 1 vs Seed 4 (8:00 AM) and Seed 2 vs Seed 3 (9:00 AM); ' +
-      'Week 8 is the 3rd-place game at 8:00 AM and the championship final at 9:00 AM.',
+    q: `How is the ${window.DB?.season?.label || 'season'} schedule structured?`,
+    a: window.DB?.season?.faqSchedule || '',
   },
   {
     q: 'How do I contest a box-score stat?',
@@ -240,7 +235,7 @@ const RESEARCH = {
 /* ---- Media gallery -------------------------------------------------------- */
 const MEDIA = {
   // Fallback folder base when Firebase has no film URL for a match.
-  // Live links live in RTDB `/matchFilm/season5/{matchId}` (FilmHub).
+  // Live links live in RTDB `/matchFilm/{roomId}/{matchId}` (FilmHub).
   // Per-game folder slug: clips/r5-capybara-vs-team3/
   filmBase: 'clips/',
 

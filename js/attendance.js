@@ -62,7 +62,7 @@ const AttendanceHub = (() => {
   }
 
   function playableIds() {
-    const roster = window.DB?.season5RosterIds || [];
+    const roster = window.DB?.seasonRosterIds || [];
     return roster.filter((id) => {
       const p = window.DB?.player(id);
       return p && p.level !== 'Pro (IR)';
@@ -180,9 +180,11 @@ const AttendanceHub = (() => {
 
   async function setStatus(playerId, date, status) {
     const next = normalizeStatus(status);
+    const label = window.DB?.season?.label || 'this season';
+    if (window.DB?.isArchived?.()) throw new Error(`${label} is archived — attendance is read-only`);
     if (!playerId || !date) throw new Error('Missing player or date');
     if (!nights().includes(date)) throw new Error('Unknown league night');
-    if (!playableIds().includes(playerId)) throw new Error('Player not on Season 5 roster');
+    if (!playableIds().includes(playerId)) throw new Error(`Player not on the ${label} roster`);
 
     if (mode === 'firebase' && db) {
       await db.ref(`attendance/${roomId()}/table/${date}/${playerId}`).set(next);
