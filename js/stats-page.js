@@ -76,7 +76,7 @@
   function freeAgentOptions(exclude) {
     const ex = new Set(exclude || []);
     return DB.freeAgents()
-      .filter((p) => DB.isSeason5(p.id) && !ex.has(p.id))
+      .filter((p) => DB.inSeason(p.id) && !ex.has(p.id))
       .map((p) => `<option value="${p.id}">${p.name}</option>`)
       .join('');
   }
@@ -186,7 +186,7 @@
       return `<div class="se-claim-banner mine" role="status">
         <div class="se-claim-copy">
           <strong>You claimed this game</strong>
-          <span class="muted small">Week ${claim?.week ?? week}${when ? ` · claimed ${when}` : ''} · auto-clears after 16h · Release when done</span>
+          <span class="muted small">${DB.roundName(claim?.week ?? week)}${when ? ` · claimed ${when}` : ''} · auto-clears after 16h · Release when done</span>
         </div>
         <button type="button" class="btn btn-ghost" id="se-claim-release">Release</button>
       </div>`;
@@ -194,7 +194,7 @@
     if (claim) {
       return `<div class="se-claim-banner theirs" role="status">
         <div class="se-claim-copy">
-          <strong>${claim.label} claimed Week ${claim.week ?? '—'} · this game</strong>
+          <strong>${claim.label} claimed ${claim.week != null ? DB.roundName(claim.week) : '—'} · this game</strong>
           <span class="muted small">${when ? `Claimed ${when} · ` : ''}Save buttons disabled until they Release (or 16h pass)</span>
         </div>
       </div>`;
@@ -202,7 +202,7 @@
     return `<div class="se-claim-banner" role="status">
       <div class="se-claim-copy">
         <strong>Not claimed</strong>
-        <span class="muted small">Claim this week/game so others can’t overwrite your entry (expires after 16h)</span>
+        <span class="muted small">Claim this game so others can’t overwrite your entry (expires after 16h)</span>
       </div>
       <button type="button" class="btn" id="se-claim">Claim</button>
     </div>`;
@@ -310,6 +310,14 @@
     const title = `${side === 'home' ? 'Home' : 'Away'} — ${teamName(teamId)}`;
     const used = [...draft.homeLineup, ...draft.awayLineup];
 
+    if (DB.team(teamId)?.visiting && !lineup.length) {
+      return `
+      <section class="panel se-side">
+        <div class="panel-head"><h3>${title}</h3></div>
+        <p class="muted small se-hint">Visiting club — individual stats aren’t tracked. Series scores above are enough.</p>
+      </section>`;
+    }
+
     return `
       <section class="panel se-side">
         <div class="panel-head">
@@ -362,25 +370,31 @@
     const preview = seriesPreview();
     const saved = match ? StatsHub.getResult(match.id) : null;
 
+    const noun = DB.season.roundNoun;
+    const seasonLocked = !StatsHub.canEditSeason();
+
     root.innerHTML = `
       <div class="page-head">
-        <h2>Match stats</h2>
+        <h2>${DB.season.label} match stats</h2>
       </div>
       <div class="se-toolbar">
+        ${SeasonSwitcher.html()}
         <span class="muted small">${AdminAuth.session()?.label || 'Admin'}</span>
         <a class="muted small" href="../admin/">← Admin</a>
         <a class="muted small" href="../">Dashboard</a>
         <button type="button" class="btn btn-ghost" id="se-logout">Log out</button>
       </div>
+      ${SeasonSwitcher.bannerHtml()}
+      ${seasonLocked ? `<p class="draft-msg err">${DB.season.label} is archived — only admins can change its stats.</p>` : ''}
       <p class="draft-msg ${msg.cls}">${msg.text}</p>
-      ${claimBannerHtml()}
+      ${seasonLocked ? '' : claimBannerHtml()}
 
       <section class="panel">
-        <div class="panel-head"><h3>1 · Pick week &amp; game</h3></div>
+        <div class="panel-head"><h3>1 · Pick ${noun.toLowerCase()} &amp; game</h3></div>
         <div class="se-pickers">
-          <label>Week
+          <label>${noun}
             <select id="se-week">
-              ${weeks().map((r) => `<option value="${r}" ${Number(week) === r ? 'selected' : ''}>Week ${r}</option>`).join('')}
+              ${weeks().map((r) => `<option value="${r}" ${Number(week) === r ? 'selected' : ''}>${DB.roundTitle(r)}</option>`).join('')}
             </select>
           </label>
           <label>Game
@@ -459,7 +473,7 @@
       ${clipsPanelHtml()}` : ''}`;
 
     const syncSubmitButtons = () => {
-      const ok = AdminAuth.isLoggedIn() && claimAllowsEdit();
+      const ok = AdminAuth.isLoggedIn() && claimAllowsEdit() && !seasonLocked;
       const hasSaved = !!(matchId && StatsHub.getResult(matchId));
       const hasBox = !!(matchId && (StatsHub.getResult(matchId)?.boxSavedAt || StatsHub.getResult(matchId)?.box?.length));
       const hasFilm = !!(matchId && typeof FilmHub !== 'undefined' && FilmHub.urlFor(matchId));
@@ -471,7 +485,7 @@
       if ($('#se-clear-film')) $('#se-clear-film').disabled = !ok || !hasFilm;
       if ($('#se-clip-add')) $('#se-clip-add').disabled = !ok;
       // Soft-disable entry fields when another user holds the claim
-      const locked = AdminAuth.isLoggedIn() && !claimAllowsEdit();
+      const locked = seasonLocked || (AdminAuth.isLoggedIn() && !claimAllowsEdit());
       $$('.se-num, .se-score, #se-film-url, [data-add-side], .se-remove, #se-clip-player, #se-clip-type, #se-clip-url, #se-clip-note, .se-clip-remove')
         .forEach((el) => { el.disabled = locked; });
     };

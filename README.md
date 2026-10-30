@@ -29,7 +29,7 @@ just pushing the folder.
 | Tab | What it shows |
 |-----|---------------|
 | 📊 **Dashboard** | Headline stat cards, live standings (hover ⓘ for a column glossary), top-rated players (hover ⓘ for the rating formula), next games, recent results, and a goals-for/against chart. |
-| 🛡️ **Teams** | A card per team: rank, W-D-L, points, captain (C), aggregate stats, roster with player level (Pro/Rookie), plus a free-agents strip. |
+| 🛡️ **Teams** | A card per team: rank, W-D-L, points, captain (C), aggregate stats, roster, plus a free-agents strip. |
 | 👤 **Roster** | Full sortable/filterable player table (by team **or** free agents) with the transparent rating formula and a hover info pane. |
 | 🗓️ **Schedule** | Every round of the double round-robin — finals show scores, upcoming show fixtures. |
 | 📈 **Stats** | A **player spotlight** tile (filter by roster → pick a player → see their radar + line), top scorers, steals leaders, goal-share doughnut, team-profile radar, cumulative points line. |
@@ -81,12 +81,31 @@ ATX-UTL/
 ## Editing the data
 
 Everything is data in `js/data.js`:
-- `TEAMS` — clubs, colors, captains.
-- `PLAYERS` — roster; each `skill` (0–1) gently biases generated box scores.
+- `SEASONS` — one entry per season (teams, roster ids, schedule builder, labels).
+- `PLAYERS` — all-time ATX player directory; each `skill` (0–1) gently biases generated box scores.
 - `RATING.weights` — tune how goals/assists/steals/blocks/turnovers score.
 - `LEAGUE.seed` — change to regenerate the whole season.
 
 Editorial copy (rules, FAQ, studies) lives in `js/content.js`.
+
+### Seasons
+
+The site shows one season at a time. The first non-archived entry in `SEASONS`
+(currently **UTL Nationals**) is the default; the header's season picker reloads
+any page on another season (`?season=season5`, remembered for the browser tab).
+
+- **Archived seasons** (`archived: true`, e.g. Season 5) are read-only: the draft
+  is locked, attendance and volunteer sign-ups are frozen, and only the league
+  admin can change saved stats.
+- **Live data** is scoped per season in `js/firebase-config.js` (`DRAFT_CONFIGS`):
+  each season has its own `roomId` for drafts, results, attendance, film, claims,
+  appeals and volunteers. Nationals roster picks live under
+  `rosterAssignments/nationals` and its highlights under
+  `season5-highlights/nationals`, so Season 5 data is never overwritten.
+- **Overall** stats on Teams &amp; Roster add every season's saved results together.
+
+To add a season: add a `SEASONS` entry (and teams/roster/schedule), a matching
+`DRAFT_CONFIGS` entry, and mark the previous season `archived: true`.
 
 ## Deploy to GitHub Pages
 

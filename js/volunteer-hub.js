@@ -4,12 +4,14 @@
    Path: /volunteers/{roomId}/{matchId}/{role}
    Shape: [ { username, label, claimedAt }, ... ]
    First entry = primary; later entries = backups (background ordering).
-   Roles: ref | camera | safety
+   Roles: ref | ref2 (extra referee) | camera | safety
+   addedBy is set when someone else put the volunteer on the list by name.
    ============================================================================ */
 
 const VolunteerHub = (() => {
   const ROLES = [
     { id: 'ref', label: 'Referee' },
+    { id: 'ref2', label: 'Extra referee' },
     { id: 'camera', label: 'Camera' },
     { id: 'safety', label: 'Safety' },
   ];
@@ -71,6 +73,7 @@ const VolunteerHub = (() => {
       username,
       label,
       claimedAt: Number(raw.claimedAt) || Date.now(),
+      ...(raw.addedBy ? { addedBy: String(raw.addedBy) } : {}),
     };
   }
 
@@ -99,13 +102,15 @@ const VolunteerHub = (() => {
     return out;
   }
 
+  function personFromName(name) {
+    const label = String(name || '').trim().slice(0, 40);
+    if (!label) return null;
+    return { username: `vol_${label.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`, label };
+  }
+
   function identity() {
     try {
-      const saved = localStorage.getItem(NAME_KEY);
-      if (saved && saved.trim()) {
-        const label = saved.trim().slice(0, 40);
-        return { username: `vol_${label.toLowerCase().replace(/[^a-z0-9]+/g, '_')}`, label };
-      }
+      return personFromName(localStorage.getItem(NAME_KEY));
     } catch (e) { /* ignore */ }
     return null;
   }
@@ -118,6 +123,9 @@ const VolunteerHub = (() => {
   }
 
   async function writeMatchRole(matchId, role, list) {
+    if (window.DB?.isArchived?.()) {
+      throw new Error(`${window.DB.season.label} is archived — the volunteer board is read-only`);
+    }
     const id = String(matchId);
     if (mode === 'firebase' && db) {
       await db.ref(`${path()}/${id}/${role}`).set(list);
@@ -203,6 +211,38 @@ const VolunteerHub = (() => {
     return list;
   }
 
+  /** Put someone else on a role by name (e.g. an extra referee). */
+  async function addByName(matchId, role, name) {
+    if (!matchId) throw new Error('Select a game');
+    if (!ROLES.some((r) => r.id === role)) throw new Error('Unknown role');
+    const who = identity();
+    if (!who) throw new Error('Enter your name first');
+    const person = personFromName(name);
+    if (!person) throw new Error('Enter a name');
+    const list = [...listFor(matchId, role)];
+    if (list.some((p) => sameUser(p.username, person.username))) {
+      throw new Error(`${person.label} is already on this list`);
+    }
+    list.push({ ...person, addedBy: who.username, claimedAt: Date.now() });
+    await writeMatchRole(matchId, role, list);
+    return list;
+  }
+
+  function canRemove(person, who = identity()) {
+    if (!person || !who) return false;
+    return sameUser(person.username, who.username) || sameUser(person.addedBy, who.username);
+  }
+
+  /** Remove a volunteer — allowed for that volunteer or whoever added them by name. */
+  async function remove(matchId, role, username) {
+    const prev = listFor(matchId, role);
+    const target = prev.find((p) => sameUser(p.username, username));
+    if (!target) throw new Error('Volunteer not found');
+    if (!canRemove(target)) throw new Error('Only that volunteer or whoever added them can remove them');
+    await writeMatchRole(matchId, role, prev.filter((p) => p !== target));
+    return prev;
+  }
+
   /** Promote a backup to primary (must already be on the list). */
   async function promote(matchId, role, username) {
     const list = [...listFor(matchId, role)];
@@ -217,7 +257,7 @@ const VolunteerHub = (() => {
 
   return {
     init, onChange, roles: ROLES, identity, setDisplayName,
-    listFor, primary, isSignedUp, claim, leave, promote,
+    listFor, primary, isSignedUp, claim, leave, promote, addByName, canRemove, remove,
     status: () => ({ mode, connectionError }),
   };
 })();

@@ -1102,8 +1102,11 @@ a.btn:hover, a.btn:focus { text-decoration: none; color: inherit; }
 }
 .vol-role-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
+}
+@media (max-width: 1100px) and (min-width: 901px), (max-width: 760px) {
+  .vol-role-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 640px) {
   .vol-role-grid { grid-template-columns: 1fr; }
@@ -1140,6 +1143,7 @@ a.btn:hover, a.btn:focus { text-decoration: none; color: inherit; }
 }
 .vol-name { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .vol-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.vol-actions .btn { padding: 3px 9px; min-height: 0; font-size: 11.5px; white-space: nowrap; }
 
 /* ---- Admin save history -------------------------------------------------- */
 .ad-history-match-list {
@@ -1184,4 +1188,50 @@ a.btn:hover, a.btn:focus { text-decoration: none; color: inherit; }
   align-items: center;
   gap: 8px;
   margin-bottom: 4px;
+}
+
+/* ---- Season switcher / archive banner ------------------------------------ */
+.brand { min-width: 0; }
+.brand > div { min-width: 0; }
+.brand-title { white-space: nowrap; }
+.brand-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.header-actions { flex: none; }
+.season-switch { display: flex; align-items: center; gap: 8px; }
+.season-switch-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+  color: var(--text-muted);
+}
+.season-select { min-width: 0; height: 40px; padding: 0 12px; font-weight: 600; cursor: pointer; }
+.season-select:hover, .season-select:focus { border-color: var(--accent); outline: none; }
+.se-toolbar .season-switch { margin-right: auto; }
+.se-toolbar .season-select { height: 36px; }
+
+.season-banner-host { max-width: 1180px; margin: 0 auto; padding: 14px clamp(16px, 4vw, 40px) 0; }
+.season-banner-host[hidden] { display: none; }
+.season-banner {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13.5px;
+  border: 1px solid color-mix(in srgb, #f59e0b 45%, var(--border));
+  background: color-mix(in srgb, #f59e0b 12%, var(--surface));
+}
+.view .season-banner, .admin-shell .season-banner, .stats-admin-page .season-banner { margin-bottom: 14px; }
+.team-visiting-note { margin: 0 0 12px; }
+
+@media (max-width: 640px) {
+  .app-header { gap: 10px; }
+  .brand { gap: 10px; }
+  .brand > div { min-width: 86px; }
+  .brand-mark { font-size: 24px; }
+  .header-actions { gap: 6px; }
+  .header-actions .season-switch-label { display: none; }
+  .header-actions .season-select { max-width: 132px; height: 36px; padding: 0 8px; font-size: 13px; }
+  .header-actions .icon-btn { width: 36px; height: 36px; font-size: 16px; }
+  .season-banner-host { padding: 12px 12px 0; }
+}
+@media (max-width: 400px) {
+  .header-actions .season-select { max-width: 112px; }
+}
+@media (max-width: 350px) {
+  .brand-mark { display: none; }
+  .header-actions .season-select { max-width: 104px; }
 }

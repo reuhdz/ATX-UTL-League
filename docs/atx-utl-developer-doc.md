@@ -280,7 +280,7 @@ flowchart LR
 |--------|---------|------------|---------------|
 | `LEAGUE` | Season metadata + PRNG seed | `name`, `venue`, `season`, `seed` (default `20260721`) | Drives all generated data |
 | `TEAMS` | Four clubs | `id`, `name`, `emoji`, `color`, `captain` | Roster via `teamId` on players |
-| `PLAYERS` | 32 active roster entries (incl. free agents) | `id`, `name`, `teamId` (`fa` = free agent), `level`, `pos`, hidden `skill` 0..1 | Lineups, box scores, availability |
+| `PLAYERS` | 32 active roster entries (incl. free agents) | `id`, `name`, `teamId` (`fa` = free agent), `pos`, hidden `skill` 0..1 | Lineups, box scores, availability |
 | `MATCHES` | Double round-robin schedule | `id`, `round`, `date`, `home`, `away`, `status`, scores, lineups, `box[]` | ~70% of rounds played at load |
 | `AVAILABILITY` | Upcoming league-night responses | `nights[]`, `table[date][playerId]` → `in`\|`maybe`\|`out` | Extends to ≥4 future Sunday nights |
 
@@ -419,7 +419,7 @@ for each match m in sched:
 **Formula / pseudocode:**
 
 ```
-FA_POOL = free agents excluding level 'Pro (IR)'
+FA_POOL = all free agents
 guestIdx = 0   // module-level, persists across all lineups in load order
 
 nextGuest():
@@ -615,11 +615,11 @@ Four headline stat cards (matches played, total goals, top rated, golden torpedo
 
 ### Teams
 
-One card per team: emoji, captain, rank, W-D-L record, aggregate team stats, clickable mini-roster with level tags and goal counts, next opponent. Free agents listed in a separate panel. Navigating via a team pill flashes and scrolls the matching card.
+One card per team: emoji, captain, rank, W-D-L record, aggregate team stats, clickable mini-roster with goal counts, next opponent. Free agents listed in a separate panel. Navigating via a team pill flashes and scrolls the matching card.
 
 ### Roster
 
-Full table with client-side sort (click column headers) and segmented filter (All / each team / Free agents). Columns: Rating, Name, Team, Level, Pos, G, A, S, B, TO, MP. Rating column includes ⓘ info popover. Footer panel documents the formula and weight chips.
+Full table with client-side sort (click column headers) and segmented filter (All / each team / Free agents). Columns: Rating, Name, Team, Pos, G, A, S, B, TO, MP. Rating column includes ⓘ info popover. Footer panel documents the formula and weight chips.
 
 > **Note — Rating column.** Values come from `DB.ratedPlayers()` — weighted box-score sum, ÷ (matches + 2), league min–max to 1–10. See §7 for the full formula and why the +2 prior prevents one-game flukes.
 

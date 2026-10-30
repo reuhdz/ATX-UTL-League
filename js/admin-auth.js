@@ -24,7 +24,7 @@ const AdminAuth = (() => {
       label: 'League admin',
       voterKey: 'utladmin',
     }];
-    (window.DB?.teams || []).forEach((t) => {
+    (window.DB?.teams || []).filter((t) => t.captain).forEach((t) => {
       list.push({
         role: 'captain',
         username: norm(t.captain),
@@ -38,10 +38,17 @@ const AdminAuth = (() => {
     return list;
   }
 
+  /** Captain logins only count for the season whose team they captain. */
+  function validForSeason(s) {
+    if (!s || s.role !== 'captain') return !!s;
+    return accounts().some((a) => a.role === 'captain' && a.username === s.username && a.teamId === s.teamId);
+  }
+
   function read() {
     try {
       const raw = sessionStorage.getItem(KEY);
-      return raw ? JSON.parse(raw) : null;
+      const s = raw ? JSON.parse(raw) : null;
+      return validForSeason(s) ? s : null;
     } catch (e) { return null; }
   }
 

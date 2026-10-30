@@ -18,6 +18,8 @@ const teamColor = (id) => {
 const fmtDate = (iso) =>
   new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 const diff = (n) => (n > 0 ? `+${n}` : `${n}`);
+const escapeHtml = (s) => String(s ?? '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 function teamPill(id) {
   if (id === 'fa') return `<span class="team-pill fa">Free Agent</span>`;
@@ -170,7 +172,7 @@ function bindStatClipTiles(root, playerId, playerName) {
       </div>
       ${clips.length ? `<ul class="prof-clip-list">${clips.map((c) => {
         const matchLabel = c.round != null
-          ? `Week ${c.round} · ${DB.teamName(c.home)} vs ${DB.teamName(c.away)}`
+          ? `${DB.roundName(c.round)} · ${DB.teamName(c.home)} vs ${DB.teamName(c.away)}`
           : 'Clip';
         const kind = c.type === 'swimOffAttempts' ? 'attempt'
           : c.type === 'swimOffs' ? 'win' : '';
@@ -188,10 +190,10 @@ function bindStatClipTiles(root, playerId, playerName) {
 }
 
 function gameLogTableHtml(log, { filmCol = true } = {}) {
-  if (!log.length) return '<p class="muted">No league matches played yet this season.</p>';
+  if (!log.length) return `<p class="muted">No ${DB.season.label} matches played yet.</p>`;
   return `
     <table class="tbl gamelog">
-      <thead><tr><th>W</th><th>Opp</th><th>Res</th><th>G</th><th>A</th><th>S</th><th>B</th><th>TO</th><th>SOA</th><th>SO</th><th>SH</th>${filmCol ? '<th>Film</th>' : ''}</tr></thead>
+      <thead><tr><th title="${DB.season.roundNoun}">${DB.season.roundAbbr}</th><th>Opp</th><th>Res</th><th>G</th><th>A</th><th>S</th><th>B</th><th>TO</th><th>SOA</th><th>SO</th><th>SH</th>${filmCol ? '<th>Film</th>' : ''}</tr></thead>
       <tbody>${log.map((g) => `
         <tr>
           <td>${g.round}</td>
@@ -416,8 +418,8 @@ function renderDashboard() {
 
   view.innerHTML = `
     <div class="page-head">
-      <h2>${DB.league.season} Overview</h2>
-      <p class="muted">Starts ${fmtDate(DB.league.startDate)} · ${DB.league.weeks} weeks</p>
+      <h2>${DB.season.label} Overview</h2>
+      <p class="muted">${DB.season.overviewSub}</p>
     </div>
 
     <div class="stat-cards">
@@ -478,7 +480,7 @@ function renderDashboard() {
       <section class="panel">
         <div class="panel-head"><h3>🗓️ Next games</h3></div>
         <div class="fixture-list">
-          ${sortMatchesByKickoff(upcoming).slice(0, 4).map((m, i) => fixtureRow(m, i)).join('') || '<p class="muted">Season complete.</p>'}
+          ${sortMatchesByKickoff(upcoming).slice(0, 4).map((m, i) => fixtureRow(m, i)).join('') || `<p class="muted">${DB.season.label} complete.</p>`}
         </div>
       </section>
       <section class="panel">
@@ -534,7 +536,7 @@ function matchKickoffLabel(m, indexInWeek = 0) {
 function sortMatchesByKickoff(games) {
   return [...(games || [])].sort((a, b) => {
     const slotOrder = (m) => (m.slot === '9am' || m.timeLabel === '9:00 AM' ? 1 : 0);
-    return slotOrder(a) - slotOrder(b) || String(a.id).localeCompare(String(b.id));
+    return slotOrder(a) - slotOrder(b) || String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
   });
 }
 
@@ -542,7 +544,7 @@ function fixtureRow(m, indexInWeek = 0) {
   const time = matchKickoffLabel(m, indexInWeek);
   const tag = m.label
     ? `<span class="playoff-tag">${m.label}</span>`
-    : `<span class="fx-date">${fmtDate(m.date)} · W${m.round}</span>`;
+    : `<span class="fx-date">${fmtDate(m.date)} · ${DB.roundShort(m.round)}</span>`;
   return `<div class="fixture">
       ${tag}
       <span class="fx-time">${time}</span>
@@ -558,7 +560,7 @@ function resultRow(m, indexInWeek = 0) {
   const time = matchKickoffLabel(m, indexInWeek);
   const tag = m.label
     ? `<span class="playoff-tag">${m.label}</span>`
-    : `<span class="fx-date">${fmtDate(m.date)} · W${m.round}</span>`;
+    : `<span class="fx-date">${fmtDate(m.date)} · ${DB.roundShort(m.round)}</span>`;
   return `<div class="fixture">
       ${tag}
       <span class="fx-time">${time}</span>
@@ -574,7 +576,7 @@ function resultRow(m, indexInWeek = 0) {
    TEAMS & ROSTER
    ============================================================================ */
 let rosterSort = { key: 'rating', dir: -1 };
-let rosterView = 'season5'; // 'season5' | 'overall'
+let rosterView = 'season'; // 'season' (active season) | 'overall'
 
 function renderTeamsRoster() {
   const standings = DB.standings();
@@ -585,7 +587,7 @@ function renderTeamsRoster() {
 
   const colsFor = (view) => [
     ['rating', 'Rating'], ['name', 'Name'], ['pos', 'Pos'],
-    ...(view === 'season5' ? [['teamId', 'Team']] : []),
+    ...(view === 'season' ? [['teamId', 'Team']] : []),
     ['goals', 'G'], ['assists', 'A'], ['steals', 'S'], ['blocks', 'B'], ['turnovers', 'TO'],
     ['swimOffAttempts', 'SOA'], ['swimOffs', 'SO'], ['shots', 'SH'], ['matches', 'MP'],
   ];
@@ -603,15 +605,15 @@ function renderTeamsRoster() {
   };
 
   const draw = () => {
-    const seasonView = rosterView === 'season5';
+    const seasonView = rosterView === 'season';
     const cols = colsFor(rosterView);
     // If current sort key isn't in this view (e.g. teamId on overall), fall back
     if (!cols.some(([k]) => k === rosterSort.key)) rosterSort = { key: 'rating', dir: -1 };
 
     const { key, dir } = rosterSort;
-    // Season 5 = current-season stats; Overall = all-seasons career stats (no team col)
+    // Season view = active-season stats; Overall = all-seasons career stats (no team col)
     let rows = seasonView
-      ? seasonRated.filter((p) => DB.isSeason5(p.playerId))
+      ? seasonRated.filter((p) => DB.inSeason(p.playerId))
       : careerRated;
     rows = [...rows].sort((a, b) => {
       const av = a[key], bv = b[key];
@@ -637,7 +639,7 @@ function renderTeamsRoster() {
         <td>${p.swimOffAttempts || 0}</td><td>${p.swimOffs}</td><td>${p.shots}</td><td>${p.matches}</td>
       </tr>`).join('');
 
-    const title = seasonView ? '🌊 Season 5 roster' : '👤 Overall roster';
+    const title = seasonView ? `🌊 ${DB.season.label} roster` : '👤 Overall roster';
     $('#roster-title').textContent = title;
     if ($('#roster-meta')) $('#roster-meta').textContent = '';
 
@@ -659,16 +661,22 @@ function renderTeamsRoster() {
         const roster = DB.rosterOf(t.id);
         const next = DB.nextGameFor(t.id);
         const tt = DB.teamTotals(t.id);
+        const sub = t.captain ? `Captain: ${t.captain}` : (t.visiting ? 'Visiting club' : '');
         return `
           <section class="team-card ${teamHighlight === t.id ? 'flash' : ''}" id="team-${t.id}" style="--tc:${t.color}">
             <div class="team-card-head">
-              <div><h3>${t.name}</h3><span class="muted small">Captain: ${t.captain}</span></div>
+              <div><h3>${t.name}</h3><span class="muted small">${sub}</span></div>
               <span class="team-rank">#${rankOf[t.id]}</span>
             </div>
             <div class="team-record">
               <span><b>${s.w}</b>W</span><span><b>${s.d}</b>D</span><span><b>${s.l}</b>L</span>
               <span class="sep"></span><span><b>${s.pts}</b> pts</span>
             </div>
+            ${t.visiting ? `
+            <div class="team-mini-stats">
+              <span>🥅 ${s.gf} GF</span><span>🛡️ ${s.ga} GA</span>
+            </div>
+            <p class="muted small team-visiting-note">Visiting club — roster not tracked here.</p>` : `
             <div class="team-mini-stats">
               <span>🥅 ${tt.goals}</span><span>🅰️ ${tt.assists}</span><span>🖐️ ${tt.steals}</span>
               <span>🧱 ${tt.blocks}</span><span>🏁 ${tt.swimOffAttempts || 0}/${tt.swimOffs} SO</span><span>🏹 ${tt.shots} SH</span>
@@ -683,8 +691,8 @@ function renderTeamsRoster() {
                   <span class="rm-goals">${totals[p.id].goals}G</span>
                 </li>`;
               }).join('')}
-            </ul>
-            <div class="team-next">${next ? `Next: ${fmtDate(next.date)} vs ${DB.teamName(next.home === t.id ? next.away : next.home)}` : 'Season complete'}</div>
+            </ul>`}
+            <div class="team-next">${next ? `Next: ${fmtDate(next.date)} vs ${DB.teamName(next.home === t.id ? next.away : next.home)}` : `${DB.season.label} complete`}</div>
           </section>`;
       }).join('')}
     </div>
@@ -700,7 +708,7 @@ function renderTeamsRoster() {
 
     <div class="toolbar">
       <div class="seg" id="roster-view-toggle">
-        <button class="seg-btn" data-view="season5">Season 5</button>
+        <button class="seg-btn" data-view="season">${DB.season.label}</button>
         <button class="seg-btn" data-view="overall">Overall</button>
       </div>
     </div>
@@ -740,17 +748,14 @@ function renderSchedule() {
   DB.matches.forEach((m) => (byRound[m.round] = byRound[m.round] || []).push(m));
 
   view.innerHTML = `
-    <div class="page-head"><h2>Schedule &amp; Results</h2>
-      <p class="muted">Weeks 1–6 regular season · Weeks 7–8 playoffs · First game 8:00 AM · Second game 9:00 AM</p>
+    <div class="page-head"><h2>${DB.season.label} Schedule &amp; Results</h2>
+      <p class="muted">${DB.season.scheduleSub || ''}</p>
     </div>
     <div class="rounds">
       ${Object.keys(byRound).map((r) => {
         const games = byRound[r];
         const played = games.every((g) => g.status === 'final');
-        const isPlayoff = games.some((g) => g.phase === 'playoff');
-        const title = isPlayoff
-          ? (Number(r) === 7 ? 'Week 7 · Semifinals' : 'Week 8 · Finals')
-          : `Week ${r}`;
+        const title = DB.roundTitle(Number(r));
         return `<section class="panel round">
             <div class="panel-head"><h3>${title}</h3>
               <span class="badge ${played ? 'done' : 'up'}">${played ? 'Final' : 'Upcoming'} · ${fmtDate(games[0].date)}</span></div>
@@ -763,7 +768,7 @@ function renderSchedule() {
 /* =============================================================================
    STATS (+ player spotlight tile)
    ============================================================================ */
-let spotlightTeam = 'capybara';
+let spotlightTeam = null;
 let spotlightPlayer = null;
 
 function renderStats() {
@@ -771,15 +776,19 @@ function renderStats() {
   const standings = DB.standings();
   const topScorers = [...rated].sort((a, b) => b.goals - a.goals).slice(0, 8);
   const topSteals = [...rated].sort((a, b) => b.steals - a.steals).slice(0, 8);
+  const spotTeams = DB.rosterTeams();
+  if (spotlightTeam !== 'fa' && !spotTeams.some((t) => t.id === spotlightTeam)) {
+    spotlightTeam = spotTeams[0]?.id || 'fa';
+  }
 
   view.innerHTML = `
-    <div class="page-head"><h2>Stats Center</h2><p class="muted">League leaders, team comparisons, and a player spotlight.</p></div>
+    <div class="page-head"><h2>${DB.season.label} Stats Center</h2><p class="muted">League leaders, team comparisons, and a player spotlight.</p></div>
 
     <section class="panel spotlight">
       <div class="panel-head"><h3>🔦 Player spotlight</h3><span class="muted small">filter by roster</span></div>
       <div class="spot-controls">
         <div class="seg" id="spot-team">
-          ${DB.teams.map((t) => `<button class="seg-btn" data-team="${t.id}">${t.name}</button>`).join('')}
+          ${spotTeams.map((t) => `<button class="seg-btn" data-team="${t.id}">${t.name}</button>`).join('')}
           <button class="seg-btn" data-team="fa">🧢 Free agents</button>
         </div>
         <select id="spot-player" class="select"></select>
@@ -831,8 +840,8 @@ function renderStats() {
         <ul class="chart-notes">
           <li><b>Top scorers / Steals leaders</b> — season totals summed from every final box score.</li>
           <li><b>Goal share</b> — each team’s Goals For as a slice of all goals scored.</li>
-          <li><b>Team profile</b> — six dimensions (Attack, Defense, Playmaking, Steals, Blocks, Discipline) min-max normalized to 0–100 across the four teams, so the best on each axis reaches the rim.</li>
-          <li><b>Points progression</b> — cumulative league points after each week.</li>
+          <li><b>Team profile</b> — six dimensions (Attack, Defense, Playmaking, Steals, Blocks, Discipline) min-max normalized to 0–100 across the ${DB.teams.length} teams, so the best on each axis reaches the rim.</li>
+          <li><b>Points progression</b> — cumulative league points after each ${DB.season.roundNoun.toLowerCase()}.</li>
         </ul>
       </div>
     </section>
@@ -881,12 +890,14 @@ function renderStats() {
     });
     DB.teams.forEach((t) => series[t.id].push(running[t.id]));
   });
-  ChartHub.line('c-progress', rounds.map((r) => `W${r}`),
+  ChartHub.line('c-progress', rounds.map((r) => DB.roundShort(r)),
     DB.teams.map((t) => ({ label: t.name, data: series[t.id], borderColor: t.color, backgroundColor: t.color + '22', tension: 0.3, fill: false })));
 
   // spotlight wiring
   const fillPlayers = () => {
-    const list = DB.ratedPlayers().filter((p) => spotlightTeam === 'fa' ? p.teamId === 'fa' : p.teamId === spotlightTeam);
+    const list = DB.ratedPlayers().filter((p) => spotlightTeam === 'fa'
+      ? p.teamId === 'fa' && DB.inSeason(p.playerId)
+      : p.teamId === spotlightTeam);
     spotlightPlayer = list[0] ? list[0].playerId : null;
     $('#spot-player').innerHTML = list.map((p) =>
       `<option value="${p.playerId}">${p.name}</option>`).join('');
@@ -964,10 +975,10 @@ function renderMedia() {
       <div class="panel-head"><h3>💡 Nominate a highlight</h3></div>
       <form id="highlight-form" class="highlight-form">
         <div class="se-pickers" id="hl-meta-pickers">
-          <label>Week
+          <label>${DB.season.roundNoun}
             <select id="hl-week" required>
               ${[...new Set(DB.matches.map((m) => m.round))].sort((a, b) => a - b).map((r) =>
-                `<option value="${r}">Week ${r}</option>`).join('')}
+                `<option value="${r}">${DB.roundTitle(r)}</option>`).join('')}
             </select>
           </label>
           <label>Match
@@ -976,7 +987,7 @@ function renderMedia() {
           <label>Player spotlight
             <select id="hl-player">
               <option value="">— optional —</option>
-              ${DB.season5Roster().map((p) => `<option value="${p.id}">${p.name}</option>`).join('')}
+              ${DB.seasonRoster().map((p) => `<option value="${p.id}">${p.name}</option>`).join('')}
             </select>
           </label>
         </div>
@@ -1007,7 +1018,7 @@ function renderMedia() {
           <button class="seg-btn ${mediaFilter.team === 'all' ? 'active' : ''}" data-team="all">All</button>
           ${DB.teams.map((t) => `<button class="seg-btn ${mediaFilter.team === t.id ? 'active' : ''}" data-team="${t.id}">${t.name}</button>`).join('')}
         </div>
-        <input id="media-search" class="select search" type="search" placeholder="Search team or week (e.g. Capybara, W5)…" value="${mediaFilter.q}" />
+        <input id="media-search" class="select search" type="search" placeholder="Search team or ${DB.season.roundNoun.toLowerCase()} (e.g. ${DB.rosterTeams()[0]?.name || DB.teams[0].name}, ${DB.roundShort(2)})…" value="${mediaFilter.q}" />
       </div>
       <div id="game-film" class="media-grid"></div>
     </section>
@@ -1055,7 +1066,7 @@ function renderMedia() {
       if ($('#hl-url')) $('#hl-url').value = '';
       if ($('#hl-comment')) $('#hl-comment').value = '';
       if ($('#hl-player')) $('#hl-player').value = '';
-      setHlMsg('Submitted — thanks! Vote at Season 5 highlights.', 'ok');
+      setHlMsg(`Submitted — thanks! Vote at ${DB.season.label} highlights.`, 'ok');
     } catch (err) {
       setHlMsg(err.message || String(err), 'err');
     } finally {
@@ -1063,7 +1074,7 @@ function renderMedia() {
     }
   });
 
-  const games = [...DB.matches].sort((a, b) => a.round - b.round || a.id.localeCompare(b.id));
+  const games = [...DB.matches].sort((a, b) => a.round - b.round || a.id.localeCompare(b.id, undefined, { numeric: true }));
 
   const draw = () => {
     const q = mediaFilter.q.trim().toLowerCase();
@@ -1087,7 +1098,7 @@ function renderMedia() {
           cards.push(`
             <article class="media-card game-card hl-media-card">
               <div class="media-thumb game-thumb" style="background:linear-gradient(135deg, ${hueA}, ${hueB})">
-                <span class="media-tag">Week ${m.round} · #${i + 1}</span>
+                <span class="media-tag">${DB.roundName(m.round)} · #${i + 1}</span>
                 <span class="game-score">${h.voteCount} vote${h.voteCount === 1 ? '' : 's'}</span>
                 <span class="media-kind">🎬</span>
               </div>
@@ -1124,7 +1135,7 @@ function renderMedia() {
       return `
         <a class="media-card game-card" href="${href}" target="_blank" rel="noopener" title="Open game film: ${slug || m.id}">
           <div class="media-thumb game-thumb" style="background:linear-gradient(135deg, ${hueA}, ${hueB})">
-            <span class="media-tag">Week ${m.round}</span>
+            <span class="media-tag">${DB.roundName(m.round)}</span>
             ${scoreline}
             <span class="media-kind">📁</span>
           </div>
@@ -1162,22 +1173,24 @@ let attUnsub = null;
 
 function renderAttendance() {
   const statusMap = { in: ['In', 'in'], maybe: ['Maybe', 'maybe'], out: ['Out', 'out'] };
-  const seasonPlayers = () => DB.season5Roster().filter((p) => p.level !== 'Pro (IR)');
+  const seasonPlayers = () => DB.seasonRoster();
   const nights = () => DB.availability.nights;
+  const readOnly = DB.isArchived();
 
   view.innerHTML = `
     <div class="page-head">
-      <h2>Attendance &amp; Availability</h2>
+      <h2>${DB.season.label} Attendance &amp; Availability</h2>
+      ${readOnly ? `<p class="muted">${DB.season.label} is archived — availability is read-only.</p>` : ''}
     </div>
     <p id="att-live-msg" class="draft-msg"></p>
 
-    <div id="att-empty" class="panel" hidden><p class="muted">No upcoming nights — season complete.</p></div>
+    <div id="att-empty" class="panel" hidden><p class="muted">No upcoming game days — ${DB.season.label} complete.</p></div>
     <div id="att-live" hidden>
       <div class="att-summary" id="att-summary"></div>
       <div class="toolbar">
         <div class="seg" id="att-filter">
           <button class="seg-btn" data-team="all">All</button>
-          ${DB.teams.map((t) => `<button class="seg-btn" data-team="${t.id}">${t.name}</button>`).join('')}
+          ${DB.rosterTeams().map((t) => `<button class="seg-btn" data-team="${t.id}">${t.name}</button>`).join('')}
           <button class="seg-btn" data-team="fa">🧢 Free agents</button>
         </div>
       </div>
@@ -1258,7 +1271,7 @@ function renderAttendance() {
         ${ns.map((d) => {
           const status = AttendanceHub.statusFor(d, p.id);
           const [lbl, cls] = statusMap[status];
-          return `<td><button type="button" class="pill ${cls} att-toggle" data-att-player="${p.id}" data-date="${d}" title="Click to cycle In / Maybe / Out">${lbl}</button></td>`;
+          return `<td><button type="button" class="pill ${cls} att-toggle" data-att-player="${p.id}" data-date="${d}" ${readOnly ? 'disabled title="Archived season — read-only"' : 'title="Click to cycle In / Maybe / Out"'}>${lbl}</button></td>`;
         }).join('')}
         <td class="strong">${DB.attendancePct(p.id)}%</td>
       </tr>`).join('');
@@ -1335,8 +1348,8 @@ function openProfile(id) {
       <div class="prof-id">
         <div class="prof-avatar" style="--tc:${teamColor(p.teamId)}">${p.name[0]}</div>
         <div>
-          <h2>${p.name}${DB.isSeason5(p.playerId) ? ' <span class="s5-tag">S5</span>' : ''}</h2>
-          <p class="muted">${DB.isSeason5(p.playerId) ? teamBadge(p.teamId) : 'ATX roster'}${posSuffix(p)}${att != null ? ` · ${att}% availability` : ''}</p>
+          <h2>${p.name}${DB.inSeason(p.playerId) ? ` <span class="s5-tag" title="${DB.season.label} roster">${DB.season.tag}</span>` : ''}</h2>
+          <p class="muted">${DB.inSeason(p.playerId) ? teamBadge(p.teamId) : 'ATX roster'}${posSuffix(p)}${att != null ? ` · ${att}% availability` : ''}</p>
         </div>
       </div>
       <div class="prof-rating">${p.matches ? p.rating : '—'}<small>rating</small></div>
@@ -1419,7 +1432,7 @@ function openContentionForm(playerId) {
   const matchOpts = log.length
     ? log.map((g) => {
       const line = g;
-      return `<option value="${g.matchId}" data-round="${g.round}">W${g.round} vs ${DB.teamName(g.opp)} (${g.result} ${g.gf}-${g.ga})</option>`;
+      return `<option value="${g.matchId}" data-round="${g.round}">${DB.roundShort(g.round)} vs ${DB.teamName(g.opp)} (${g.result} ${g.gf}-${g.ga})</option>`;
     }).join('')
     : '<option value="">No games yet — request credit for upcoming entry</option>';
 
@@ -1550,20 +1563,25 @@ function renderVolunteer() {
     volunteerMatchId = weekGames[0]?.id || null;
   }
   const who = VolunteerHub.identity();
+  const archived = DB.isArchived();
+  const noun = DB.season.roundNoun;
+  const allLabel = `All ${noun.toLowerCase()}s`;
 
   view.innerHTML = `
     <div class="page-head">
-      <h2>Game-day volunteers</h2>
-      <p class="muted">Sign up as referee, camera, or safety for a specific game.</p>
+      <h2>${DB.season.label} game-day volunteers</h2>
+      <p class="muted">${archived
+        ? `${DB.season.label} is archived — the volunteer board is read-only.`
+        : 'Sign up as referee, extra referee, camera, or safety for a specific game.'}</p>
     </div>
     <p id="vol-msg" class="draft-msg"></p>
 
-    <section class="panel">
+    <section class="panel" ${archived ? 'hidden' : ''}>
       <div class="panel-head"><h3>Sign up</h3></div>
       <form id="vol-form" class="vol-form">
-        <label>Week
+        <label>${noun}
           <select id="vol-week" class="select" required>
-            ${weeks.map((w) => `<option value="${w}" ${Number(volunteerWeek) === w ? 'selected' : ''}>Week ${w}</option>`).join('')}
+            ${weeks.map((w) => `<option value="${w}" ${Number(volunteerWeek) === w ? 'selected' : ''}>${DB.roundTitle(w)}</option>`).join('')}
           </select>
         </label>
         <label>Game
@@ -1581,6 +1599,9 @@ function renderVolunteer() {
             ${VolunteerHub.roles.map((r) => `<option value="${r.id}">${r.label}</option>`).join('')}
           </select>
         </label>
+        <label><span>Extra referee <span class="muted small">(optional)</span></span>
+          <input id="vol-extra-ref" class="input" maxlength="40" placeholder="Add a second referee by name" />
+        </label>
         <div class="se-actions">
           <button type="submit" class="btn" id="vol-submit">Submit</button>
         </div>
@@ -1591,12 +1612,12 @@ function renderVolunteer() {
       <div class="panel-head vol-board-head">
         <div>
           <h3>Volunteer board</h3>
-          <p class="muted small" id="vol-board-caption">All weeks</p>
+          <p class="muted small" id="vol-board-caption">${allLabel}</p>
         </div>
-        <label class="vol-board-filter">Week
+        <label class="vol-board-filter">${noun}
           <select id="vol-board-week" class="select">
-            <option value="all" ${volunteerBoardWeek === 'all' ? 'selected' : ''}>All weeks</option>
-            ${weeks.map((w) => `<option value="${w}" ${String(volunteerBoardWeek) === String(w) ? 'selected' : ''}>Week ${w}</option>`).join('')}
+            <option value="all" ${volunteerBoardWeek === 'all' ? 'selected' : ''}>${allLabel}</option>
+            ${weeks.map((w) => `<option value="${w}" ${String(volunteerBoardWeek) === String(w) ? 'selected' : ''}>${DB.roundTitle(w)}</option>`).join('')}
           </select>
         </label>
       </div>
@@ -1636,11 +1657,11 @@ function renderVolunteer() {
     const caption = $('#vol-board-caption');
     if (caption) {
       caption.textContent = volunteerBoardWeek === 'all'
-        ? 'All weeks'
-        : `Week ${volunteerBoardWeek}`;
+        ? allLabel
+        : DB.roundTitle(volunteerBoardWeek);
     }
     if (!visibleWeeks.length) {
-      host.innerHTML = '<p class="muted">No games for that week.</p>';
+      host.innerHTML = `<p class="muted">No games for that ${noun.toLowerCase()}.</p>`;
       return;
     }
     host.innerHTML = visibleWeeks.map((week) => {
@@ -1653,13 +1674,15 @@ function renderVolunteer() {
           const list = VolunteerHub.listFor(m.id, role.id);
           const people = list.length
             ? list.map((p, idx) => {
-              const canLeave = me && p.username.toLowerCase() === me.username.toLowerCase();
-              const canPromote = idx > 0;
+              const canLeave = !archived && me && p.username.toLowerCase() === me.username.toLowerCase();
+              const canRemoveAdded = !archived && !canLeave && VolunteerHub.canRemove(p, me);
+              const canPromote = !archived && idx > 0;
               return `<li class="${idx === 0 ? 'vol-primary' : 'vol-backup'}">
-                <span class="vol-name">${p.label}</span>
+                <span class="vol-name">${escapeHtml(p.label)}</span>
                 <span class="vol-actions">
-                  ${canPromote ? `<button type="button" class="btn btn-ghost vol-promote" data-match="${m.id}" data-role="${role.id}" data-user="${p.username}">Make primary</button>` : ''}
+                  ${canPromote ? `<button type="button" class="btn btn-ghost vol-promote" data-match="${m.id}" data-role="${role.id}" data-user="${escapeHtml(p.username)}">Make primary</button>` : ''}
                   ${canLeave ? `<button type="button" class="btn btn-ghost vol-leave" data-match="${m.id}" data-role="${role.id}">Remove me</button>` : ''}
+                  ${canRemoveAdded ? `<button type="button" class="btn btn-ghost vol-remove" data-match="${m.id}" data-role="${role.id}" data-user="${escapeHtml(p.username)}">Remove</button>` : ''}
                 </span>
               </li>`;
             }).join('')
@@ -1679,7 +1702,7 @@ function renderVolunteer() {
       }).join('');
       return `<article class="vol-week-tile">
         <div class="vol-week-head">
-          <h3>Week ${week}</h3>
+          <h3>${DB.roundTitle(week)}</h3>
           <span class="muted small">${date}</span>
         </div>
         ${gameBlocks}
@@ -1691,6 +1714,15 @@ function renderVolunteer() {
         try {
           await VolunteerHub.leave(btn.dataset.match, btn.dataset.role);
           setMsg('Removed from that role.', 'ok');
+          paintOverview();
+        } catch (e) { setMsg(e.message || String(e), 'err'); }
+      });
+    });
+    $$('.vol-remove', host).forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        try {
+          await VolunteerHub.remove(btn.dataset.match, btn.dataset.role, btn.dataset.user);
+          setMsg('Removed.', 'ok');
           paintOverview();
         } catch (e) { setMsg(e.message || String(e), 'err'); }
       });
@@ -1722,11 +1754,17 @@ function renderVolunteer() {
       const week = Number($('#vol-week')?.value);
       const matchId = $('#vol-game')?.value;
       const role = $('#vol-role')?.value;
+      const extraRef = ($('#vol-extra-ref')?.value || '').trim();
       volunteerWeek = week;
       volunteerMatchId = matchId;
       VolunteerHub.setDisplayName($('#vol-name')?.value);
-      await VolunteerHub.claim(matchId, role);
-      setMsg('Signed up — thanks!', 'ok');
+      // Adding an extra referee doesn't require signing yourself up again.
+      if (!extraRef || !VolunteerHub.isSignedUp(matchId, role)) await VolunteerHub.claim(matchId, role);
+      if (extraRef) {
+        await VolunteerHub.addByName(matchId, 'ref2', extraRef);
+        $('#vol-extra-ref').value = '';
+      }
+      setMsg(extraRef ? `Signed up — thanks! ${extraRef} added as extra referee.` : 'Signed up — thanks!', 'ok');
       paintOverview();
     } catch (err) {
       setMsg(err.message || String(err), 'err');
@@ -1794,13 +1832,17 @@ function renderDraft() {
     const picks = d.picks || [];
     const ready = d.ready || {};
 
+    const locked = archived && d.status !== 'done';
     if ($('#draft-status-pill')) {
-      const label = d.status === 'waiting' ? 'waiting for captains' : (d.status || 'waiting');
+      const label = locked ? 'locked'
+        : d.status === 'waiting' ? 'waiting for captains' : (d.status || 'waiting');
       $('#draft-status-pill').textContent = label;
-      $('#draft-status-pill').dataset.state = d.status || 'waiting';
+      $('#draft-status-pill').dataset.state = locked ? 'done' : (d.status || 'waiting');
     }
     if ($('#draft-turn')) {
-      if (d.status === 'live' && currentTeamId) {
+      if (locked) {
+        $('#draft-turn').textContent = 'Draft locked';
+      } else if (d.status === 'live' && currentTeamId) {
         const t = DB.team(currentTeamId);
         $('#draft-turn').innerHTML =
           `On the clock: <b>${teamName(currentTeamId)}</b> (${t?.captain || 'Captain'}) · pick #${(d.pickIndex || 0) + 1}`;
@@ -1880,9 +1922,13 @@ function renderDraft() {
     }
   };
 
+  const archived = DraftHub.isArchived();
+  const draftTeams = boardOrder();
+
   view.innerHTML = `
     <div class="page-head">
-      <h2>Draft Room</h2>
+      <h2>${DB.season.label} Draft Room</h2>
+      <p class="muted">${DB.seasonRosterIds.length}-player pool · ${draftTeams.map((t) => t.name).join(', ')}</p>
     </div>
 
     <section class="panel">
@@ -1892,19 +1938,21 @@ function renderDraft() {
 
     <section class="panel">
       <div class="panel-head">
-        <h3>🎯 Season 5 draft</h3>
+        <h3>🎯 ${DB.season.label} draft</h3>
         <div class="draft-head-meta">
           <span class="draft-clock" id="draft-clock" hidden>--:--</span>
           <span class="pill draft-state" id="draft-status-pill">waiting</span>
         </div>
       </div>
-      <div class="draft-controls">
+      ${archived
+        ? `<p class="muted">${DB.season.label} is archived — the draft is locked. Final rosters are shown above.</p>`
+        : `<div class="draft-controls">
         <label class="draft-field">PIN
           <input id="draft-pin" class="input" type="password" autocomplete="off" placeholder="Captain PIN to ready / master to start" />
         </label>
         <button type="button" class="btn" id="draft-start">Ready / Start</button>
         <button type="button" class="btn btn-ghost" id="draft-reset">Reset</button>
-      </div>
+      </div>`}
       <p id="draft-turn" class="draft-turn muted">Waiting for captains</p>
       <div class="panel-head tight"><h4>Available pool</h4></div>
       <div id="draft-pool" class="draft-pool"></div>
@@ -2049,8 +2097,10 @@ applyTheme();
 initTabs();
 initTheme();
 initClicks();
-$('#brand-sub').textContent = DB.league.full;
+$('#brand-sub').textContent = `${DB.league.full} · ${DB.season.label}`;
 $('#footer-venue').textContent = DB.league.venue;
+$('#footer-season').textContent = `ATX UTL · ${DB.season.label} · ${DB.season.footer}`;
+document.title = `ATX UTL — ${DB.season.label}`;
 Promise.all([
   DraftHub.init(), AttendanceHub.init(), StatsHub.init(), HighlightsHub.init(), FilmHub.init(),
   ContentionHub.init(), VolunteerHub.init(),

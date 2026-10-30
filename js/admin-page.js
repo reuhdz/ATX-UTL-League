@@ -18,11 +18,22 @@
       .replace(/"/g, '&quot;');
   }
 
+  function seasonHead(title) {
+    const captains = (window.DB?.teams || []).filter((t) => t.captain).map((t) => t.captain);
+    return `
+      <div class="page-head">
+        <h2>${title}</h2>
+        <p class="muted">${escapeHtml(DB.season.label)} · captain logins: ${escapeHtml(captains.join(', ') || 'none')}</p>
+      </div>
+      <div class="se-toolbar">${SeasonSwitcher.html()}</div>
+      ${SeasonSwitcher.bannerHtml()}`;
+  }
+
   function paint() {
     const s = AdminAuth.session();
     if (!s) {
       root.innerHTML = `
-        <div class="page-head"><h2>Staff login</h2></div>
+        ${seasonHead('Staff login')}
         <section class="panel se-lock">
           <label class="se-pin"><span>Username</span>
             <input id="ad-user" class="input" autocomplete="username" placeholder="Captain name or utladmin" />
@@ -56,9 +67,7 @@
     }
 
     root.innerHTML = `
-      <div class="page-head">
-        <h2>Welcome, ${escapeHtml(s.label || s.username)}</h2>
-      </div>
+      ${seasonHead(`Welcome, ${escapeHtml(s.label || s.username)}`)}
       <section class="panel admin-links">
         <ul class="admin-link-list">
           <li><a class="btn" href="../stats/">Match stats entry</a></li>
