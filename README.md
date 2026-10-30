@@ -29,7 +29,7 @@ just pushing the folder.
 | Tab | What it shows |
 |-----|---------------|
 | 📊 **Dashboard** | Headline stat cards, live standings (hover ⓘ for a column glossary), top-rated players (hover ⓘ for the rating formula), next games, recent results, and a goals-for/against chart. |
-| 🛡️ **Teams** | A card per team: rank, W-D-L, points, captain (C), aggregate stats, roster with player level (Pro/Rookie), plus a free-agents strip. |
+| 🛡️ **Teams** | A card per team: rank, W-D-L, points, captain (C), aggregate stats, roster, plus a free-agents strip. |
 | 👤 **Roster** | Full sortable/filterable player table (by team **or** free agents) with the transparent rating formula and a hover info pane. |
 | 🗓️ **Schedule** | Every round of the double round-robin — finals show scores, upcoming show fixtures. |
 | 📈 **Stats** | A **player spotlight** tile (filter by roster → pick a player → see their radar + line), top scorers, steals leaders, goal-share doughnut, team-profile radar, cumulative points line. |
