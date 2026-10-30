@@ -12,10 +12,14 @@ const SeasonSwitcher = (() => {
   function html() {
     const d = db();
     if (!d?.seasons?.length) return '';
+    const opt = (s) => `<option value="${s.id}"${s.id === d.season.id ? ' selected' : ''}>${s.label}</option>`;
+    const current = d.seasons.filter((s) => !s.archived);
+    const archived = d.seasons.filter((s) => s.archived);
     return `<label class="season-switch">
       <span class="season-switch-label">Season</span>
       <select class="select season-select" aria-label="Season">
-        ${d.seasons.map((s) => `<option value="${s.id}"${s.id === d.season.id ? ' selected' : ''}>${s.label}${s.archived ? ' (archive)' : ''}</option>`).join('')}
+        ${current.map(opt).join('')}
+        ${archived.length ? `<optgroup label="Archive">${archived.map(opt).join('')}</optgroup>` : ''}
       </select>
     </label>`;
   }

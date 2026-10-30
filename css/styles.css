@@ -1185,3 +1185,54 @@ a.btn:hover, a.btn:focus { text-decoration: none; color: inherit; }
   gap: 8px;
   margin-bottom: 4px;
 }
+
+/* ---- Season switcher / archive banner ------------------------------------ */
+.brand { min-width: 0; }
+.brand > div { min-width: 0; }
+.brand-title { white-space: nowrap; }
+.brand-sub { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.header-actions { flex: none; }
+.season-switch { display: flex; align-items: center; gap: 8px; }
+.season-switch-label {
+  font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px;
+  color: var(--text-muted);
+}
+.season-select { min-width: 0; height: 40px; padding: 0 12px; font-weight: 600; cursor: pointer; }
+.season-select:hover, .season-select:focus { border-color: var(--accent); outline: none; }
+.se-toolbar .season-switch { margin-right: auto; }
+.se-toolbar .season-select { height: 36px; }
+
+.season-banner-host { max-width: 1180px; margin: 0 auto; padding: 14px clamp(16px, 4vw, 40px) 0; }
+.season-banner-host[hidden] { display: none; }
+.season-banner {
+  display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 14px; border-radius: var(--radius-sm); font-size: 13.5px;
+  border: 1px solid color-mix(in srgb, #f59e0b 45%, var(--border));
+  background: color-mix(in srgb, #f59e0b 12%, var(--surface));
+}
+.view .season-banner, .admin-shell .season-banner, .stats-admin-page .season-banner { margin-bottom: 14px; }
+.tentative-tag {
+  display: inline-block; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: .4px;
+  padding: 2px 7px; border-radius: 999px; vertical-align: middle;
+  color: #f59e0b; background: color-mix(in srgb, #f59e0b 16%, transparent);
+}
+.team-visiting-note { margin: 0 0 12px; }
+
+@media (max-width: 640px) {
+  .app-header { gap: 10px; }
+  .brand { gap: 10px; }
+  .brand > div { min-width: 86px; }
+  .brand-mark { font-size: 24px; }
+  .header-actions { gap: 6px; }
+  .header-actions .season-switch-label { display: none; }
+  .header-actions .season-select { max-width: 132px; height: 36px; padding: 0 8px; font-size: 13px; }
+  .header-actions .icon-btn { width: 36px; height: 36px; font-size: 16px; }
+  .season-banner-host { padding: 12px 12px 0; }
+}
+@media (max-width: 400px) {
+  .header-actions .season-select { max-width: 112px; }
+}
+@media (max-width: 350px) {
+  .brand-mark { display: none; }
+  .header-actions .season-select { max-width: 104px; }
+}
