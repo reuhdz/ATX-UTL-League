@@ -18,6 +18,8 @@ const teamColor = (id) => {
 const fmtDate = (iso) =>
   new Date(iso + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
 const diff = (n) => (n > 0 ? `+${n}` : `${n}`);
+const escapeHtml = (s) => String(s ?? '')
+  .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 function teamPill(id) {
   if (id === 'fa') return `<span class="team-pill fa">Free Agent</span>`;
@@ -1570,7 +1572,7 @@ function renderVolunteer() {
       <h2>${DB.season.label} game-day volunteers</h2>
       <p class="muted">${archived
         ? `${DB.season.label} is archived — the volunteer board is read-only.`
-        : 'Sign up as referee, camera, or safety for a specific game.'}</p>
+        : 'Sign up as referee, extra referee, camera, or safety for a specific game.'}</p>
     </div>
     <p id="vol-msg" class="draft-msg"></p>
 
@@ -1596,6 +1598,9 @@ function renderVolunteer() {
           <select id="vol-role" class="select" required>
             ${VolunteerHub.roles.map((r) => `<option value="${r.id}">${r.label}</option>`).join('')}
           </select>
+        </label>
+        <label><span>Extra referee <span class="muted small">(optional)</span></span>
+          <input id="vol-extra-ref" class="input" maxlength="40" placeholder="Add a second referee by name" />
         </label>
         <div class="se-actions">
           <button type="submit" class="btn" id="vol-submit">Submit</button>
@@ -1670,12 +1675,14 @@ function renderVolunteer() {
           const people = list.length
             ? list.map((p, idx) => {
               const canLeave = !archived && me && p.username.toLowerCase() === me.username.toLowerCase();
+              const canRemoveAdded = !archived && !canLeave && VolunteerHub.canRemove(p, me);
               const canPromote = !archived && idx > 0;
               return `<li class="${idx === 0 ? 'vol-primary' : 'vol-backup'}">
-                <span class="vol-name">${p.label}</span>
+                <span class="vol-name">${escapeHtml(p.label)}</span>
                 <span class="vol-actions">
-                  ${canPromote ? `<button type="button" class="btn btn-ghost vol-promote" data-match="${m.id}" data-role="${role.id}" data-user="${p.username}">Make primary</button>` : ''}
+                  ${canPromote ? `<button type="button" class="btn btn-ghost vol-promote" data-match="${m.id}" data-role="${role.id}" data-user="${escapeHtml(p.username)}">Make primary</button>` : ''}
                   ${canLeave ? `<button type="button" class="btn btn-ghost vol-leave" data-match="${m.id}" data-role="${role.id}">Remove me</button>` : ''}
+                  ${canRemoveAdded ? `<button type="button" class="btn btn-ghost vol-remove" data-match="${m.id}" data-role="${role.id}" data-user="${escapeHtml(p.username)}">Remove</button>` : ''}
                 </span>
               </li>`;
             }).join('')
@@ -1711,6 +1718,15 @@ function renderVolunteer() {
         } catch (e) { setMsg(e.message || String(e), 'err'); }
       });
     });
+    $$('.vol-remove', host).forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        try {
+          await VolunteerHub.remove(btn.dataset.match, btn.dataset.role, btn.dataset.user);
+          setMsg('Removed.', 'ok');
+          paintOverview();
+        } catch (e) { setMsg(e.message || String(e), 'err'); }
+      });
+    });
     $$('.vol-promote', host).forEach((btn) => {
       btn.addEventListener('click', async () => {
         try {
@@ -1738,11 +1754,17 @@ function renderVolunteer() {
       const week = Number($('#vol-week')?.value);
       const matchId = $('#vol-game')?.value;
       const role = $('#vol-role')?.value;
+      const extraRef = ($('#vol-extra-ref')?.value || '').trim();
       volunteerWeek = week;
       volunteerMatchId = matchId;
       VolunteerHub.setDisplayName($('#vol-name')?.value);
-      await VolunteerHub.claim(matchId, role);
-      setMsg('Signed up — thanks!', 'ok');
+      // Adding an extra referee doesn't require signing yourself up again.
+      if (!extraRef || !VolunteerHub.isSignedUp(matchId, role)) await VolunteerHub.claim(matchId, role);
+      if (extraRef) {
+        await VolunteerHub.addByName(matchId, 'ref2', extraRef);
+        $('#vol-extra-ref').value = '';
+      }
+      setMsg(extraRef ? `Signed up — thanks! ${extraRef} added as extra referee.` : 'Signed up — thanks!', 'ok');
       paintOverview();
     } catch (err) {
       setMsg(err.message || String(err), 'err');
