@@ -4,11 +4,11 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <meta name="theme-color" content="#0b1a2b" />
-<meta name="description" content="ATX UTL — Austin Underwater Torpedo League Season 5 dashboard: 8-week season starting August 23. Standings, rosters, stats, and schedule." />
-<title>ATX UTL — Season 5 Dashboard</title>
+<meta name="description" content="ATX UTL — Austin Underwater Torpedo League dashboard: UTL Nationals plus the Season 5 archive. Standings, rosters, stats, and schedule." />
+<title>ATX UTL — Dashboard</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E%F0%9F%8C%8A%3C/text%3E%3C/svg%3E" />
 <meta http-equiv="Cache-Control" content="no-cache" />
-<link rel="stylesheet" href="css/styles.css?v=20260916leaders" />
+<link rel="stylesheet" href="css/styles.css?v=20261030nationals" />
 </head>
 <body>
 <!-- ============================ HEADER ============================ -->
@@ -22,6 +22,7 @@
   </div>
 
   <div class="header-actions">
+    <div class="season-switch-host" data-season-switcher></div>
     <button id="theme-toggle" class="icon-btn" title="Toggle light / dark" aria-label="Toggle theme">🌙</button>
     <button id="menu-toggle" class="icon-btn only-mobile" aria-label="Menu">☰</button>
   </div>
@@ -40,6 +41,8 @@
   <button class="tab-btn" data-tab="faq" role="tab">📖 Rules &amp; FAQ</button>
 </nav>
 
+<div class="season-banner-host" data-season-banner hidden></div>
+
 <!-- ============================ MAIN ============================ -->
 <main id="view" class="view"></main>
 
@@ -50,24 +53,25 @@
 <footer class="app-footer">
   <span id="footer-venue">Deepend Fitness — Austin, Texas</span>
   <span class="dot">•</span>
-  <span>ATX UTL · Season 5 · starts Aug 23, 2026</span>
+  <span id="footer-season">ATX UTL</span>
 </footer>
 
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-database-compat.js"></script>
 <script src="vendor/chart.umd.js?v=20260907mediaall"></script>
-<script src="js/data.js?v=20261016playoffs"></script>
-<script src="js/content.js?v=20260917goalplane2"></script>
+<script src="js/data.js?v=20261030nationals"></script>
+<script src="js/season-switcher.js?v=20261030nationals"></script>
+<script src="js/content.js?v=20261030nationals"></script>
 <script src="js/charts.js?v=20260907mediaall"></script>
-<script src="js/firebase-config.js?v=20260907mediaall"></script>
-<script src="js/admin-auth.js?v=20260907mediaall"></script>
-<script src="js/draft.js?v=20260907mediaall"></script>
-<script src="js/attendance.js?v=20260907mediaall"></script>
-<script src="js/stats-hub.js?v=20260907mediaall"></script>
-<script src="js/highlights-hub.js?v=20260907mediaall"></script>
+<script src="js/firebase-config.js?v=20261030nationals"></script>
+<script src="js/admin-auth.js?v=20261030nationals"></script>
+<script src="js/draft.js?v=20261030nationals"></script>
+<script src="js/attendance.js?v=20261030nationals"></script>
+<script src="js/stats-hub.js?v=20261030nationals"></script>
+<script src="js/highlights-hub.js?v=20261030nationals"></script>
 <script src="js/film-hub.js?v=20260907mediaall"></script>
 <script src="js/contention-hub.js?v=20260907mediaall"></script>
-<script src="js/volunteer-hub.js?v=20260907mediaall"></script>
-<script src="js/app.js?v=20260916leaders"></script>
+<script src="js/volunteer-hub.js?v=20261030nationals"></script>
+<script src="js/app.js?v=20261030nationals"></script>
 </body>
 </html>
