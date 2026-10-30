@@ -89,54 +89,52 @@ const STANDINGS_GLOSSARY = [
 /* ---- Players (all-time ATX directory). skill 0..1 gently biases box scores.
         teamId 'fa' = free agent / unassigned. teamId here is the Season 5
         base; other seasons reset it from their own baseTeams at load.
-        Overall roster view hides team affiliation; season views show it.
-        level: Pro/Rookie/IR.  */
+        Overall roster view hides team affiliation; season views show it.  */
 const PLAYERS = [
   // Season 5 captains (team-affiliated)
-  { id: 'reuben', name: 'Reuben', teamId: 'capybara', level: 'Pro',  skill: 0.78 },
-  { id: 'rich',   name: 'Rich',   teamId: 'team1',    level: 'Pro', skill: 0.64 },
-  { id: 'zach',   name: 'Zach',   teamId: 'team2',    level: 'Pro',  skill: 0.75 },
-  { id: 'travis', name: 'Travis', teamId: 'team2',    level: 'Pro',  skill: 0.64 },
-  { id: 'river',  name: 'River',  teamId: 'team3',    level: 'Pro',  skill: 0.76 },
+  { id: 'reuben', name: 'Reuben', teamId: 'capybara', skill: 0.78 },
+  { id: 'rich',   name: 'Rich',   teamId: 'team1',    skill: 0.64 },
+  { id: 'zach',   name: 'Zach',   teamId: 'team2',    skill: 0.75 },
+  { id: 'travis', name: 'Travis', teamId: 'team2',    skill: 0.64 },
+  { id: 'river',  name: 'River',  teamId: 'team3',    skill: 0.76 },
 
   // Season 5 pool (unassigned) + broader overall roster
-  { id: 'lesley',      name: 'Lesley',      teamId: 'fa', level: 'Pro',  skill: 0.90 },
-  { id: 'bonney',      name: 'Bonney',      teamId: 'fa', level: 'Pro', skill: 0.68 },
-  { id: 'max',         name: 'Max',         teamId: 'fa', level: 'Pro',  skill: 0.72 },
-  { id: 'sk',          name: 'SK',          teamId: 'fa', level: 'Pro',  skill: 0.80 },
-  { id: 'justin',      name: 'Justin',      teamId: 'fa', level: 'Pro', skill: 0.60 },
-  { id: 'eric',        name: 'Eric',        teamId: 'fa', level: 'Rookie',  skill: 0.39 },
-  { id: 'michal',      name: 'Michal',      teamId: 'fa', level: 'Rookie',  skill: 0.45 },
-  { id: 'jacqueline',  name: 'Jacqueline',  teamId: 'fa', level: 'Rookie',  skill: 0.41 },
-  { id: 'andriy',      name: 'Andriy',      teamId: 'fa', level: 'Rookie',  skill: 0.40 },
-  { id: 'judson',      name: 'Judson',      teamId: 'fa', level: 'Rookie',  skill: 0.40 },
-  { id: 'mauricio',    name: 'Mauricio',    teamId: 'fa', level: 'Rookie',  skill: 0.40 },
-  { id: 'brooke',      name: 'Brooke',      teamId: 'fa', level: 'Rookie',  skill: 0.39 },
-  { id: 'kora',        name: 'Kora',        teamId: 'fa', level: 'Rookie',  skill: 0.40 },
-  { id: 'kevin',       name: 'Kevin',       teamId: 'fa', level: 'Rookie',  skill: 0.40 },
+  { id: 'lesley',      name: 'Lesley',      teamId: 'fa', skill: 0.90 },
+  { id: 'bonney',      name: 'Bonney',      teamId: 'fa', skill: 0.68 },
+  { id: 'max',         name: 'Max',         teamId: 'fa', skill: 0.72 },
+  { id: 'sk',          name: 'SK',          teamId: 'fa', skill: 0.80 },
+  { id: 'justin',      name: 'Justin',      teamId: 'fa', skill: 0.60 },
+  { id: 'eric',        name: 'Eric',        teamId: 'fa', skill: 0.39 },
+  { id: 'michal',      name: 'Michal',      teamId: 'fa', skill: 0.45 },
+  { id: 'jacqueline',  name: 'Jacqueline',  teamId: 'fa', skill: 0.41 },
+  { id: 'andriy',      name: 'Andriy',      teamId: 'fa', skill: 0.40 },
+  { id: 'judson',      name: 'Judson',      teamId: 'fa', skill: 0.40 },
+  { id: 'mauricio',    name: 'Mauricio',    teamId: 'fa', skill: 0.40 },
+  { id: 'brooke',      name: 'Brooke',      teamId: 'fa', skill: 0.39 },
+  { id: 'kora',        name: 'Kora',        teamId: 'fa', skill: 0.40 },
+  { id: 'kevin',       name: 'Kevin',       teamId: 'fa', skill: 0.40 },
 
   // Overall roster (additional ATX players)
-  { id: 'jamese',  name: 'James E',     teamId: 'fa', level: 'Pro', skill: 0.70 },
-  { id: 'walter',  name: 'Walter',      teamId: 'fa', level: 'Pro',  skill: 0.85 },
-  { id: 'shaneye', name: 'Shaneye',     teamId: 'fa', level: 'Rookie',  skill: 0.42 },
-  { id: 'kellie',  name: 'Kellie',      teamId: 'fa', level: 'Pro',  skill: 0.64 },
-  { id: 'manny',   name: 'Manny',       teamId: 'fa', level: 'Pro',  skill: 0.70 },
-  { id: 'will',    name: 'Will',        teamId: 'fa', level: 'Pro',  skill: 0.68 },
-  { id: 'benb',    name: 'Ben B',       teamId: 'fa', level: 'Pro', skill: 0.66 },
-  { id: 'emma',    name: 'Emma',        teamId: 'fa', level: 'Rookie',  skill: 0.38 },
-  { id: 'liam',    name: 'Liam',        teamId: 'fa', level: 'Rookie',  skill: 0.40 },
-  { id: 'jack',    name: 'Jack Armstrong', teamId: 'fa', level: 'Rookie',  skill: 0.38 },
-  { id: 'sage',    name: 'Sage',        teamId: 'fa', level: 'Pro',  skill: 0.80 },
-  { id: 'eddy',    name: 'Eddy',        teamId: 'fa', level: 'Pro',  skill: 0.62 },
-  { id: 'glenn',   name: 'Glenn',       teamId: 'fa', level: 'Pro', skill: 0.82 },
-  { id: 'patrick', name: 'Patrick',     teamId: 'fa', level: 'Pro',  skill: 0.63 },
-  { id: 'scheese', name: 'Sean Cheese', teamId: 'fa', level: 'Pro',  skill: 0.61 },
-  { id: 'scroc',   name: 'Sean Croc',   teamId: 'fa', level: 'Pro', skill: 0.59 },
+  { id: 'jamese',  name: 'James E',     teamId: 'fa', skill: 0.70 },
+  { id: 'walter',  name: 'Walter',      teamId: 'fa', skill: 0.85 },
+  { id: 'shaneye', name: 'Shaneye',     teamId: 'fa', skill: 0.42 },
+  { id: 'kellie',  name: 'Kellie',      teamId: 'fa', skill: 0.64 },
+  { id: 'manny',   name: 'Manny',       teamId: 'fa', skill: 0.70 },
+  { id: 'will',    name: 'Will',        teamId: 'fa', skill: 0.68 },
+  { id: 'benb',    name: 'Ben B',       teamId: 'fa', skill: 0.66 },
+  { id: 'emma',    name: 'Emma',        teamId: 'fa', skill: 0.38 },
+  { id: 'liam',    name: 'Liam',        teamId: 'fa', skill: 0.40 },
+  { id: 'jack',    name: 'Jack Armstrong', teamId: 'fa', skill: 0.38 },
+  { id: 'sage',    name: 'Sage',        teamId: 'fa', skill: 0.80 },
+  { id: 'eddy',    name: 'Eddy',        teamId: 'fa', skill: 0.62 },
+  { id: 'glenn',   name: 'Glenn',       teamId: 'fa', skill: 0.82 },
+  { id: 'patrick', name: 'Patrick',     teamId: 'fa', skill: 0.63 },
+  { id: 'scheese', name: 'Sean Cheese', teamId: 'fa', skill: 0.61 },
+  { id: 'scroc',   name: 'Sean Croc',   teamId: 'fa', skill: 0.59 },
 
   // Added for UTL Nationals
-  { id: 'john',    name: 'John',        teamId: 'fa', level: 'Rookie', skill: 0.40 },
-  { id: 'trevor',  name: 'Trevor',      teamId: 'fa', level: 'Rookie', skill: 0.40 },
-  { id: 'jamesb',  name: 'James B',     teamId: 'fa', level: 'Rookie', skill: 0.40 },
+  { id: 'john',    name: 'John',        teamId: 'fa', skill: 0.40 },
+  { id: 'trevor',  name: 'Trevor',      teamId: 'fa', skill: 0.40 },
 ];
 
 function addDays(iso, days) {
@@ -252,7 +250,7 @@ const NATIONALS_TEAMS = [
 /* Texas player pool for the Nationals draft (captains included, locked to their team). */
 const NATIONALS_ROSTER = [
   'sk', 'jacqueline', 'reuben', 'max', 'sage', 'john', 'trevor',
-  'glenn', 'jamesb', 'lesley', 'zach', 'scheese', 'rich', 'eric',
+  'glenn', 'bonney', 'lesley', 'zach', 'scheese', 'rich', 'eric',
   'justin', 'benb', 'manny', 'eddy', 'jack', 'river', 'walter',
 ];
 
@@ -416,7 +414,7 @@ const STAT_ZERO = () => ({
 const OTHER_SEASON_TOTALS = {};
 
 const rosterOf = (tid) => PLAYERS.filter((p) => p.teamId === tid);
-const FA_POOL = PLAYERS.filter((p) => p.teamId === 'fa' && p.level !== 'Pro (IR)').map((p) => p.id);
+const FA_POOL = PLAYERS.filter((p) => p.teamId === 'fa').map((p) => p.id);
 let guestIdx = 0;
 const nextGuest = () => {
   const id = FA_POOL[guestIdx++ % FA_POOL.length];
@@ -497,7 +495,7 @@ const AVAILABILITY = (() => {
   }
   const playable = SEASON.rosterIds
     .map((id) => PLAYERS.find((p) => p.id === id))
-    .filter((p) => p && p.level !== 'Pro (IR)');
+    .filter(Boolean);
   const out = {};
   nights.forEach((date) => {
     out[date] = {};

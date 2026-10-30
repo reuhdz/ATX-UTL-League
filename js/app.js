@@ -1171,7 +1171,7 @@ let attUnsub = null;
 
 function renderAttendance() {
   const statusMap = { in: ['In', 'in'], maybe: ['Maybe', 'maybe'], out: ['Out', 'out'] };
-  const seasonPlayers = () => DB.seasonRoster().filter((p) => p.level !== 'Pro (IR)');
+  const seasonPlayers = () => DB.seasonRoster();
   const nights = () => DB.availability.nights;
   const readOnly = DB.isArchived();
 

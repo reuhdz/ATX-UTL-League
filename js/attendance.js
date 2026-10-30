@@ -63,10 +63,7 @@ const AttendanceHub = (() => {
 
   function playableIds() {
     const roster = window.DB?.seasonRosterIds || [];
-    return roster.filter((id) => {
-      const p = window.DB?.player(id);
-      return p && p.level !== 'Pro (IR)';
-    });
+    return roster.filter((id) => !!window.DB?.player(id));
   }
 
   function normalizeStatus(val) {
