@@ -25,6 +25,9 @@ window.DRAFT_CONFIGS = {
     roomId: 'nationals',
     rosterPath: 'rosterAssignments/nationals',
     highlightsPath: 'season5-highlights/nationals',
+    /* Admin team-name / roster overlay. Nested under attendance so a draft
+       reset cannot wipe it; the attendance hub only reads /table. */
+    leaguePath: 'attendance/nationals/league',
     /* Snake draft first-round order by captain: River, Zach, Reuben */
     draftOrder: ['tx3', 'tx1', 'tx2'],
     /* Captains are pre-assigned and excluded from the draft pool */
@@ -55,6 +58,7 @@ window.DRAFT_CONFIGS = {
     /* Legacy flat node: { [playerId]: { teamId } } — Season 5 final rosters */
     rosterPath: 'rosterAssignments',
     highlightsPath: 'season5-highlights',
+    leaguePath: 'attendance/season5/league',
     /* Snake draft first-round order by captain: River, Zach, Reuben, Rich */
     draftOrder: ['team3', 'team2', 'capybara', 'team1'],
     /* Captains are pre-assigned and excluded from the draft pool */

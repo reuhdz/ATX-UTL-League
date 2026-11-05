@@ -187,7 +187,10 @@
   applyTheme();
   if (!AdminAuth.requireLogin('../admin/')) return;
 
-  ContentionHub.init().then(() => {
+  Promise.all([
+    window.LeagueHub?.init?.() || Promise.resolve(),
+    ContentionHub.init(),
+  ]).then(() => {
     ContentionHub.onChange(() => paint());
     paint();
   }).catch((e) => {

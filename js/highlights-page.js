@@ -153,7 +153,10 @@
   }
 
   applyTheme();
-  HighlightsHub.init().then(() => {
+  Promise.all([
+    window.LeagueHub?.init?.() || Promise.resolve(),
+    HighlightsHub.init(),
+  ]).then(() => {
     HighlightsHub.onChange(() => paint());
     paint();
   }).catch((e) => {

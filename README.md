@@ -96,12 +96,13 @@ any page on another season (`?season=season5`, remembered for the browser tab).
 
 - **Archived seasons** (`archived: true`, e.g. Season 5) are read-only: the draft
   is locked, attendance and volunteer sign-ups are frozen, and only the league
-  admin can change saved stats.
+  admin can change saved stats, team names, and rosters.
 - **Live data** is scoped per season in `js/firebase-config.js` (`DRAFT_CONFIGS`):
   each season has its own `roomId` for drafts, results, attendance, film, claims,
   appeals and volunteers. Nationals roster picks live under
   `rosterAssignments/nationals` and its highlights under
   `season5-highlights/nationals`, so Season 5 data is never overwritten.
+  Admin team-name and roster edits live under `attendance/{roomId}/league`.
 - **Overall** stats on Teams &amp; Roster add every season's saved results together.
 
 To add a season: add a `SEASONS` entry (and teams/roster/schedule), a matching

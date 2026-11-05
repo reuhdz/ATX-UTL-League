@@ -1,6 +1,7 @@
-/* /admin — login + tool links (no Firebase; live tools open on their own pages) */
+/* /admin — login, tool links, and (for league admin) team / roster editor */
 (() => {
   const $ = (sel, root = document) => root.querySelector(sel);
+  const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
   const root = $('#admin-app');
   if (!root) return;
 
@@ -27,6 +28,169 @@
       </div>
       <div class="se-toolbar">${SeasonSwitcher.html()}</div>
       ${SeasonSwitcher.bannerHtml()}`;
+  }
+
+  function toolLinks() {
+    return `
+      <section class="panel admin-links">
+        <ul class="admin-link-list">
+          <li><a class="btn" href="../stats/">Match stats entry</a></li>
+          <li><a class="btn btn-ghost" href="../contention/">Stat contention</a></li>
+          <li><a class="btn btn-ghost" href="../season-5-highlights/">Highlight nominations</a></li>
+          <li><a class="btn btn-ghost" href="../#volunteer">Volunteer board</a></li>
+          <li><a class="btn btn-ghost" href="../">League dashboard</a></li>
+        </ul>
+      </section>`;
+  }
+
+  function poolOptions(teamId) {
+    const onTeam = new Set((DB.rosterOf(teamId) || []).map((p) => p.id));
+    const inSeason = new Set(DB.seasonRosterIds || []);
+    const seasonFa = (DB.players || []).filter((p) => inSeason.has(p.id) && p.teamId === 'fa' && !onTeam.has(p.id));
+    const others = (DB.players || []).filter((p) => !onTeam.has(p.id) && !seasonFa.some((x) => x.id === p.id));
+    const opt = (p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name)}</option>`;
+    return `
+      <option value="">Add existing player…</option>
+      ${seasonFa.length ? `<optgroup label="Free agents">${seasonFa.map(opt).join('')}</optgroup>` : ''}
+      ${others.length ? `<optgroup label="All-time directory">${others.map(opt).join('')}</optgroup>` : ''}`;
+  }
+
+  function teamSelect(playerId, currentId) {
+    const opts = [
+      `<option value="fa" ${currentId === 'fa' ? 'selected' : ''}>Free agent</option>`,
+      ...(DB.teams || []).map((t) =>
+        `<option value="${escapeHtml(t.id)}" ${t.id === currentId ? 'selected' : ''}>${escapeHtml(t.name)}</option>`),
+    ];
+    return `<select class="select lg-move" data-player="${escapeHtml(playerId)}" aria-label="Team">${opts.join('')}</select>`;
+  }
+
+  function editorHtml() {
+    const st = window.LeagueHub?.status?.() || {};
+    const archived = DB.isArchived();
+    const teams = DB.teams || [];
+    return `
+      <section class="panel lg-editor" id="lg-editor">
+        <div class="panel-head">
+          <h3>Teams &amp; rosters</h3>
+          <span class="muted small">${st.mode === 'firebase' ? 'Live' : 'This browser only'}</span>
+        </div>
+        <p class="muted small">Rename a team or a player, move someone between clubs, or add a new name. Changes show on the dashboard, draft, and stats pages for this season. Captain login passwords follow the team name (<code>utl</code> + the name as one word).</p>
+        ${archived ? `<p class="draft-msg err">${escapeHtml(DB.season.label)} is archived — edits here change the historical record.</p>` : ''}
+        <p id="lg-msg" class="draft-msg ${escapeHtml(lastMsg.cls)}">${escapeHtml(lastMsg.text)}</p>
+        <div class="lg-grid">
+          ${teams.map((t) => {
+            const roster = DB.rosterOf(t.id);
+            return `
+            <article class="lg-team" style="--tc:${t.color}" data-team="${escapeHtml(t.id)}">
+              <header class="lg-team-head">
+                <label>Team name
+                  <input class="input lg-team-name" maxlength="40" value="${escapeHtml(t.name)}" />
+                </label>
+                <button type="button" class="btn lg-save-team">Save name</button>
+              </header>
+              ${t.captain ? `<p class="muted small">Captain login: ${escapeHtml(t.captain)}</p>` : ''}
+              ${t.visiting ? `<p class="muted small">Visiting club — add a player to start tracking a roster.</p>` : ''}
+              <ul class="lg-roster">
+                ${roster.length ? roster.map((p) => `
+                  <li>
+                    <input class="input lg-player-name" maxlength="40" data-player="${escapeHtml(p.id)}" value="${escapeHtml(p.name)}" />
+                    ${teamSelect(p.id, t.id)}
+                    <button type="button" class="btn btn-ghost lg-remove" data-player="${escapeHtml(p.id)}">Remove</button>
+                  </li>`).join('') : '<li class="muted">No players on this roster yet.</li>'}
+              </ul>
+              <div class="lg-add">
+                <select class="select lg-existing">${poolOptions(t.id)}</select>
+                <button type="button" class="btn btn-ghost lg-add-existing">Add</button>
+                <input class="input lg-new-name" maxlength="40" placeholder="New player name" />
+                <button type="button" class="btn lg-add-new">Add new</button>
+              </div>
+            </article>`;
+          }).join('')}
+        </div>
+      </section>`;
+  }
+
+  let lastMsg = { text: '', cls: '' };
+
+  function setMsg(text, cls = '') {
+    lastMsg = { text: text || '', cls };
+    const el = $('#lg-msg');
+    if (!el) return;
+    el.className = `draft-msg ${cls}`.trim();
+    el.textContent = text || '';
+  }
+
+  function bindEditor() {
+    const host = $('#lg-editor');
+    if (!host || !window.LeagueHub) return;
+
+    $$('.lg-save-team', host).forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const card = btn.closest('.lg-team');
+        try {
+          await LeagueHub.setTeamName(card.dataset.team, card.querySelector('.lg-team-name')?.value);
+          setMsg('Team name saved.', 'ok');
+          paint();
+        } catch (e) { setMsg(e.message || String(e), 'err'); }
+      });
+    });
+
+    $$('.lg-player-name', host).forEach((inp) => {
+      inp.addEventListener('change', async () => {
+        try {
+          await LeagueHub.setPlayerName(inp.dataset.player, inp.value);
+          setMsg('Player name saved.', 'ok');
+          paint();
+        } catch (e) { setMsg(e.message || String(e), 'err'); }
+      });
+    });
+
+    $$('.lg-move', host).forEach((sel) => {
+      sel.addEventListener('change', async () => {
+        try {
+          await LeagueHub.movePlayer(sel.dataset.player, sel.value);
+          setMsg(sel.value === 'fa' ? 'Moved to free agents.' : 'Player moved.', 'ok');
+          paint();
+        } catch (e) { setMsg(e.message || String(e), 'err'); }
+      });
+    });
+
+    $$('.lg-remove', host).forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const name = DB.player(btn.dataset.player)?.name || 'this player';
+        if (!window.confirm(`Remove ${name} from this roster? They stay in the player directory as a free agent.`)) return;
+        try {
+          await LeagueHub.removePlayer(btn.dataset.player);
+          setMsg('Removed from the roster.', 'ok');
+          paint();
+        } catch (e) { setMsg(e.message || String(e), 'err'); }
+      });
+    });
+
+    $$('.lg-add-existing', host).forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const card = btn.closest('.lg-team');
+        const id = card.querySelector('.lg-existing')?.value;
+        if (!id) { setMsg('Pick a player to add.', 'err'); return; }
+        try {
+          await LeagueHub.addPlayer({ playerId: id, teamId: card.dataset.team });
+          setMsg('Player added.', 'ok');
+          paint();
+        } catch (e) { setMsg(e.message || String(e), 'err'); }
+      });
+    });
+
+    $$('.lg-add-new', host).forEach((btn) => {
+      btn.addEventListener('click', async () => {
+        const card = btn.closest('.lg-team');
+        const name = card.querySelector('.lg-new-name')?.value;
+        try {
+          await LeagueHub.addPlayer({ name, teamId: card.dataset.team });
+          setMsg('New player added.', 'ok');
+          paint();
+        } catch (e) { setMsg(e.message || String(e), 'err'); }
+      });
+    });
   }
 
   function paint() {
@@ -66,24 +230,29 @@
       return;
     }
 
+    const admin = AdminAuth.isAdmin();
     root.innerHTML = `
       ${seasonHead(`Welcome, ${escapeHtml(s.label || s.username)}`)}
-      <section class="panel admin-links">
-        <ul class="admin-link-list">
-          <li><a class="btn" href="../stats/">Match stats entry</a></li>
-          <li><a class="btn btn-ghost" href="../contention/">Stat contention</a></li>
-          <li><a class="btn btn-ghost" href="../season-5-highlights/">Highlight nominations</a></li>
-          <li><a class="btn btn-ghost" href="../#volunteer">Volunteer board</a></li>
-          <li><a class="btn btn-ghost" href="../">League dashboard</a></li>
-        </ul>
-        <button type="button" class="btn btn-ghost" id="ad-logout">Log out</button>
-      </section>`;
+      ${toolLinks()}
+      ${admin ? editorHtml() : ''}
+      <button type="button" class="btn btn-ghost" id="ad-logout">Log out</button>`;
     $('#ad-logout')?.addEventListener('click', () => {
       AdminAuth.logout();
       paint();
     });
+    if (admin) bindEditor();
   }
 
   applyTheme();
-  paint();
+  Promise.all([
+    window.LeagueHub?.init?.() || Promise.resolve(),
+    window.DraftHub?.init?.() || Promise.resolve(),
+  ]).then(() => {
+    paint();
+    window.LeagueHub?.onChange?.(() => {
+      if (!AdminAuth.isAdmin()) return;
+      if (document.activeElement?.closest?.('#lg-editor')) return;
+      paint();
+    });
+  }).catch(() => paint());
 })();
