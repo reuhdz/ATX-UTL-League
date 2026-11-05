@@ -4,12 +4,13 @@
    Path: /attendance/{roomId}/league  (extra child next to /table; draft reset
    does not touch it). Shape:
      {
-       teams: { [teamId]: { name, visiting? } },
+       teams: { [teamId]: { name, visiting?, captainId? } },
        players: { [playerId]: { name, teamId?, added? } },
        rosterIds: string[] | null,   // season pool once an admin adds someone
        updatedAt, by
      }
-   Everyone reads the overlay. Only the league admin can write.
+   Everyone reads the overlay. League admin and captains can write
+   (archived seasons stay admin-only).
    Team membership is also written to rosterAssignments so the draft tab
    stays in sync; the overlay is reapplied after draft updates so a draft
    reset does not drop admin-set names or extra players.
@@ -73,8 +74,10 @@ const LeagueHub = (() => {
     Object.entries(isObj(raw.teams) ? raw.teams : {}).forEach(([id, meta]) => {
       if (!isObj(meta)) return;
       const name = String(meta.name || '').trim().slice(0, 40);
+      const captainId = String(meta.captainId || '').trim();
       teams[id] = {
         ...(name ? { name } : {}),
+        ...(captainId ? { captainId } : {}),
         ...(meta.visiting === false ? { visiting: false } : {}),
         ...(meta.visiting === true ? { visiting: true } : {}),
       };
@@ -126,6 +129,10 @@ const LeagueHub = (() => {
       }
       if (meta.visiting === false) t.visiting = false;
       if (meta.visiting === true) t.visiting = true;
+      if (meta.captainId) {
+        const cap = window.DB?.player(meta.captainId);
+        if (cap && (!cap.teamId || cap.teamId === id)) t.captain = cap.name;
+      }
     });
 
     Object.entries(next.players || {}).forEach(([id, meta]) => {
@@ -150,8 +157,15 @@ const LeagueHub = (() => {
     apply(state);
   }
 
-  function requireAdmin() {
-    if (!window.AdminAuth?.isAdmin?.()) throw new Error('League admin login required');
+  function canEdit() {
+    return !!(window.AdminAuth?.isAdmin?.() || window.AdminAuth?.isCaptain?.());
+  }
+
+  function requireEditor() {
+    if (!canEdit()) throw new Error('Captain or admin login required');
+    if (window.DB?.isArchived?.() && !window.AdminAuth?.isAdmin?.()) {
+      throw new Error(`${window.DB.season?.label || 'This season'} is archived — only the league admin can edit it`);
+    }
   }
 
   function actor() {
@@ -204,11 +218,25 @@ const LeagueHub = (() => {
       if (p) p.teamId = teamId;
       return;
     }
-    await window.DraftHub.assignTeam(playerId, teamId, { admin: true });
+    await window.DraftHub.assignTeam(playerId, teamId, {
+      admin: !!window.AdminAuth?.isAdmin?.(),
+    });
+  }
+
+  function clearCaptainIfNeeded(playerId) {
+    Object.entries(state.teams || {}).forEach(([id, meta]) => {
+      if (meta.captainId === playerId) {
+        const next = { ...meta };
+        delete next.captainId;
+        state.teams[id] = next;
+        const t = window.DB?.team(id);
+        if (t) delete t.captain;
+      }
+    });
   }
 
   async function setTeamName(teamId, name) {
-    requireAdmin();
+    requireEditor();
     const t = window.DB?.team(teamId);
     if (!t) throw new Error('Unknown team');
     const next = String(name || '').trim().slice(0, 40);
@@ -218,8 +246,28 @@ const LeagueHub = (() => {
     return t;
   }
 
+  async function setCaptain(teamId, playerId) {
+    requireEditor();
+    const t = window.DB?.team(teamId);
+    if (!t) throw new Error('Unknown team');
+    const p = window.DB?.player(playerId);
+    if (!p) throw new Error('Unknown player');
+    if (p.teamId !== teamId) throw new Error('Captain must be on this roster');
+    state.teams[teamId] = { ...(state.teams[teamId] || {}), captainId: playerId };
+    await persist();
+    return p;
+  }
+
+  function isTeamCaptain(teamId, playerId) {
+    const overlayId = state.teams?.[teamId]?.captainId;
+    if (overlayId) return overlayId === playerId;
+    const t = window.DB?.team(teamId);
+    const p = window.DB?.player(playerId);
+    return !!(t && p && t.captain && p.name === t.captain);
+  }
+
   async function setPlayerName(playerId, name) {
-    requireAdmin();
+    requireEditor();
     const p = window.DB?.player(playerId);
     if (!p) throw new Error('Unknown player');
     const next = String(name || '').trim().slice(0, 40);
@@ -230,7 +278,7 @@ const LeagueHub = (() => {
   }
 
   async function addPlayer({ name, teamId, playerId } = {}) {
-    requireAdmin();
+    requireEditor();
     const team = teamId && teamId !== 'fa' ? window.DB?.team(teamId) : null;
     if (teamId && teamId !== 'fa' && !team) throw new Error('Unknown team');
 
@@ -274,9 +322,10 @@ const LeagueHub = (() => {
   }
 
   async function removePlayer(playerId) {
-    requireAdmin();
+    requireEditor();
     const p = window.DB?.player(playerId);
     if (!p) throw new Error('Unknown player');
+    clearCaptainIfNeeded(playerId);
     state.players[playerId] = { ...(state.players[playerId] || {}), teamId: 'fa' };
     if (p.name && !state.players[playerId].name) state.players[playerId].name = p.name;
     apply(state);
@@ -287,8 +336,10 @@ const LeagueHub = (() => {
   }
 
   async function movePlayer(playerId, teamId) {
-    requireAdmin();
+    requireEditor();
     if (teamId === 'fa') return removePlayer(playerId);
+    const fromId = window.DB?.player(playerId)?.teamId;
+    if (fromId && fromId !== teamId) clearCaptainIfNeeded(playerId);
     return addPlayer({ playerId, teamId });
   }
 
@@ -331,7 +382,8 @@ const LeagueHub = (() => {
 
   return {
     init, onChange, apply, reapply,
-    setTeamName, setPlayerName, addPlayer, removePlayer, movePlayer,
+    setTeamName, setPlayerName, setCaptain, isTeamCaptain,
+    addPlayer, removePlayer, movePlayer, canEdit,
     status: () => ({ mode, connectionError, state, path: path() }),
   };
 })();

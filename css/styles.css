@@ -771,10 +771,24 @@ a.btn:hover, a.btn:focus { text-decoration: none; color: inherit; }
 }
 .lg-roster li {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(110px, 160px) auto;
+  grid-template-columns: auto minmax(0, 1fr) minmax(110px, 160px) auto;
   gap: 8px;
   align-items: center;
 }
+.lg-cap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.lg-cap input { margin: 0; accent-color: var(--tc, var(--accent, #38bdf8)); }
 @media (max-width: 560px) {
   .lg-roster li, .lg-team-head { grid-template-columns: 1fr; }
 }

@@ -1,4 +1,4 @@
-/* /admin — login, tool links, and (for league admin) team / roster editor */
+/* /admin — login, tool links, and team / roster editor (admin + captains) */
 (() => {
   const $ = (sel, root = document) => root.querySelector(sel);
   const $$ = (sel, root = document) => [...root.querySelectorAll(sel)];
@@ -74,7 +74,7 @@
           <h3>Teams &amp; rosters</h3>
           <span class="muted small">${st.mode === 'firebase' ? 'Live' : 'This browser only'}</span>
         </div>
-        <p class="muted small">Rename a team or a player, move someone between clubs, or add a new name. Changes show on the dashboard, draft, and stats pages for this season. Captain login passwords follow the team name (<code>utl</code> + the name as one word).</p>
+        <p class="muted small">Rename a team or a player, mark a captain, move someone between clubs, or add a new name. Changes show on the dashboard, draft, and stats pages for this season. The captain login is that player&apos;s name; the password is the team name as one word.</p>
         ${archived ? `<p class="draft-msg err">${escapeHtml(DB.season.label)} is archived — edits here change the historical record.</p>` : ''}
         <p id="lg-msg" class="draft-msg ${escapeHtml(lastMsg.cls)}">${escapeHtml(lastMsg.text)}</p>
         <div class="lg-grid">
@@ -88,15 +88,22 @@
                 </label>
                 <button type="button" class="btn lg-save-team">Save name</button>
               </header>
-              ${t.captain ? `<p class="muted small">Captain login: ${escapeHtml(t.captain)}</p>` : ''}
+              ${t.captain ? `<p class="muted small">Captain login: ${escapeHtml(t.captain)}</p>` : '<p class="muted small">No captain set — pick one with the radio on a roster row.</p>'}
               ${t.visiting ? `<p class="muted small">Visiting club — add a player to start tracking a roster.</p>` : ''}
               <ul class="lg-roster">
-                ${roster.length ? roster.map((p) => `
+                ${roster.length ? roster.map((p) => {
+                  const isCap = window.LeagueHub?.isTeamCaptain?.(t.id, p.id) || p.name === t.captain;
+                  return `
                   <li>
+                    <label class="lg-cap">
+                      <input type="radio" class="lg-captain" name="lg-cap-${escapeHtml(t.id)}" data-team="${escapeHtml(t.id)}" data-player="${escapeHtml(p.id)}" ${isCap ? 'checked' : ''} />
+                      <span>Captain</span>
+                    </label>
                     <input class="input lg-player-name" maxlength="40" data-player="${escapeHtml(p.id)}" value="${escapeHtml(p.name)}" />
                     ${teamSelect(p.id, t.id)}
                     <button type="button" class="btn btn-ghost lg-remove" data-player="${escapeHtml(p.id)}">Remove</button>
-                  </li>`).join('') : '<li class="muted">No players on this roster yet.</li>'}
+                  </li>`;
+                }).join('') : '<li class="muted">No players on this roster yet.</li>'}
               </ul>
               <div class="lg-add">
                 <select class="select lg-existing">${poolOptions(t.id)}</select>
@@ -180,6 +187,17 @@
       });
     });
 
+    $$('.lg-captain', host).forEach((radio) => {
+      radio.addEventListener('change', async () => {
+        if (!radio.checked) return;
+        try {
+          const p = await LeagueHub.setCaptain(radio.dataset.team, radio.dataset.player);
+          setMsg(`${p.name} is now the captain. Their login is that name; the password is the team name as one word.`, 'ok');
+          paint();
+        } catch (e) { setMsg(e.message || String(e), 'err'); }
+      });
+    });
+
     $$('.lg-add-new', host).forEach((btn) => {
       btn.addEventListener('click', async () => {
         const card = btn.closest('.lg-team');
@@ -230,17 +248,17 @@
       return;
     }
 
-    const admin = AdminAuth.isAdmin();
+    const canEdit = AdminAuth.isAdmin() || AdminAuth.isCaptain();
     root.innerHTML = `
       ${seasonHead(`Welcome, ${escapeHtml(s.label || s.username)}`)}
       ${toolLinks()}
-      ${admin ? editorHtml() : ''}
+      ${canEdit ? editorHtml() : ''}
       <button type="button" class="btn btn-ghost" id="ad-logout">Log out</button>`;
     $('#ad-logout')?.addEventListener('click', () => {
       AdminAuth.logout();
       paint();
     });
-    if (admin) bindEditor();
+    if (canEdit) bindEditor();
   }
 
   applyTheme();
@@ -250,7 +268,7 @@
   ]).then(() => {
     paint();
     window.LeagueHub?.onChange?.(() => {
-      if (!AdminAuth.isAdmin()) return;
+      if (!AdminAuth.isAdmin() && !AdminAuth.isCaptain()) return;
       if (document.activeElement?.closest?.('#lg-editor')) return;
       paint();
     });
