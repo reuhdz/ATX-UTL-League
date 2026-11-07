@@ -17,7 +17,8 @@ const RULES = [
     body:
       'A match is played to 5 points (roughly 10 minutes). A game is best-of-three ' +
       'matches — win two matches to win the game. Rounds restart from a throw-off ' +
-      'after each goal.',
+      'after each goal. At UTL Nationals, Saturday pool play is a single 30-minute ' +
+      'game; Sunday placement matches are best of 3.',
   },
   {
     title: 'Possession is underwater only',

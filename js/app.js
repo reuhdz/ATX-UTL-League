@@ -554,7 +554,7 @@ function fixtureRow(m, indexInWeek = 0) {
 }
 function resultRow(m, indexInWeek = 0) {
   const hw = m.homeScore > m.awayScore, aw = m.awayScore > m.homeScore;
-  const games = Array.isArray(m.games) && m.games.length
+  const games = !DB.isSingleGame(m) && Array.isArray(m.games) && m.games.length
     ? `<span class="fx-games muted small">${m.games.map((g, i) => `G${i + 1} ${g.home}–${g.away}`).join(' · ')}</span>`
     : '';
   const time = matchKickoffLabel(m, indexInWeek);

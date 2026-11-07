@@ -29,7 +29,7 @@
 
   let week = null;
   let matchId = null;
-  let seriesGames = [{ home: '', away: '' }, { home: '', away: '' }, { home: '', away: '' }];
+  let seriesGames = [{ home: '', away: '' }];
   let draft = null; // { homeLineup, awayLineup, box, events }
   let msg = { text: '', cls: '' };
   let clipForm = { playerId: '', type: 'goals', url: '', note: '' };
@@ -139,9 +139,14 @@
     return d;
   }
 
+  function emptySeriesSlots(match) {
+    const n = StatsHub.slotCount(StatsHub.formatForMatch(match));
+    return Array.from({ length: n }, () => ({ home: '', away: '' }));
+  }
+
   function loadSeriesForMatch(match) {
     const saved = StatsHub.getResult(match.id);
-    const empty = [{ home: '', away: '' }, { home: '', away: '' }, { home: '', away: '' }];
+    const empty = emptySeriesSlots(match);
     if (!saved?.games?.length) return empty;
     return empty.map((slot, i) => {
       const g = saved.games[i];
@@ -154,7 +159,7 @@
     const m = currentMatch();
     if (!m) {
       draft = null;
-      seriesGames = [{ home: '', away: '' }, { home: '', away: '' }, { home: '', away: '' }];
+      seriesGames = [];
       return;
     }
     seriesGames = loadSeriesForMatch(m);
@@ -300,7 +305,8 @@
     const games = seriesGames
       .map((g) => ({ home: Number(g.home) || 0, away: Number(g.away) || 0 }))
       .filter((g) => g.home > 0 || g.away > 0);
-    return StatsHub.seriesFromGames(games);
+    const match = currentMatch();
+    return StatsHub.seriesFromGames(games, StatsHub.formatForMatch(match));
   }
 
   function sideTable(side) {
@@ -314,7 +320,7 @@
       return `
       <section class="panel se-side">
         <div class="panel-head"><h3>${title}</h3></div>
-        <p class="muted small se-hint">Visiting club — individual stats aren’t tracked. Series scores above are enough.</p>
+        <p class="muted small se-hint">Visiting club — individual stats aren’t tracked. Scores above are enough.</p>
       </section>`;
     }
 
@@ -369,6 +375,9 @@
     const match = currentMatch();
     const preview = seriesPreview();
     const saved = match ? StatsHub.getResult(match.id) : null;
+    const format = match ? StatsHub.formatForMatch(match) : StatsHub.FORMAT_BO3;
+    const single = format === StatsHub.FORMAT_SINGLE;
+    const scoreCap = StatsHub.gameCap(format);
 
     const noun = DB.season.roundNoun;
     const seasonLocked = !StatsHub.canEditSeason();
@@ -412,29 +421,33 @@
       ${match ? `
       <section class="panel">
         <div class="panel-head">
-          <h3>2 · Series scores</h3>
-          <span class="muted small">Series ${preview.homeScore}–${preview.awayScore} · points ${preview.pointsHome}–${preview.pointsAway}</span>
+          <h3>${single ? '2 · Game score' : '2 · Series scores'}</h3>
+          <span class="muted small">${single
+            ? `Score ${preview.homeScore}–${preview.awayScore}`
+            : `Series ${preview.homeScore}–${preview.awayScore} · points ${preview.pointsHome}–${preview.pointsAway}`}</span>
         </div>
         <div class="se-games">
           ${seriesGames.map((g, i) => `
             <div class="se-game">
-              <span class="se-game-label">Game ${i + 1}</span>
+              <span class="se-game-label">${single ? 'Score' : `Game ${i + 1}`}</span>
               <label>${teamName(match.home)}
-                <input class="input se-score" type="number" min="0" max="5" data-game="${i}" data-side="home" value="${g.home}" />
+                <input class="input se-score" type="number" min="0" max="${scoreCap}" data-game="${i}" data-side="home" value="${g.home}" />
               </label>
               <span class="se-vs">–</span>
               <label>${teamName(match.away)}
-                <input class="input se-score" type="number" min="0" max="5" data-game="${i}" data-side="away" value="${g.away}" />
+                <input class="input se-score" type="number" min="0" max="${scoreCap}" data-game="${i}" data-side="away" value="${g.away}" />
               </label>
             </div>`).join('')}
         </div>
         <div class="se-actions">
-          <button type="button" class="btn" id="se-save-series" disabled>Submit series scores</button>
+          <button type="button" class="btn" id="se-save-series" disabled>${single ? 'Submit score' : 'Submit series scores'}</button>
           <button type="button" class="btn btn-ghost" id="se-clear" disabled>Clear match</button>
         </div>
         <p class="muted small">${saved?.seriesSavedBy
           ? enteredByHtml(saved.seriesSavedBy, saved.seriesSavedAt)
-          : 'Leave unused games blank (e.g. 2–0 series only needs Game 1 &amp; 2).'}</p>
+          : (single
+            ? 'One 30-minute game — enter the final score.'
+            : 'Best of 3 (each game to 5). Leave unused games blank (e.g. 2–0 only needs Game 1 &amp; 2).')}</p>
       </section>
 
       <section class="panel">
@@ -632,9 +645,10 @@
 
     $$('.se-score').forEach((inp) => {
       bindZeroClear(inp, {
-        max: 5,
+        max: scoreCap,
         onCommit: (n) => {
           const i = Number(inp.dataset.game);
+          if (!seriesGames[i]) seriesGames[i] = { home: '', away: '' };
           seriesGames[i][inp.dataset.side] = String(n);
         },
       });
@@ -677,11 +691,12 @@
       try {
         ClaimHub.assertCanEdit(matchId);
         const games = seriesGames.map((g) => ({
-          home: Math.min(5, Math.max(0, Number(g.home) || 0)),
-          away: Math.min(5, Math.max(0, Number(g.away) || 0)),
+          home: Math.min(scoreCap, Math.max(0, Number(g.home) || 0)),
+          away: Math.min(scoreCap, Math.max(0, Number(g.away) || 0)),
         }));
         await StatsHub.saveSeries(matchId, games);
-        setMsg(`Series saved — ${teamName(match.home)} ${preview.homeScore}–${preview.awayScore} ${teamName(match.away)}`, 'ok');
+        const savedPreview = StatsHub.seriesFromGames(games, format);
+        setMsg(`${single ? 'Score' : 'Series'} saved — ${teamName(match.home)} ${savedPreview.homeScore}–${savedPreview.awayScore} ${teamName(match.away)}`, 'ok');
         paint();
       } catch (e) {
         setMsg(e.message || String(e), 'err');

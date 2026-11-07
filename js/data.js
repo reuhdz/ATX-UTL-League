@@ -316,6 +316,7 @@ function buildNationalsSchedule() {
     id: `r1g${i}`, round: 1, date: satDay,
     home: g.home, away: g.away,
     phase: 'regular',
+    format: 'single',
     timeLabel: g.timeLabel,
   }));
 
@@ -360,7 +361,7 @@ function buildNationalsSchedule() {
     },
   ];
   sunday.forEach((g) => matches.push({
-    round: 2, date: sunDay, phase: 'playoff', ...g,
+    round: 2, date: sunDay, phase: 'playoff', format: 'bo3-ft5', ...g,
   }));
   return matches;
 }
@@ -378,7 +379,7 @@ const SEASONS = [
     venue: 'Austin, Texas',
     overviewSub: 'Nov 7–8, 2026 · Austin, Texas · 6-team tournament · Saturday 9 games, Sunday placement games',
     footer: 'Nov 7–8, 2026',
-    scheduleSub: 'Saturday: 9 games, 30 minutes each, 8-minute transitions (warmup 10:00 AM, first game 10:15 AM). Sunday: 48-minute games from 10:15 AM (setup 10:00, cleanup 3:51). QF1 Seed 3 vs 6, QF2 Seed 4 vs 5, then semis, 5th place, bronze, and gold',
+    scheduleSub: 'Saturday: 9 single 30-minute games (one score each), 8-minute transitions (warmup 10:00 AM, first game 10:15 AM). Sunday: best-of-3 placement games (each game to 5) from 10:15 AM (setup 10:00, cleanup 3:51). QF1 Seed 3 vs 6, QF2 Seed 4 vs 5, then semis, 5th place, bronze, and gold',
     roundNoun: 'Day',
     roundAbbr: 'D',
     roundTitles: { 1: 'Saturday, Nov 7 · 10:15 AM–3:49 PM', 2: 'Sunday, Nov 8 · 10:15 AM–3:51 PM' },
@@ -400,9 +401,9 @@ const SEASONS = [
     faqSchedule:
       'UTL Nationals is a 6-team tournament: Lone Starfish, Capybaras and Splash Damage (drafted from the ' +
       'Texas pool) plus SC Guapos, KC Misfits and LSOC, played Nov 7–8, 2026 in Austin, Texas. ' +
-      'Saturday is nine 30-minute games with 8-minute transitions (warmup at 10:00 AM, first game at 10:15 AM, ' +
-      'cleanup at 3:49 PM). Each team plays three (3 points for a win, 1 for a draw). ' +
-      'Sunday games are 48 minutes. Setup is 10:00–10:15 AM. Quarterfinals are Seed 3 vs Seed 6 at 10:15 AM and ' +
+      'Saturday is nine single 30-minute games with 8-minute transitions (warmup at 10:00 AM, first game at 10:15 AM, ' +
+      'cleanup at 3:49 PM). Each team plays three; standings are 3 points for a win, 1 for a draw, from that one game. ' +
+      'Sunday placement matches are best of 3 (each game to 5) in 48-minute slots. Setup is 10:00–10:15 AM. Quarterfinals are Seed 3 vs Seed 6 at 10:15 AM and ' +
       'Seed 4 vs Seed 5 at 11:03 AM. Semifinal 1 is Seed 2 vs the winner of QF1 at 11:51 AM; Semifinal 2 is Seed 1 vs ' +
       'the winner of QF2 at 12:39 PM. 5th place (losers of the quarterfinals) is at 1:27 PM, bronze at 2:15 PM, ' +
       'and the final at 3:03 PM. Cleanup is 3:51–4:00 PM.',
@@ -565,7 +566,16 @@ function playMatch(match) {
 const MATCHES = (() => {
   const sched = SEASON.schedule(SEASON);
   return sched.map((m) =>
-    ({ ...m, status: 'scheduled', homeScore: null, awayScore: null, box: [], homeLineup: [], awayLineup: [] }));
+    ({
+      ...m,
+      format: m.format || 'bo3-ft5',
+      status: 'scheduled',
+      homeScore: null,
+      awayScore: null,
+      box: [],
+      homeLineup: [],
+      awayLineup: [],
+    }));
 })();
 
 /* ---- Availability for the season's game days (season roster only) -------- */
@@ -679,6 +689,14 @@ const DB = {
   matchLabel: (m) => m?.label || null,
 
   isRegular: (m) => (m.phase || 'regular') === 'regular',
+
+  /** 'single' = one game (Nationals Saturday). 'bo3-ft5' = best of 3, each to 5. */
+  matchFormat: (m) => {
+    if (m?.format === 'single' || m?.format === 'bo3-ft5') return m.format;
+    if (SEASON.id === 'nationals' && Number(m?.round) === 1) return 'single';
+    return 'bo3-ft5';
+  },
+  isSingleGame(m) { return this.matchFormat(m) === 'single'; },
 
   /** Regular-season (pool play) standings only — used for playoff seeding. */
   regularStandings() {
@@ -935,8 +953,10 @@ const DB = {
       const p = this.player(playerId);
       const forTeam = m.homeLineup.includes(playerId) ? m.home : m.away;
       const opp = forTeam === m.home ? m.away : m.home;
-      const gf = forTeam === m.home ? m.homeScore : m.awayScore;
-      const ga = forTeam === m.home ? m.awayScore : m.homeScore;
+      const hg = m.pointsHome != null ? m.pointsHome : m.homeScore;
+      const ag = m.pointsAway != null ? m.pointsAway : m.awayScore;
+      const gf = forTeam === m.home ? hg : ag;
+      const ga = forTeam === m.home ? ag : hg;
       const guest = p.teamId === 'fa' || forTeam !== p.teamId;
       log.push({
         matchId: m.id,

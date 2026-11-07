@@ -1,13 +1,13 @@
 /* =============================================================================
-   Stats hub — Firebase live match results (Bo3 first-to-5 + box scores)
+   Stats hub — Firebase live match results (single game or Bo3 first-to-5)
    -----------------------------------------------------------------------------
    Path: /matchResults/{roomId}/{matchId}
    Shape:
      {
        status: 'final',
-       format: 'bo3-ft5',
-       games: [{ home, away }, ...],   // up to 3 games, each first to 5
-       homeScore, awayScore,           // series wins (0–2) — used for W/L
+       format: 'single' | 'bo3-ft5',
+       games: [{ home, away }, ...],   // 1 game (single) or up to 3 (Bo3, each to 5)
+       homeScore, awayScore,           // single: game points; Bo3: series wins (0–2)
        pointsHome, pointsAway,         // sum of game points — used for GF/GA
        homeLineup, awayLineup, box,
        events: [{ id, playerId, type, url, note, createdAt }], // Option A/B clips
@@ -206,7 +206,39 @@ const StatsHub = (() => {
     return Number.isFinite(v) && v >= 0 ? Math.round(v) : fallback;
   }
 
-  function seriesFromGames(games) {
+  const FORMAT_SINGLE = 'single';
+  const FORMAT_BO3 = 'bo3-ft5';
+
+  function isSingleFormat(format) {
+    return format === FORMAT_SINGLE;
+  }
+
+  function formatForMatch(match) {
+    if (typeof window.DB?.matchFormat === 'function') return window.DB.matchFormat(match);
+    if (match?.format === FORMAT_SINGLE || match?.format === FORMAT_BO3) return match.format;
+    return FORMAT_BO3;
+  }
+
+  function formatForMatchId(matchId) {
+    const m = (window.DB?.matches || []).find((x) => x.id === matchId);
+    return formatForMatch(m);
+  }
+
+  function gameCap(format) {
+    return isSingleFormat(format) ? 99 : 5;
+  }
+
+  function slotCount(format) {
+    return isSingleFormat(format) ? 1 : 3;
+  }
+
+  function seriesFromGames(games, format) {
+    if (isSingleFormat(format)) {
+      const g = (games || [])[0] || { home: 0, away: 0 };
+      const h = num(g.home);
+      const a = num(g.away);
+      return { homeScore: h, awayScore: a, pointsHome: h, pointsAway: a };
+    }
     let hw = 0;
     let aw = 0;
     let ph = 0;
@@ -264,12 +296,17 @@ const StatsHub = (() => {
 
   function normalizeResult(raw, matchId) {
     if (!raw || typeof raw !== 'object') return null;
+    const format = (raw.format === FORMAT_SINGLE || raw.format === FORMAT_BO3)
+      ? raw.format
+      : formatForMatchId(matchId);
+    const cap = gameCap(format);
     const games = Array.isArray(raw.games)
       ? raw.games
         .filter((g) => g && (g.home != null || g.away != null))
-        .map((g) => ({ home: Math.min(5, num(g.home)), away: Math.min(5, num(g.away)) }))
+        .slice(0, slotCount(format))
+        .map((g) => ({ home: Math.min(cap, num(g.home)), away: Math.min(cap, num(g.away)) }))
       : [];
-    const derived = seriesFromGames(games);
+    const derived = seriesFromGames(games, format);
     const homeScore = games.length ? derived.homeScore : num(raw.homeScore);
     const awayScore = games.length ? derived.awayScore : num(raw.awayScore);
     const pointsHome = games.length ? derived.pointsHome : num(raw.pointsHome, homeScore);
@@ -283,7 +320,7 @@ const StatsHub = (() => {
     return {
       matchId,
       status: 'final',
-      format: 'bo3-ft5',
+      format,
       games,
       homeScore,
       awayScore,
@@ -521,16 +558,20 @@ const StatsHub = (() => {
     const match = (window.DB?.matches || []).find((m) => m.id === matchId);
     if (!match) throw new Error('Unknown match');
 
+    const format = formatForMatch(match);
+    const cap = gameCap(format);
     const cleaned = (games || [])
-      .map((g) => ({ home: num(g.home), away: num(g.away) }))
+      .slice(0, slotCount(format))
+      .map((g) => ({ home: Math.min(cap, num(g.home)), away: Math.min(cap, num(g.away)) }))
       .filter((g) => g.home > 0 || g.away > 0);
-    if (!cleaned.length) throw new Error('Enter at least one game score');
+    if (!cleaned.length) throw new Error(isSingleFormat(format) ? 'Enter the game score' : 'Enter at least one game score');
 
     const prev = results[matchId] || {};
-    const derived = seriesFromGames(cleaned);
+    const derived = seriesFromGames(cleaned, format);
     const actor = actorFromSession();
     const next = normalizeResult({
       ...prev,
+      format,
       games: cleaned,
       ...derived,
       homeLineup: prev.homeLineup || [],
@@ -553,7 +594,8 @@ const StatsHub = (() => {
 
     const prev = results[matchId] || {};
     if (!prev.games?.length && !payload.allowWithoutSeries) {
-      throw new Error('Submit series scores first');
+      const fmt = formatForMatch(match);
+      throw new Error(isSingleFormat(fmt) ? 'Submit the game score first' : 'Submit series scores first');
     }
 
     const homeLineup = Array.isArray(payload.homeLineup) ? payload.homeLineup.filter(Boolean) : [];
@@ -664,6 +706,8 @@ const StatsHub = (() => {
   return {
     init, onChange, status, getResult, saveSeries, saveBox, clearMatch, clearBox,
     checkMasterPin, canEditSeason, emptyLine, seriesFromGames, fields: STAT_FIELDS,
+    formatForMatch, formatForMatchId, gameCap, slotCount,
+    FORMAT_SINGLE, FORMAT_BO3,
     normalizeUrl, clipsForPlayer, clipCountsForPlayer,
     historyFor, actionLabel, HISTORY_ACTIONS,
   };
