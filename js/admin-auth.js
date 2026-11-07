@@ -2,7 +2,7 @@
    Admin / captain session auth (client-side gate for /admin tools)
    -----------------------------------------------------------------------------
    Captains: username = captain first name, password = team name one word
-   Admin:    username = utladmin, password = utlmaster
+   Admin:    utladmin / utlmaster, or utlatx / utlnationals
    ============================================================================ */
 
 const AdminAuth = (() => {
@@ -17,13 +17,22 @@ const AdminAuth = (() => {
   }
 
   function accounts() {
-    const list = [{
-      role: 'admin',
-      username: 'utladmin',
-      password: 'utlmaster',
-      label: 'League admin',
-      voterKey: 'utladmin',
-    }];
+    const list = [
+      {
+        role: 'admin',
+        username: 'utladmin',
+        password: 'utlmaster',
+        label: 'League admin',
+        voterKey: 'utladmin',
+      },
+      {
+        role: 'admin',
+        username: 'utlatx',
+        password: 'utlnationals',
+        label: 'ATX UTL admin',
+        voterKey: 'utlatx',
+      },
+    ];
     (window.DB?.teams || []).filter((t) => t.captain).forEach((t) => {
       list.push({
         role: 'captain',

@@ -32,12 +32,13 @@ window.DRAFT_CONFIGS = {
     draftOrder: ['tx3', 'tx1', 'tx2'],
     /* Captains are pre-assigned and excluded from the draft pool */
     captainIds: ['river', 'zach', 'reuben'],
-    /* SC Guapos + KC Misfits rosters are set — keep them off the Texas draft */
+    /* Visiting-club rosters are set — keep them off the Texas draft */
     preAssignedIds: [
       'erikflegal', 'aquilaturk', 'chrisemde', 'isaackeohone', 'lanejohnson',
       'matmacdonnell', 'rickyquintero', 'samuelbrooks', 'josecaride',
       'jeremygulley', 'scottstecklein', 'xavierperry', 'elimills', 'nickfisher',
       'graydenpeoples', 'joshpreston', 'israelgulley', 'mikejohnson',
+      'jamest', 'quinn', 'tyler', 'jackb', 'vance', 'levi',
     ],
     turnSeconds: 120, // 2 minutes per pick
     /* Master PIN can pick on any turn */

@@ -218,7 +218,7 @@
         ${seasonHead('Staff login')}
         <section class="panel se-lock">
           <label class="se-pin"><span>Username</span>
-            <input id="ad-user" class="input" autocomplete="username" placeholder="Captain name or utladmin" />
+            <input id="ad-user" class="input" autocomplete="username" placeholder="Captain name, utladmin, or utlatx" />
           </label>
           <label class="se-pin"><span>Password</span>
             <input id="ad-pass" class="input" type="password" autocomplete="current-password" placeholder="Team name (one word) or utlmaster" />
