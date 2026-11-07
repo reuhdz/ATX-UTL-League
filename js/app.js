@@ -2108,7 +2108,7 @@ $('#footer-venue').textContent = DB.league.venue;
 $('#footer-season').textContent = `ATX UTL · ${DB.season.label} · ${DB.season.footer}`;
 document.title = `ATX UTL — ${DB.season.label}`;
 Promise.all([
-  DraftHub.init(), AttendanceHub.init(), StatsHub.init(), HighlightsHub.init(), FilmHub.init(),
+  LeagueHub.init(), DraftHub.init(), AttendanceHub.init(), StatsHub.init(), HighlightsHub.init(), FilmHub.init(),
   ContentionHub.init(), VolunteerHub.init(),
 ]).then(() => {
   try { DB.refreshPlayoffAssignments?.(); } catch (e) { /* ignore */ }
@@ -2119,6 +2119,11 @@ Promise.all([
     // Attendance paints via AttendanceHub — only remount when teams change.
     if (tab === 'teams') go(tab);
     if (tab === 'attendance') go(tab);
+  });
+  LeagueHub.onChange(() => {
+    let tab = 'overview';
+    try { tab = localStorage.getItem('atxutl.tab') || 'overview'; } catch (e) {}
+    if (['overview', 'schedule', 'stats', 'teams', 'attendance', 'draft'].includes(tab)) go(tab);
   });
   // Remount when match results change (ignore connection-only emits).
   let lastStatsResultsSig = null;

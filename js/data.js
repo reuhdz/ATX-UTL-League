@@ -157,6 +157,14 @@ const PLAYERS = [
   { id: 'joshpreston',    name: 'Josh Preston',    teamId: 'fa', skill: 0.50 },
   { id: 'israelgulley',   name: 'Israel Gulley',   teamId: 'fa', skill: 0.50 },
   { id: 'mikejohnson',    name: 'Mike Johnson',    teamId: 'fa', skill: 0.50 },
+
+  // LSOC (Nationals)
+  { id: 'jamest', name: 'James T.', teamId: 'fa', skill: 0.50 },
+  { id: 'quinn',  name: 'Quinn',    teamId: 'fa', skill: 0.50 },
+  { id: 'tyler',  name: 'Tyler',    teamId: 'fa', skill: 0.50 },
+  { id: 'jackb',  name: 'Jack B.',  teamId: 'fa', skill: 0.50 },
+  { id: 'vance',  name: 'Vance',    teamId: 'fa', skill: 0.50 },
+  { id: 'levi',   name: 'Levi',     teamId: 'fa', skill: 0.50 },
 ];
 
 function addDays(iso, days) {
@@ -259,8 +267,8 @@ function buildSeason5Schedule(season) {
 
 /* =============================================================================
    UTL Nationals (current) — 6-team tournament.
-   Texas sends three drafted teams. SC Guapos and KC Misfits bring set rosters
-   (not drafted). LSOC is still a visiting club — series scores only.
+   Texas sends three drafted teams. SC Guapos, KC Misfits, and LSOC bring
+   set rosters (not drafted).
    ============================================================================ */
 const NATIONALS_TEAMS = [
   { id: 'tx1',       name: 'Lone Starfish', color: '#f59e0b', captain: 'Zach',         region: 'TX' },
@@ -268,10 +276,10 @@ const NATIONALS_TEAMS = [
   { id: 'tx3',       name: 'Splash Damage', color: '#ef4444', captain: 'River',        region: 'TX' },
   { id: 'scguapos',  name: 'SC Guapos',     color: '#a855f7', captain: 'Erik Flegal',  region: 'SC' },
   { id: 'kcmisfits', name: 'KC Misfits',    color: '#ec4899', captain: 'Jeremy Gulley', region: 'KC' },
-  { id: 'lsoc',      name: 'LSOC',          color: '#22c55e', visiting: true },
+  { id: 'lsoc',      name: 'LSOC',          color: '#22c55e', captain: 'Vance',        region: 'LS' },
 ];
 
-/* Texas draft pool, plus the locked SC Guapos and KC Misfits rosters. */
+/* Texas draft pool, plus the locked SC Guapos, KC Misfits, and LSOC rosters. */
 const NATIONALS_ROSTER = [
   'sk', 'jacqueline', 'reuben', 'max', 'sage', 'john', 'trevor',
   'glenn', 'bonney', 'lesley', 'zach', 'scheese', 'rich', 'eric',
@@ -280,6 +288,7 @@ const NATIONALS_ROSTER = [
   'matmacdonnell', 'rickyquintero', 'samuelbrooks', 'josecaride',
   'jeremygulley', 'scottstecklein', 'xavierperry', 'elimills', 'nickfisher',
   'graydenpeoples', 'joshpreston', 'israelgulley', 'mikejohnson',
+  'jamest', 'quinn', 'tyler', 'jackb', 'vance', 'levi',
 ];
 
 /* Tournament weekend — Sat Nov 7 (9 games) and Sun Nov 8 (placement games). */
@@ -310,37 +319,42 @@ function buildNationalsSchedule() {
     timeLabel: g.timeLabel,
   }));
 
-  // Sunday: best-of-3 single elimination. Seeds 1 and 2 bye to the semis.
-  // QF1 4v5 10:00, QF2 3v6 10:54, SF1 11:48, break 12:42, SF2 1:00,
-  // bronze 1:54, final 2:48. Latest end 4:42 if every series goes two games.
+  // Sunday: 48-minute games. Setup 10:00–10:15, cleanup 3:51–4:00.
+  // QF1 3v6 10:15, QF2 4v5 11:03, SF1 2 vs W QF1 11:51, SF2 1 vs W QF2 12:39,
+  // 5th L QF1 vs L QF2 1:27, bronze 2:15, final 3:03.
   const sunday = [
     {
-      id: 'r2g0', playoff: 'qf-a', timeLabel: '10:00 AM',
-      home: 'seed:4', away: 'seed:5',
-      label: 'Quarterfinal 1 · Seed 4 vs Seed 5',
-    },
-    {
-      id: 'r2g1', playoff: 'qf-b', timeLabel: '10:54 AM',
+      id: 'r2g0', playoff: 'qf-a', timeLabel: '10:15 AM',
       home: 'seed:3', away: 'seed:6',
-      label: 'Quarterfinal 2 · Seed 3 vs Seed 6',
+      label: 'Quarterfinal 1 · Seed 3 vs Seed 6',
     },
     {
-      id: 'r2g2', playoff: 'semi-a', timeLabel: '11:48 AM',
-      home: 'seed:1', away: 'winner:qf-a',
-      label: 'Semifinal 1 · Seed 1 vs Winner of QF1',
+      id: 'r2g1', playoff: 'qf-b', timeLabel: '11:03 AM',
+      home: 'seed:4', away: 'seed:5',
+      label: 'Quarterfinal 2 · Seed 4 vs Seed 5',
     },
     {
-      id: 'r2g3', playoff: 'semi-b', timeLabel: '1:00 PM',
-      home: 'seed:2', away: 'winner:qf-b',
-      label: 'Semifinal 2 · Seed 2 vs Winner of QF2',
+      id: 'r2g2', playoff: 'semi-a', timeLabel: '11:51 AM',
+      home: 'seed:2', away: 'winner:qf-a',
+      label: 'Semifinal 1 · Seed 2 vs Winner of QF1',
     },
     {
-      id: 'r2g4', playoff: 'consolation', timeLabel: '1:54 PM',
+      id: 'r2g3', playoff: 'semi-b', timeLabel: '12:39 PM',
+      home: 'seed:1', away: 'winner:qf-b',
+      label: 'Semifinal 2 · Seed 1 vs Winner of QF2',
+    },
+    {
+      id: 'r2g4', playoff: 'fifth', timeLabel: '1:27 PM',
+      home: 'loser:qf-a', away: 'loser:qf-b',
+      label: '5th Place · Loser of QF1 vs Loser of QF2',
+    },
+    {
+      id: 'r2g5', playoff: 'consolation', timeLabel: '2:15 PM',
       home: 'loser:semi-a', away: 'loser:semi-b',
       label: 'Bronze',
     },
     {
-      id: 'r2g5', playoff: 'final', timeLabel: '2:48 PM',
+      id: 'r2g6', playoff: 'final', timeLabel: '3:03 PM',
       home: 'winner:semi-a', away: 'winner:semi-b',
       label: 'Championship Final',
     },
@@ -364,10 +378,10 @@ const SEASONS = [
     venue: 'Austin, Texas',
     overviewSub: 'Nov 7–8, 2026 · Austin, Texas · 6-team tournament · Saturday 9 games, Sunday placement games',
     footer: 'Nov 7–8, 2026',
-    scheduleSub: 'Saturday: 9 games, 30 minutes each, 8-minute transitions (warmup 10:00 AM, first game 10:15 AM). Sunday: quarterfinals 4 vs 5 and 3 vs 6 (seeds 1 and 2 get a bye), semis, bronze, and gold',
+    scheduleSub: 'Saturday: 9 games, 30 minutes each, 8-minute transitions (warmup 10:00 AM, first game 10:15 AM). Sunday: 48-minute games from 10:15 AM (setup 10:00, cleanup 3:51). QF1 Seed 3 vs 6, QF2 Seed 4 vs 5, then semis, 5th place, bronze, and gold',
     roundNoun: 'Day',
     roundAbbr: 'D',
-    roundTitles: { 1: 'Saturday, Nov 7 · 10:15 AM–3:49 PM', 2: 'Sunday, Nov 8 · Bracket' },
+    roundTitles: { 1: 'Saturday, Nov 7 · 10:15 AM–3:49 PM', 2: 'Sunday, Nov 8 · 10:15 AM–3:51 PM' },
     teams: NATIONALS_TEAMS,
     rosterIds: NATIONALS_ROSTER,
     baseTeams: {
@@ -378,6 +392,8 @@ const SEASONS = [
       jeremygulley: 'kcmisfits', scottstecklein: 'kcmisfits', xavierperry: 'kcmisfits',
       elimills: 'kcmisfits', nickfisher: 'kcmisfits', graydenpeoples: 'kcmisfits',
       joshpreston: 'kcmisfits', israelgulley: 'kcmisfits', mikejohnson: 'kcmisfits',
+      jamest: 'lsoc', quinn: 'lsoc', tyler: 'lsoc', jackb: 'lsoc',
+      vance: 'lsoc', levi: 'lsoc',
     },
     playoffSeeds: [],
     minNights: 0,
@@ -386,9 +402,10 @@ const SEASONS = [
       'Texas pool) plus SC Guapos, KC Misfits and LSOC, played Nov 7–8, 2026 in Austin, Texas. ' +
       'Saturday is nine 30-minute games with 8-minute transitions (warmup at 10:00 AM, first game at 10:15 AM, ' +
       'cleanup at 3:49 PM). Each team plays three (3 points for a win, 1 for a draw). ' +
-      'Sunday is best-of-3 single elimination. Quarterfinals are Seed 4 vs Seed 5 at 10:00 AM and ' +
-      'Seed 3 vs Seed 6 at 10:54 AM. Seeds 1 and 2 bye into the semifinals (11:48 AM and 1:00 PM). ' +
-      'Bronze is at 1:54 PM and the final is at 2:48 PM.',
+      'Sunday games are 48 minutes. Setup is 10:00–10:15 AM. Quarterfinals are Seed 3 vs Seed 6 at 10:15 AM and ' +
+      'Seed 4 vs Seed 5 at 11:03 AM. Semifinal 1 is Seed 2 vs the winner of QF1 at 11:51 AM; Semifinal 2 is Seed 1 vs ' +
+      'the winner of QF2 at 12:39 PM. 5th place (losers of the quarterfinals) is at 1:27 PM, bronze at 2:15 PM, ' +
+      'and the final at 3:03 PM. Cleanup is 3:51–4:00 PM.',
     schedule: buildNationalsSchedule,
   },
   {
@@ -646,11 +663,11 @@ const DB = {
     if (!id) return 'TBD';
     if (String(id).startsWith('seed:')) return `Seed ${String(id).slice(5)}`;
     if (String(id).startsWith('winner:')) {
-      const slot = { 'qf-a': 'QF1', 'qf-b': 'QF2' }[String(id).slice(7)];
+      const slot = { 'qf-a': 'QF1', 'qf-b': 'QF2', 'semi-a': 'SF1', 'semi-b': 'SF2' }[String(id).slice(7)];
       return slot ? `Winner of ${slot}` : 'Winner TBD';
     }
     if (String(id).startsWith('loser:')) {
-      const slot = { 'semi-a': 'SF1', 'semi-b': 'SF2' }[String(id).slice(6)];
+      const slot = { 'qf-a': 'QF1', 'qf-b': 'QF2', 'semi-a': 'SF1', 'semi-b': 'SF2' }[String(id).slice(6)];
       return slot ? `Loser of ${slot}` : 'Loser TBD';
     }
     return (TEAMS.find((t) => t.id === id) || {}).name || id;
@@ -728,26 +745,31 @@ const DB = {
     const qfB = bySlot['qf-b'];
     const semiA = bySlot['semi-a'];
     const semiB = bySlot['semi-b'];
+    const fifth = bySlot.fifth;
     const final = bySlot.final;
     const consol = bySlot.consolation;
 
     if (qfA || qfB) {
-      // 6-team bracket: 4v5 and 3v6, seeds 1 and 2 bye into the semis.
+      // 6-team bracket: QF1 3v6, QF2 4v5; seeds 1 and 2 bye into the semis.
       if (qfA) {
-        qfA.home = seedOf(4);
-        qfA.away = seedOf(5);
+        qfA.home = seedOf(3);
+        qfA.away = seedOf(6);
       }
       if (qfB) {
-        qfB.home = seedOf(3);
-        qfB.away = seedOf(6);
+        qfB.home = seedOf(4);
+        qfB.away = seedOf(5);
       }
       if (semiA) {
-        semiA.home = seedOf(1);
+        semiA.home = seedOf(2);
         semiA.away = this.playoffWinner(qfA) || 'winner:qf-a';
       }
       if (semiB) {
-        semiB.home = seedOf(2);
+        semiB.home = seedOf(1);
         semiB.away = this.playoffWinner(qfB) || 'winner:qf-b';
+      }
+      if (fifth) {
+        fifth.home = this.playoffLoser(qfA) || 'loser:qf-a';
+        fifth.away = this.playoffLoser(qfB) || 'loser:qf-b';
       }
     } else {
       // 4-team bracket: semis are 1v4 and 2v3.

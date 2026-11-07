@@ -793,6 +793,7 @@
   if (!AdminAuth.requireLogin('../admin/')) return;
 
   Promise.all([
+    LeagueHub.init(),
     DraftHub.init(),
     AttendanceHub.init(),
     StatsHub.init(),

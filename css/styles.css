@@ -729,6 +729,77 @@ a.btn:hover, a.btn:focus { text-decoration: none; color: inherit; }
 .admin-link-list { list-style: none; margin: 0 0 16px; padding: 0; display: flex; flex-direction: column; gap: 10px; }
 .admin-link-list .btn { display: inline-flex; justify-content: center; text-decoration: none; }
 
+.lg-editor .panel-head { margin-bottom: 8px; }
+.lg-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 12px;
+}
+@media (max-width: 800px) {
+  .lg-grid { grid-template-columns: 1fr; }
+}
+.lg-team {
+  margin: 0;
+  padding: 14px;
+  border-radius: var(--radius, 10px);
+  border: 1px solid var(--border);
+  background: var(--surface-2);
+  border-left: 4px solid var(--tc, var(--border));
+}
+.lg-team-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: end;
+  margin-bottom: 8px;
+}
+.lg-team-head label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.lg-roster {
+  list-style: none;
+  margin: 10px 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.lg-roster li {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) minmax(110px, 160px) auto;
+  gap: 8px;
+  align-items: center;
+}
+.lg-cap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .03em;
+  color: var(--text-muted);
+  cursor: pointer;
+  user-select: none;
+}
+.lg-cap input { margin: 0; accent-color: var(--tc, var(--accent, #38bdf8)); }
+@media (max-width: 560px) {
+  .lg-roster li, .lg-team-head { grid-template-columns: 1fr; }
+}
+.lg-add {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+}
+.lg-add .lg-new-name { grid-column: 1; }
+.lg-add .lg-add-new { grid-column: 2; }
+
 .ad-login-wrap {
   display: grid;
   place-items: center;

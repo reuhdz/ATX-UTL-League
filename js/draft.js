@@ -185,6 +185,7 @@ const DraftHub = (() => {
       }
       p.teamId = locked.has(p.id) ? (BASE_TEAMS[p.id] || p.teamId) : 'fa';
     });
+    window.LeagueHub?.reapply?.();
   }
 
   function turnRemainingMs(d = draftState) {
@@ -502,12 +503,20 @@ const DraftHub = (() => {
   }
 
   async function assignTeam(playerId, teamId, opts = {}) {
-    assertWritable();
+    if (opts.admin) {
+      if (!window.AdminAuth?.isAdmin?.()) throw new Error('League admin login required');
+    } else {
+      assertWritable();
+    }
     const validTeam = teamId === 'fa' || (window.DB?.teams || []).some((t) => t.id === teamId);
     if (!validTeam) throw new Error('Unknown team');
     if (!window.DB?.player(playerId)) throw new Error('Unknown player');
 
-    const entry = { teamId, updatedAt: Date.now(), by: opts.fromDraft ? 'draft' : 'form' };
+    const entry = {
+      teamId,
+      updatedAt: Date.now(),
+      by: opts.fromDraft ? 'draft' : (opts.admin ? 'admin' : 'form'),
+    };
     const next = { ...assignments, [playerId]: entry };
 
     if (mode === 'firebase') {
