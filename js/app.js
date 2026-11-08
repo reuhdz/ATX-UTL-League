@@ -396,6 +396,10 @@ function renderDashboard() {
   const leader = DB.awardContenders('rated', 1)[0];
   const topScorer = DB.awardContenders('torpedo', 1)[0];
   const topDefense = DB.awardContenders('glove', 1)[0];
+  const placement = typeof DB.playoffPlacement === 'function' ? DB.playoffPlacement() : [];
+  const championId = typeof DB.champion === 'function' ? DB.champion() : null;
+  const finalMatch = typeof DB.playoffMatch === 'function' ? DB.playoffMatch('final') : null;
+  const nationals = DB.season.id === 'nationals';
 
   const cards = [
     { icon: '🎮', label: 'Matches played', value: finals.length, sub: `${upcoming.length} upcoming` },
@@ -416,11 +420,30 @@ function renderDashboard() {
     },
   ];
 
+  const topPlayersPanel = `
+      <section class="panel">
+        <div class="panel-head">
+          <h3>⭐ Top players ${infoIcon(ratingInfoHtml())}</h3>
+          <button class="text-link" data-goto="teams" data-scroll="#full-roster">View roster →</button>
+        </div>
+        <ul class="leader-list">
+          ${rated.length ? rated.slice(0, 7).map((p, i) => `
+            <li>
+              <span class="lead-rank">${i + 1}</span>
+              <span class="lead-name">${playerLink(p.playerId)}<small>${teamBadge(p.teamId)}</small></span>
+              <span class="lead-stat">${p.goals}G · ${p.assists}A</span>
+              <span class="rating-badge">${p.rating}</span>
+            </li>`).join('') : '<li class="muted">No games played yet. <button class="text-link" data-goto="teams" data-scroll="#full-roster">See roster →</button></li>'}
+        </ul>
+      </section>`;
+
   view.innerHTML = `
     <div class="page-head">
       <h2>${DB.season.label} Overview</h2>
       <p class="muted">${DB.season.overviewSub}</p>
     </div>
+
+    ${finalMatch ? championTileHtml(championId, finalMatch) : ''}
 
     <div class="stat-cards">
       ${cards.map((c) => `
@@ -438,7 +461,7 @@ function renderDashboard() {
     <div class="grid-2">
       <section class="panel">
         <div class="panel-head">
-          <h3>🏆 Standings ${infoIcon(standingsGlossaryHtml())}</h3>
+          <h3>🏆 ${nationals ? 'Saturday standings' : 'Standings'} ${infoIcon(standingsGlossaryHtml())}</h3>
           <span class="muted small">hover ⓘ for columns</span>
         </div>
         <table class="tbl standings">
@@ -458,41 +481,38 @@ function renderDashboard() {
           </tbody>
         </table>
       </section>
-
-      <section class="panel">
-        <div class="panel-head">
-          <h3>⭐ Top players ${infoIcon(ratingInfoHtml())}</h3>
-          <button class="text-link" data-goto="teams" data-scroll="#full-roster">View roster →</button>
-        </div>
-        <ul class="leader-list">
-          ${rated.length ? rated.slice(0, 7).map((p, i) => `
-            <li>
-              <span class="lead-rank">${i + 1}</span>
-              <span class="lead-name">${playerLink(p.playerId)}<small>${teamBadge(p.teamId)}</small></span>
-              <span class="lead-stat">${p.goals}G · ${p.assists}A</span>
-              <span class="rating-badge">${p.rating}</span>
-            </li>`).join('') : '<li class="muted">No games played yet. <button class="text-link" data-goto="teams" data-scroll="#full-roster">See roster →</button></li>'}
-        </ul>
-      </section>
+      ${placement.length ? sundayRankingPanelHtml(placement, nationals) : topPlayersPanel}
     </div>
 
-    <div class="grid-2">
+    ${placement.length ? `<div class="grid-2">${topPlayersPanel}` : '<div class="grid-2">'}
       <section class="panel">
         <div class="panel-head"><h3>🗓️ Next games</h3></div>
         <div class="fixture-list">
           ${sortMatchesByKickoff(upcoming).slice(0, 4).map((m, i) => fixtureRow(m, i)).join('') || `<p class="muted">${DB.season.label} complete.</p>`}
         </div>
       </section>
+      ${placement.length ? '' : `
+      <section class="panel">
+        <div class="panel-head"><h3>📋 Recent results</h3></div>
+        <div class="fixture-list">${finals.length ? [...finals].slice(-4).reverse().map(resultRow).join('') : '<p class="muted">No results yet.</p>'}</div>
+      </section>`}
+    </div>
+
+    ${placement.length ? `
+    <div class="grid-2">
       <section class="panel">
         <div class="panel-head"><h3>📋 Recent results</h3></div>
         <div class="fixture-list">${finals.length ? [...finals].slice(-4).reverse().map(resultRow).join('') : '<p class="muted">No results yet.</p>'}</div>
       </section>
-    </div>
-
+      <section class="panel">
+        <div class="panel-head"><h3>📈 Goals scored by team</h3></div>
+        <div class="chart-wrap"><canvas id="dash-goals"></canvas></div>
+      </section>
+    </div>` : `
     <section class="panel">
       <div class="panel-head"><h3>📈 Goals scored by team</h3></div>
       <div class="chart-wrap"><canvas id="dash-goals"></canvas></div>
-    </section>
+    </section>`}
   `;
 
   ChartHub.bar('dash-goals',
@@ -501,6 +521,62 @@ function renderDashboard() {
       { label: 'Goals for', data: standings.map((s) => s.gf), backgroundColor: standings.map((s) => teamColor(s.teamId)), borderRadius: 6 },
       { label: 'Goals against', data: standings.map((s) => s.ga), backgroundColor: standings.map((s) => teamColor(s.teamId) + '55'), borderRadius: 6 },
     ]);
+}
+
+function championTileHtml(championId, finalMatch) {
+  const crowned = !!championId;
+  const time = finalMatch?.timeLabel || '';
+  const date = finalMatch?.date ? fmtDate(finalMatch.date) : '';
+  const kicker = crowned
+    ? `${DB.season.label} Champion`
+    : 'Championship Final';
+  const name = crowned
+    ? teamPill(championId)
+    : `${teamPill(finalMatch.home)} <em>vs</em> ${teamPill(finalMatch.away)}`;
+  const sub = crowned
+    ? 'Winner of the final'
+    : [date, time].filter(Boolean).join(' · ') || 'Winner TBD';
+  return `
+    <section class="champion-tile${crowned ? ' crowned' : ' pending'}"${crowned ? ` style="--tc:${teamColor(championId)}"` : ''}>
+      <div class="champion-mark">${crowned ? '👑' : '🏆'}</div>
+      <div class="champion-body">
+        <div class="champion-kicker">${kicker}</div>
+        <div class="champion-name">${name}</div>
+        <div class="champion-sub">${sub}</div>
+      </div>
+    </section>`;
+}
+
+function sundayRankingInfoHtml() {
+  return '<b>Sunday ranking</b>' +
+    '<span class="gl">Places come from the bracket: winner of the final is 1st, loser of the final is 2nd, bronze winner 3rd, bronze loser 4th, 5th-place game 5th and 6th.</span>' +
+    '<span class="gl"><b>W–L</b> is Sunday series wins and losses only (Saturday pool play is in the other table).</span>';
+}
+
+function sundayRankingPanelHtml(placement, nationals) {
+  const title = nationals ? 'Sunday ranking' : 'Playoff ranking';
+  return `
+      <section class="panel sunday-rank-panel">
+        <div class="panel-head">
+          <h3>🥇 ${title} ${infoIcon(sundayRankingInfoHtml())}</h3>
+          <span class="muted small">from bracket W/L</span>
+        </div>
+        <table class="tbl standings sunday-rank">
+          <thead><tr>
+            <th>#</th><th>Team</th><th>W</th><th>L</th><th>Finish</th>
+          </tr></thead>
+          <tbody>
+            ${placement.map((s) => `
+              <tr class="${s.place === 1 ? 'champ-row' : ''}${s.teamId ? '' : ' tbd-row'}">
+                <td class="rank">${s.place}</td>
+                <td>${s.teamId ? teamPill(s.teamId) : '<span class="muted">TBD</span>'}</td>
+                <td>${s.w == null ? '—' : s.w}</td>
+                <td>${s.l == null ? '—' : s.l}</td>
+                <td class="finish">${s.finish}</td>
+              </tr>`).join('')}
+          </tbody>
+        </table>
+      </section>`;
 }
 
 function standingsGlossaryHtml() {

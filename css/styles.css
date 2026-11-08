@@ -159,6 +159,44 @@ img, canvas, video, table { max-width: 100%; }
 .stat-label { font-size: 12.5px; color: var(--text-muted); }
 .stat-sub { font-size: 11.5px; color: var(--text-muted); opacity: .85; margin-top: 2px; }
 
+.champion-tile {
+  display: flex; align-items: center; gap: 18px;
+  padding: 20px 24px; margin-bottom: 18px;
+  border-radius: var(--radius);
+  border: 1px solid color-mix(in srgb, #fbbf24 40%, var(--border));
+  background: linear-gradient(135deg, color-mix(in srgb, #fbbf24 14%, var(--surface)), var(--surface-2));
+  box-shadow: var(--shadow);
+}
+.champion-tile.crowned {
+  border-color: color-mix(in srgb, #fbbf24 70%, var(--border));
+  background: linear-gradient(135deg, color-mix(in srgb, var(--tc, #fbbf24) 26%, var(--surface)), var(--surface-2));
+  box-shadow: 0 16px 40px -18px color-mix(in srgb, #fbbf24 55%, transparent);
+}
+.champion-mark {
+  font-size: 42px; line-height: 1;
+  filter: drop-shadow(0 4px 10px rgba(251, 191, 36, .45));
+}
+.champion-kicker {
+  font-size: 12px; font-weight: 700; letter-spacing: .8px;
+  text-transform: uppercase; color: #fbbf24;
+}
+.champion-name {
+  font-size: 26px; font-weight: 800; line-height: 1.15;
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+}
+.champion-name .team-pill { font-size: 16px; }
+.champion-name em { color: var(--text-muted); font-style: normal; font-weight: 600; font-size: 16px; }
+.champion-sub { color: var(--text-muted); font-size: 13px; margin-top: 4px; }
+.sunday-rank { min-width: 300px; }
+.sunday-rank .finish { font-weight: 700; }
+.sunday-rank .champ-row { background: color-mix(in srgb, #fbbf24 12%, transparent); }
+.sunday-rank .tbd-row { opacity: .75; }
+@media (max-width: 640px) {
+  .champion-tile { padding: 16px; gap: 12px; }
+  .champion-mark { font-size: 32px; }
+  .champion-name { font-size: 20px; }
+}
+
 /* ---- Tables -------------------------------------------------------------- */
 .table-scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
 .table-scroll::-webkit-scrollbar { height: 8px; }

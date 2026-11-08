@@ -851,6 +851,72 @@ const DB = {
   finals: () => MATCHES.filter((m) => m.status === 'final'),
   upcoming: () => MATCHES.filter((m) => m.status === 'scheduled'),
 
+  playoffMatch(slot) {
+    return MATCHES.find((m) => m.playoff === slot) || null;
+  },
+  playoffMatches() {
+    return MATCHES.filter((m) => m.playoff);
+  },
+
+  /** Sunday / playoff series W–L for a club (draws ignored). */
+  playoffRecord(teamId) {
+    let w = 0;
+    let l = 0;
+    this.playoffMatches().forEach((m) => {
+      if (m.status !== 'final') return;
+      if (m.home !== teamId && m.away !== teamId) return;
+      if (this.isPlaceholderTeam(m.home) || this.isPlaceholderTeam(m.away)) return;
+      const winner = this.playoffWinner(m);
+      if (!winner) return;
+      if (winner === teamId) w += 1;
+      else l += 1;
+    });
+    return { w, l };
+  },
+
+  champion() {
+    return this.playoffWinner(this.playoffMatch('final'));
+  },
+
+  /**
+   * Placement from the bracket: final, bronze, then 5th-place.
+   * Unknown slots stay in the table as TBD until that match is final.
+   */
+  playoffPlacement() {
+    const final = this.playoffMatch('final');
+    const bronze = this.playoffMatch('consolation');
+    const fifth = this.playoffMatch('fifth');
+    if (!final && !bronze && !fifth && !this.playoffMatch('semi-a')) return [];
+    const row = (place, teamId, finish) => {
+      const known = teamId && !this.isPlaceholderTeam(teamId);
+      const rec = known ? this.playoffRecord(teamId) : null;
+      return {
+        place,
+        teamId: known ? teamId : null,
+        finish,
+        w: rec ? rec.w : null,
+        l: rec ? rec.l : null,
+      };
+    };
+    const rows = [
+      row(1, this.playoffWinner(final), 'Champion'),
+      row(2, this.playoffLoser(final), 'Runner-up'),
+    ];
+    if (bronze) {
+      rows.push(
+        row(3, this.playoffWinner(bronze), 'Bronze'),
+        row(4, this.playoffLoser(bronze), '4th'),
+      );
+    }
+    if (fifth) {
+      rows.push(
+        row(5, this.playoffWinner(fifth), '5th'),
+        row(6, this.playoffLoser(fifth), '6th'),
+      );
+    }
+    return rows;
+  },
+
   /** Regular season / pool play only — playoffs do not affect the table. */
   standings() {
     return this.regularStandings();
