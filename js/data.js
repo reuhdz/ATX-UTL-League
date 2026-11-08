@@ -396,13 +396,17 @@ const SEASONS = [
       jamest: 'lsoc', quinn: 'lsoc', tyler: 'lsoc', jackb: 'lsoc',
       vance: 'lsoc', levi: 'lsoc',
     },
-    playoffSeeds: [],
+    standingsTiebreak: 'h2h',
+    /* Saturday final table: 1 SC Guapos, 2 Lagooners (H2H over Capybaras),
+       3 Capybaras, 4 Soundwave, 5 KC Misfits, 6 LSOC. */
+    playoffSeeds: ['scguapos', 'tx3', 'tx2', 'tx1', 'kcmisfits', 'lsoc'],
     minNights: 0,
     faqSchedule:
       'UTL Nationals is a 6-team tournament: Lone Starfish, Capybaras and Splash Damage (drafted from the ' +
       'Texas pool) plus SC Guapos, KC Misfits and LSOC, played Nov 7–8, 2026 in Austin, Texas. ' +
       'Saturday is nine single 30-minute games with 8-minute transitions (warmup at 10:00 AM, first game at 10:15 AM, ' +
       'cleanup at 3:49 PM). Each team plays three; standings are 3 points for a win, 1 for a draw, from that one game. ' +
+      'If two teams are level on points, the winner of their head-to-head ranks higher, then goal difference, then goals for. ' +
       'Sunday placement matches are best of 3 (each game to 5) in 48-minute slots. Setup is 10:00–10:15 AM. Quarterfinals are Seed 3 vs Seed 6 at 10:15 AM and ' +
       'Seed 4 vs Seed 5 at 11:03 AM. Semifinal 1 is Seed 2 vs the winner of QF1 at 11:51 AM; Semifinal 2 is Seed 1 vs ' +
       'the winner of QF2 at 12:39 PM. 5th place (losers of the quarterfinals) is at 1:27 PM, bronze at 2:15 PM, ' +
@@ -607,7 +611,10 @@ const DB = {
   rating: RATING,
   position: POSITION,
   awards: AWARDS,
-  glossary: STANDINGS_GLOSSARY,
+  glossary: STANDINGS_GLOSSARY.map(([c, d]) =>
+    c === 'Pts' && SEASON.standingsTiebreak === 'h2h'
+      ? [c, 'Points — the ranking total (ties break by head-to-head, then GD, then GF)']
+      : [c, d]),
   teams: TEAMS,
   players: PLAYERS,
   seasonRosterIds: SEASON.rosterIds,
@@ -716,8 +723,27 @@ const DB = {
       else if (m.homeScore < m.awayScore) { a.w++; h.l++; a.pts += 3; }
       else { h.d++; a.d++; h.pts++; a.pts++; }
     });
-    return Object.values(table).sort(
-      (x, y) => y.pts - x.pts || (y.gf - y.ga) - (x.gf - x.ga) || y.gf - x.gf);
+    const h2h = SEASON.standingsTiebreak === 'h2h';
+    return Object.values(table).sort((x, y) =>
+      y.pts - x.pts
+      || (h2h ? this.headToHeadWins(y.teamId, x.teamId) : 0)
+      || (y.gf - y.ga) - (x.gf - x.ga)
+      || y.gf - x.gf);
+  },
+
+  /** Positive if a beat b more often in pool play; 0 if they split, drew, or never met. */
+  headToHeadWins(aId, bId) {
+    let a = 0;
+    let b = 0;
+    this.finals().filter((m) => this.isRegular(m)).forEach((m) => {
+      const pair = (m.home === aId && m.away === bId) || (m.home === bId && m.away === aId);
+      if (!pair) return;
+      if (m.homeScore == null || m.awayScore == null || m.homeScore === m.awayScore) return;
+      const winner = m.homeScore > m.awayScore ? m.home : m.away;
+      if (winner === aId) a += 1;
+      else if (winner === bId) b += 1;
+    });
+    return a - b;
   },
 
   playoffWinner(m) {

@@ -821,7 +821,7 @@ function renderStats() {
         <div class="index-col">
           <h4>Team &amp; standings</h4>
           <dl>${DB.glossary.map(([k, d]) => `<dt><span class="ix-key">${k}</span></dt><dd>${d}.</dd>`).join('')}
-            <dt><span class="ix-key">Win pts</span></dt><dd>Win = 3, Draw = 1, Loss = 0. Standings sort by Pts, then GD, then GF.</dd>
+            <dt><span class="ix-key">Win pts</span></dt><dd>Win = 3, Draw = 1, Loss = 0. Standings sort by Pts, then ${DB.season.standingsTiebreak === 'h2h' ? 'head-to-head, then GD, then GF' : 'GD, then GF'}.</dd>
           </dl>
         </div>
       </div>
